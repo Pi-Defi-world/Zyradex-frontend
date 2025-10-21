@@ -102,7 +102,7 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen premium-gradient">
       <div className="container mx-auto px-4 pt-24 pb-12">
         {/* Search and Actions */}
         <div className="flex flex-col md:flex-row gap-4 mb-3">

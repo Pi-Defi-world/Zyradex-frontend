@@ -10,20 +10,20 @@
   --card-foreground: oklch(0.15 0.02 264);
   --popover: oklch(0.99 0.005 264);
   --popover-foreground: oklch(0.15 0.02 264);
-  --primary: oklch(0.55 0.15 150);
+  --primary: hsl(142, 76%, 36%);
   --primary-foreground: oklch(0.99 0.005 264);
   --secondary: oklch(0.65 0.18 45);
   --secondary-foreground: oklch(0.15 0.02 264);
   --muted: oklch(0.95 0.01 264);
   --muted-foreground: oklch(0.5 0.02 264);
-  --accent: oklch(0.6 0.15 150);
+  --accent: hsl(142, 76%, 36%);
   --accent-foreground: oklch(0.99 0.005 264);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.99 0.005 264);
   --border: oklch(0.9 0.01 264);
   --input: oklch(0.9 0.01 264);
-  --ring: oklch(0.55 0.15 150);
-  --chart-1: oklch(0.55 0.15 150);
+  --ring: hsl(142, 76%, 36%);
+  --chart-1: hsl(142, 76%, 36%);
   --chart-2: oklch(0.65 0.18 45);
   --chart-3: oklch(0.5 0.15 160);
   --chart-4: oklch(0.6 0.2 320);
@@ -31,48 +31,56 @@
   --radius: 0.5rem;
   --sidebar: oklch(0.99 0.005 264);
   --sidebar-foreground: oklch(0.15 0.02 264);
-  --sidebar-primary: oklch(0.55 0.15 150);
+  --sidebar-primary: hsl(142, 76%, 36%);
   --sidebar-primary-foreground: oklch(0.99 0.005 264);
   --sidebar-accent: oklch(0.95 0.01 264);
   --sidebar-accent-foreground: oklch(0.15 0.02 264);
   --sidebar-border: oklch(0.9 0.01 264);
-  --sidebar-ring: oklch(0.55 0.15 150);
+  --sidebar-ring: hsl(142, 76%, 36%);
+  
+  /* Custom vibrant green variables for consistent usage */
+  --green-primary: hsl(142, 76%, 36%);
+  --green-secondary: hsl(142, 76%, 42%);
+  --green-tertiary: hsl(142, 76%, 48%);
+  --green-light: hsl(142, 76%, 52%);
+  --green-dark: hsl(142, 76%, 30%);
+  --green-darker: hsl(142, 76%, 24%);
 }
 
-/* Updated to exact pump.fun colors: bg #15161b, button #84efaa, text #9ba2ae */
+/* Premium Raydium-inspired dark theme with gradient backgrounds */
 .dark {
-  --background: #15161b;
-  --foreground: #9ba2ae;
-  --card: #1c1d24;
-  --card-foreground: #9ba2ae;
-  --popover: #1c1d24;
-  --popover-foreground: #9ba2ae;
-  --primary: #84efaa;
-  --primary-foreground: #15161b;
-  --secondary: #2a2b33;
-  --secondary-foreground: #9ba2ae;
-  --muted: #1c1d24;
-  --muted-foreground: #6b7280;
-  --accent: #84efaa;
-  --accent-foreground: #15161b;
+  --background: #0a0a0b;
+  --foreground: #e4e4e7;
+  --card: #111113;
+  --card-foreground: #e4e4e7;
+  --popover: #111113;
+  --popover-foreground: #e4e4e7;
+  --primary: hsl(142, 76%, 36%);
+  --primary-foreground: #0a0a0b;
+  --secondary: #1a1a1d;
+  --secondary-foreground: #e4e4e7;
+  --muted: #111113;
+  --muted-foreground: #71717a;
+  --accent: hsl(142, 76%, 36%);
+  --accent-foreground: #0a0a0b;
   --destructive: #ef4444;
-  --destructive-foreground: #9ba2ae;
-  --border: #2a2b33;
-  --input: #1c1d24;
-  --ring: #84efaa;
-  --chart-1: #84efaa;
+  --destructive-foreground: #e4e4e7;
+  --border: #1a1a1d;
+  --input: #111113;
+  --ring: hsl(142, 76%, 36%);
+  --chart-1: hsl(142, 76%, 36%);
   --chart-2: #60a5fa;
   --chart-3: #a78bfa;
   --chart-4: #f472b6;
   --chart-5: #fbbf24;
-  --sidebar: #15161b;
-  --sidebar-foreground: #9ba2ae;
-  --sidebar-primary: #84efaa;
-  --sidebar-primary-foreground: #15161b;
-  --sidebar-accent: #1c1d24;
-  --sidebar-accent-foreground: #9ba2ae;
-  --sidebar-border: #2a2b33;
-  --sidebar-ring: #84efaa;
+  --sidebar: #0a0a0b;
+  --sidebar-foreground: #e4e4e7;
+  --sidebar-primary: hsl(142, 76%, 36%);
+  --sidebar-primary-foreground: #0a0a0b;
+  --sidebar-accent: #111113;
+  --sidebar-accent-foreground: #e4e4e7;
+  --sidebar-border: #1a1a1d;
+  --sidebar-ring: hsl(142, 76%, 36%);
 }
 
 @theme inline {
@@ -123,17 +131,72 @@
   body {
     @apply bg-background text-foreground;
   }
+  
+  /* Premium gradient backgrounds inspired by Raydium */
+  .dark body {
+    background: linear-gradient(135deg, 
+      #0a0a0b 0%, 
+      #0d0d0f 25%, 
+      #0a0a0b 50%, 
+      #0c0c0e 75%, 
+      #0a0a0b 100%
+    );
+    background-attachment: fixed;
+  }
+  
+  /* Enhanced gradient backgrounds for pages */
+  .premium-gradient {
+    background: linear-gradient(135deg, 
+      #ffffff 0%, 
+      #f8fafc 25%, 
+      #f1f5f9 50%, 
+      #e2e8f0 75%, 
+      #cbd5e1 100%
+    );
+  }
+  
+  .dark .premium-gradient {
+    background: linear-gradient(135deg, 
+      #0a0a0b 0%, 
+      #0d0d0f 20%, 
+      #111113 40%, 
+      #0c0c0e 60%, 
+      #0a0a0b 80%, 
+      #080809 100%
+    );
+  }
+  
+  /* Card gradient overlays */
+  .card-gradient {
+    background: linear-gradient(135deg, 
+      rgba(255, 255, 255, 0.05) 0%, 
+      rgba(255, 255, 255, 0.02) 100%
+    );
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  
+  .dark .card-gradient {
+    background: linear-gradient(135deg, 
+      rgba(0, 0, 0, 0.3) 0%, 
+      rgba(0, 0, 0, 0.1) 100%
+    );
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
 }
 
 /* Custom glassmorphism effect */
 .glass {
   background: rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .dark .glass {
   background: rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
