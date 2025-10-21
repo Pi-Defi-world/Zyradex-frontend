@@ -1,12 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { DashboardLayout } from "@/components/dashboard-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ArrowDown, Settings, Info } from "lucide-react"
+import { ArrowDown, Settings, Info, ArrowLeftRight } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
@@ -32,8 +31,9 @@ export default function SwapPage() {
   }
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6 max-w-2xl mx-auto">
+    <div className="min-h-screen bg-background pt-16 pb-20">
+      <div className="container mx-auto px-4 py-6">
+        <div className="space-y-6 max-w-2xl mx-auto">
         <div className="flex items-center justify-end">
           <Button variant="outline" size="icon">
             <Settings className="h-4 w-4" />
@@ -168,7 +168,8 @@ export default function SwapPage() {
             </div>
           </CardContent>
         </Card>
+        </div>
       </div>
-    </DashboardLayout>
+    </div>
   )
 }

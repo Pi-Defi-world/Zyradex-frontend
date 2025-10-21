@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { DashboardLayout } from "@/components/dashboard-layout"
 import { TokenCard } from "@/components/token-card"
 import { TransactionHistory } from "@/components/transaction-history"
 import { ActivityChart } from "@/components/activity-chart"
@@ -26,94 +25,96 @@ export default function DashboardPage() {
   ]
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        {/* Stats Grid */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {stats.map((stat) => (
-            <Card key={stat.label}>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">{stat.label}</CardTitle>
-                <stat.icon className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stat.value}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  <span className="text-primary">{stat.change}</span> from last month
-                </p>
-              </CardContent>
-            </Card>
-          ))}
+    <div className="min-h-screen bg-background pt-16 pb-20">
+      <div className="container mx-auto px-4 py-6">
+        <div className="space-y-6">
+          {/* Stats Grid */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {stats.map((stat) => (
+              <Card key={stat.label}>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">{stat.label}</CardTitle>
+                  <stat.icon className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stat.value}</div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    <span className="text-primary">{stat.change}</span> from last month
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
+              <CardDescription>Perform common tasks</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Link href="/mint">
+                  <Button className="w-full h-20 text-lg" size="lg">
+                    <Coins className="mr-2 h-5 w-5" />
+                    Mint Token
+                  </Button>
+                </Link>
+                <Link href="/liquidity">
+                  <Button className="w-full h-20 text-lg bg-transparent" size="lg" variant="outline">
+                    <Droplets className="mr-2 h-5 w-5" />
+                    Create Liquidity Pool
+                  </Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Token Balances */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Token Balances</CardTitle>
+              <CardDescription>Your connected wallet balances</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {balances.map((token) => (
+                  <TokenCard key={token.symbol} {...token} />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Activity Section */}
+          <Tabs defaultValue="chart" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="chart">Activity Chart</TabsTrigger>
+              <TabsTrigger value="history">Transaction History</TabsTrigger>
+            </TabsList>
+            <TabsContent value="chart" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recent Activity</CardTitle>
+                  <CardDescription>Your transaction volume over time</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ActivityChart />
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="history" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Transaction History</CardTitle>
+                  <CardDescription>All your recent transactions</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <TransactionHistory />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>Perform common tasks</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-2">
-              <Link href="/mint">
-                <Button className="w-full h-20 text-lg" size="lg">
-                  <Coins className="mr-2 h-5 w-5" />
-                  Mint Token
-                </Button>
-              </Link>
-              <Link href="/liquidity">
-                <Button className="w-full h-20 text-lg bg-transparent" size="lg" variant="outline">
-                  <Droplets className="mr-2 h-5 w-5" />
-                  Create Liquidity Pool
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Token Balances */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Token Balances</CardTitle>
-            <CardDescription>Your connected wallet balances</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {balances.map((token) => (
-                <TokenCard key={token.symbol} {...token} />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Activity Section */}
-        <Tabs defaultValue="chart" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="chart">Activity Chart</TabsTrigger>
-            <TabsTrigger value="history">Transaction History</TabsTrigger>
-          </TabsList>
-          <TabsContent value="chart" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
-                <CardDescription>Your transaction volume over time</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ActivityChart />
-              </CardContent>
-            </Card>
-          </TabsContent>
-          <TabsContent value="history" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Transaction History</CardTitle>
-                <CardDescription>All your recent transactions</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <TransactionHistory />
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
       </div>
-    </DashboardLayout>
+    </div>
   )
 }

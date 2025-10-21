@@ -5,7 +5,7 @@ import type React from "react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
-import { LayoutDashboard, Droplets, Settings, Menu, Moon, Sun, Wallet, X, Coins, ArrowLeftRight } from "lucide-react"
+import { LayoutDashboard, Droplets, Settings, Menu, Moon, Sun, Wallet, X, Coins, ArrowLeftRight, User } from "lucide-react"
 import { useTheme } from "next-themes"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -17,8 +17,7 @@ const navigation = [
   { name: "Mint", href: "/mint", icon: Coins },
   { name: "Swap", href: "/swap", icon: ArrowLeftRight },
   { name: "Liquidity", href: "/liquidity", icon: Droplets },
-  { name: "My Tokens", href: "/my-tokens", icon: Wallet },
-  { name: "Settings", href: "/settings", icon: Settings },
+  { name: "Profile", href: "/profile", icon: User },
 ]
 
 const userTokens = [

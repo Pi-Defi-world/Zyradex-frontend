@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect } from "react"
-import { DashboardLayout } from "@/components/dashboard-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -19,8 +18,9 @@ export default function MyTokensPage() {
   }, [dispatch])
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <div className="min-h-screen bg-background pt-16 pb-20">
+      <div className="container mx-auto px-4 py-6">
+        <div className="space-y-6">
 
         {loading && (
           <div className="flex items-center justify-center py-12">
@@ -108,7 +108,8 @@ export default function MyTokensPage() {
             )
           })}
         </div>
+        </div>
       </div>
-    </DashboardLayout>
+    </div>
   )
 }
