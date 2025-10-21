@@ -8,14 +8,16 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { useLogger } from "@/hooks/use-logger"
-import { Loader2 } from "lucide-react"
+import { Loader2, Wallet } from "lucide-react"
 import { useAppDispatch } from "@/lib/store/hooks"
 import { mintToken } from "@/lib/store/slices/tokensSlice"
+import { usePi } from "@/components/providers/pi-provider"
 
 export function MintForm() {
   const { toast } = useToast()
   const { addLog } = useLogger()
   const [loading, setLoading] = useState(false)
+  const [authLoading, setAuthLoading] = useState(false)
   const [formData, setFormData] = useState({
     issuerSecret: "",
     distributorPub: "",
@@ -26,6 +28,7 @@ export function MintForm() {
   const [assetCodeError, setAssetCodeError] = useState("")
 
   const dispatch = useAppDispatch()
+  const { user, isAuthenticated, authenticate, createPayment } = usePi()
 
   const validateAssetCode = (value: string): string => {
     if (!value) {

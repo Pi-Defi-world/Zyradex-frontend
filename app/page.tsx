@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation"
 import { useAppDispatch, useAppSelector } from "@/lib/store/hooks"
 import { fetchTokens, fetchTrendingTokens, setSearchQuery as setTokenSearchQuery } from "@/lib/store/slices/tokensSlice"
 import { fetchPools, setSearchQuery as setPoolSearchQuery } from "@/lib/store/slices/liquidityPoolsSlice"
+import { usePi } from "@/components/providers/pi-provider"
 
 type SearchType = "tokens" | "pools"
 
@@ -24,6 +25,7 @@ export default function LandingPage() {
   const { toast } = useToast()
   const router = useRouter()
   const dispatch = useAppDispatch()
+  const { user, isAuthenticated, authenticate, createPayment } = usePi()
 
   const {
     tokens,
@@ -60,7 +62,7 @@ export default function LandingPage() {
   }, [searchInput, searchType, dispatch, tokenSearchQuery, poolSearchQuery])
 
   const handleMintClick = () => {
-    if (!isConnected) {
+    if (!isConnected && !isAuthenticated) {
       setWalletModalOpen(true)
     } else {
       router.push("/mint")
@@ -78,6 +80,7 @@ export default function LandingPage() {
       router.push("/dashboard")
     }, 500)
   }
+
 
   const handleLoadMoreTokens = () => {
     if (!tokensLoading && hasMore) {
@@ -100,7 +103,7 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar isConnected={isConnected} onConnect={() => setWalletModalOpen(true)} />
+      <Navbar isConnected={isConnected || isAuthenticated} onConnect={() => setWalletModalOpen(true)} />
 
       <div className="container mx-auto px-4 pt-24 pb-12">
         {/* Search and Actions */}
