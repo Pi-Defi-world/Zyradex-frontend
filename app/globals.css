@@ -45,6 +45,10 @@
   --green-light: hsl(142, 76%, 52%);
   --green-dark: hsl(142, 76%, 30%);
   --green-darker: hsl(142, 76%, 24%);
+  
+  /* Premium gradient classes for buttons */
+  --gradient-primary: linear-gradient(to right, hsl(142, 76%, 36%), hsl(142, 76%, 42%));
+  --gradient-primary-hover: linear-gradient(to right, hsl(142, 76%, 30%), hsl(142, 76%, 36%));
 }
 
 /* Premium Raydium-inspired dark theme with gradient backgrounds */
@@ -81,6 +85,10 @@
   --sidebar-accent-foreground: #e4e4e7;
   --sidebar-border: #1a1a1d;
   --sidebar-ring: hsl(142, 76%, 36%);
+  
+  /* Premium gradient classes for buttons (same in dark mode) */
+  --gradient-primary: linear-gradient(to right, hsl(142, 76%, 36%), hsl(142, 76%, 42%));
+  --gradient-primary-hover: linear-gradient(to right, hsl(142, 76%, 30%), hsl(142, 76%, 36%));
 }
 
 @theme inline {
@@ -199,4 +207,22 @@
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Premium gradient button classes */
+.btn-gradient-primary {
+  background: var(--gradient-primary);
+  color: white;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.btn-gradient-primary:hover {
+  background: var(--gradient-primary-hover);
+  transform: scale(1.02);
+  box-shadow: 0 10px 25px -5px rgba(34, 197, 94, 0.25);
+}
+
+.btn-gradient-primary:active {
+  transform: scale(0.98);
 }

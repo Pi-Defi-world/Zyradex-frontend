@@ -156,7 +156,7 @@ const ProfilePage: React.FC = () => {
   ]
 
   return (
-    <div className="min-h-screen bg-background p-3 pb-20 sm:p-4">
+    <div className="min-h-screen premium-gradient pt-16 pb-20 p-3 sm:p-4">
       <div className="max-w-md mx-auto">
         <div className="mb-4 sm:mb-6 flex items-center justify-between">
           <h1 className="text-xl sm:text-2xl font-bold text-foreground">Profile</h1>
@@ -223,7 +223,7 @@ const ProfilePage: React.FC = () => {
               <Button
                 variant="outline"
                 onClick={() => setShowCollectWallet(true)}
-                className="w-full"
+                className="w-full btn-gradient-primary"
               >
                 <Wallet className="mr-2 h-4 w-4" />
                 Enter Wallet Address

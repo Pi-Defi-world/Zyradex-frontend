@@ -34,7 +34,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pt-16 pb-20">
+    <div className="min-h-screen premium-gradient pt-16 pb-20">
       <div className="container mx-auto px-4 py-6">
         <div className="space-y-6">
 
@@ -66,7 +66,7 @@ export default function SettingsPage() {
               <Label htmlFor="email">Email</Label>
               <Input id="email" type="email" placeholder="Enter email" defaultValue="user@example.com" />
             </div>
-            <Button>Save Changes</Button>
+            <Button className="btn-gradient-primary">Save Changes</Button>
           </CardContent>
         </Card>
 
@@ -126,7 +126,7 @@ export default function SettingsPage() {
               <Label htmlFor="new-password">New Password</Label>
               <Input id="new-password" type="password" placeholder="Enter new password" />
             </div>
-            <Button>Update Password</Button>
+            <Button className="btn-gradient-primary">Update Password</Button>
           </CardContent>
         </Card>
 

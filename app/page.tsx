@@ -144,7 +144,7 @@ export default function LandingPage() {
           </div>
           <Button
             size="sm"
-            className="  bg-primary text-primary-foreground hover:bg-primary/90 font-semibold self-end"
+            className="btn-gradient-primary font-semibold self-end"
             onClick={handleMintClick}
           >
             <Plus className="mr-2 h-4 w-4" />

@@ -230,7 +230,7 @@ export function SwapCard() {
 
           {/* CTA Button */}
           <Button
-            className="w-full h-12 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-semibold shadow-lg hover:shadow-green-500/25 hover:scale-[1.02] transition-all duration-200"
+            className="w-full h-12 btn-gradient-primary font-semibold shadow-lg"
             onClick={isAuthenticated ? handleSwap : handleConnectWallet}
             disabled={isLoading}
           >

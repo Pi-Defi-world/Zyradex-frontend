@@ -18,7 +18,7 @@ export default function MyTokensPage() {
   }, [dispatch])
 
   return (
-    <div className="min-h-screen bg-background pt-16 pb-20">
+    <div className="min-h-screen premium-gradient pt-16 pb-20">
       <div className="container mx-auto px-4 py-6">
         <div className="space-y-6">
 
@@ -99,7 +99,7 @@ export default function MyTokensPage() {
                   </div>
 
                   {remaining > 0 && (
-                    <Button className="w-full" size="sm">
+                    <Button className="w-full btn-gradient-primary" size="sm">
                       Mint Remaining
                     </Button>
                   )}

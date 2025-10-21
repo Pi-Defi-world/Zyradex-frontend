@@ -25,7 +25,7 @@ export default function DashboardPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-background pt-16 pb-20">
+    <div className="min-h-screen premium-gradient pt-16 pb-20">
       <div className="container mx-auto px-4 py-6">
         <div className="space-y-6">
           {/* Stats Grid */}
@@ -54,7 +54,7 @@ export default function DashboardPage() {
             <CardContent>
               <div className="grid gap-4 md:grid-cols-2">
                 <Link href="/mint">
-                  <Button className="w-full h-20 text-lg" size="lg">
+                  <Button className="w-full h-20 text-lg btn-gradient-primary" size="lg">
                     <Coins className="mr-2 h-5 w-5" />
                     Mint Token
                   </Button>

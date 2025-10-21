@@ -92,13 +92,13 @@ export default function LiquidityPage() {
   const totalVolume = displayPools.reduce((sum, pool) => sum + pool.volume24h, 0)
 
   return (
-    <div className="min-h-screen bg-background pt-16 pb-20">
+    <div className="min-h-screen premium-gradient pt-16 pb-20">
       <div className="container mx-auto px-4 py-6">
         <div className="space-y-6">
         <div className="flex items-center justify-end">
           <Dialog>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="btn-gradient-primary">
                 <Plus className="mr-2 h-4 w-4" />
                 Create Pool
               </Button>
@@ -129,7 +129,7 @@ export default function LiquidityPage() {
                     <Input id="amount2" type="number" placeholder="0.00" />
                   </div>
                 </div>
-                <Button type="submit" className="w-full">
+                <Button type="submit" className="w-full btn-gradient-primary">
                   Create Pool
                 </Button>
               </form>
@@ -255,7 +255,7 @@ export default function LiquidityPage() {
                             <Label>{pool.tokenB.symbol} Amount</Label>
                             <Input type="number" placeholder="0.00" />
                           </div>
-                          <Button type="submit" className="w-full">
+                          <Button type="submit" className="w-full btn-gradient-primary">
                             Add Liquidity
                           </Button>
                         </form>
