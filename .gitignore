@@ -12,6 +12,9 @@
 /md
 ./md
 .md
+.guide
+./guide
+/guide
 
 # debug
 npm-debug.log*

@@ -1,5 +1,5 @@
 {
-  "name": "my-v0-project",
+  "name": "Pi-defi-world",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -69,7 +69,9 @@
     "use-sync-external-store": "latest",
     "vaul": "^0.9.9",
     "zod": "3.25.67",
-    "zustand": "latest"
+    "zustand": "latest",
+    "@stellar/stellar-sdk": "^12.0.0",
+    "stellar-hd-wallet": "^1.0.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.9",
