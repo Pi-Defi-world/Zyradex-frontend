@@ -4,14 +4,13 @@ import type React from "react"
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
 import { LayoutDashboard, Droplets, Settings, Menu, Moon, Sun, Wallet, X, Coins, ArrowLeftRight } from "lucide-react"
 import { useTheme } from "next-themes"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { LoggerConsole } from "@/components/logger-console"
-import { ConnectWalletModal } from "@/components/connect-wallet-modal"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -32,7 +31,6 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { theme, setTheme } = useTheme()
   const pathname = usePathname()
   const [showLogger, setShowLogger] = useState(false)
-  const [showWalletModal, setShowWalletModal] = useState(false)
 
   const Sidebar = ({ mobile = false }: { mobile?: boolean }) => (
     <div className="flex flex-col h-full">
@@ -41,7 +39,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
             <span className="text-white font-bold text-lg">π</span>
           </div>
-          <span className="font-bold text-xl">Pi DeFi</span>
+          <span className="font-bold text-xl">BINGEPi</span>
         </Link>
       </div>
 
@@ -63,14 +61,6 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       </nav>
 
       <div className="p-4 border-t border-border space-y-2">
-        <Button
-          variant="outline"
-          className="w-full justify-start bg-transparent"
-          onClick={() => setShowWalletModal(true)}
-        >
-          <Wallet className="mr-2 h-4 w-4" />
-          Connect Wallet
-        </Button>
         <Button
           variant="ghost"
           className="w-full justify-start"
@@ -101,6 +91,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="p-0 w-64">
+              <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
               <Sidebar mobile />
             </SheetContent>
           </Sheet>
@@ -109,7 +100,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
               <span className="text-white font-bold text-lg">π</span>
             </div>
-            <span className="font-bold text-xl">Pi DeFi</span>
+            <span className="font-bold text-xl">BINGEPi</span>
           </Link>
 
           <Button variant="ghost" size="icon" onClick={() => setShowLogger(!showLogger)}>
@@ -138,9 +129,6 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         </div>
         <LoggerConsole />
       </div>
-
-      {/* Connect Wallet Modal */}
-      <ConnectWalletModal open={showWalletModal} onOpenChange={setShowWalletModal} />
     </div>
   )
 }

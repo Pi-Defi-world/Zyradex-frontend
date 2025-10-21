@@ -5,6 +5,7 @@ import { GeistMono } from "geist/font/mono"
 import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from "@/components/ui/toaster"
 import { ThemeProvider } from "@/components/theme-provider"
+import { Navbar } from "@/components/navbar"
 import { Suspense } from "react"
 import { PiProvider } from "@/components/providers/pi-provider"
 import { Providers } from "@/lib/providers"
@@ -24,7 +25,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
+      <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} pb-20 lg:pb-0`}>
         <Script src="https://sdk.minepi.com/pi-sdk.js" strategy="beforeInteractive" />
         <Script id="pi-init" strategy="afterInteractive">
           {`
@@ -44,6 +45,7 @@ export default function RootLayout({
           <PiProvider>
             <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
               <Suspense fallback={null}>
+                <Navbar />
                 {children}
                 <Toaster />
               </Suspense>

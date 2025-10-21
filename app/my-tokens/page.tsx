@@ -5,7 +5,7 @@ import { DashboardLayout } from "@/components/dashboard-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Wallet, Loader2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { useAppDispatch, useAppSelector } from "@/lib/store/hooks"
 import { fetchMyTokens } from "@/lib/store/slices/myTokensSlice"
 import { Progress } from "@/components/ui/progress"
@@ -21,13 +21,6 @@ export default function MyTokensPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Wallet className="h-8 w-8" />
-            My Tokens
-          </h1>
-          <p className="text-muted-foreground mt-1">Manage your minted tokens</p>
-        </div>
 
         {loading && (
           <div className="flex items-center justify-center py-12">

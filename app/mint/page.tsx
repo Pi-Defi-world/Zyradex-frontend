@@ -3,7 +3,7 @@
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { MintForm } from "@/components/forms/mint-form"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Coins, Info } from "lucide-react"
+import { Info } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function MintPage() {
@@ -11,14 +11,6 @@ export default function MintPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-2xl mx-auto">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Coins className="h-8 w-8" />
-            Mint Token
-          </h1>
-          <p className="text-muted-foreground mt-1">Create and distribute new tokens on Pi Network</p>
-        </div>
-
         <Alert>
           <Info className="h-4 w-4" />
           <AlertDescription>

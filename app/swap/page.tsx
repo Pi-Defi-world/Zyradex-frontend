@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ArrowLeftRight, ArrowDown, Settings, Info } from "lucide-react"
+import { ArrowDown, Settings, Info } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
@@ -34,14 +34,7 @@ export default function SwapPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-2xl mx-auto">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <ArrowLeftRight className="h-8 w-8" />
-              Swap Tokens
-            </h1>
-            <p className="text-muted-foreground mt-1">Exchange tokens instantly</p>
-          </div>
+        <div className="flex items-center justify-end">
           <Button variant="outline" size="icon">
             <Settings className="h-4 w-4" />
           </Button>

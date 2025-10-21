@@ -4,10 +4,9 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Search, Plus, TrendingUp, Droplets, Loader2, Coins } from "lucide-react"
-import { Navbar } from "@/components/navbar"
-import { ConnectWalletModal } from "@/components/connect-wallet-modal"
 import { TokenCard } from "@/components/token-card"
 import { LiquidityPoolCard } from "@/components/liquidity-pool-card"
+import { DisclaimerPopup } from "@/components/disclaimer-popup"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { useAppDispatch, useAppSelector } from "@/lib/store/hooks"
@@ -18,10 +17,9 @@ import { usePi } from "@/components/providers/pi-provider"
 type SearchType = "tokens" | "pools"
 
 export default function LandingPage() {
-  const [walletModalOpen, setWalletModalOpen] = useState(false)
-  const [isConnected, setIsConnected] = useState(false)
   const [searchInput, setSearchInput] = useState("")
   const [searchType, setSearchType] = useState<SearchType>("tokens")
+  const [disclaimerOpen, setDisclaimerOpen] = useState(false)
   const { toast } = useToast()
   const router = useRouter()
   const dispatch = useAppDispatch()
@@ -46,6 +44,11 @@ export default function LandingPage() {
     dispatch(fetchPools({ limit: 12 }))
     dispatch(fetchTrendingTokens({ limit: 12 }))
 
+    // Check if disclaimer has been accepted before
+    const disclaimerAccepted = localStorage.getItem('bingepi-disclaimer-accepted')
+    if (!disclaimerAccepted) {
+      setDisclaimerOpen(true)
+    }
   }, [dispatch])
 
 
@@ -62,23 +65,20 @@ export default function LandingPage() {
   }, [searchInput, searchType, dispatch, tokenSearchQuery, poolSearchQuery])
 
   const handleMintClick = () => {
-    if (!isConnected && !isAuthenticated) {
-      setWalletModalOpen(true)
+    if (!isAuthenticated) {
+      toast({
+        title: "Authentication Required",
+        description: "Please connect your Pi wallet using the navbar to mint tokens.",
+        variant: "destructive",
+      })
     } else {
       router.push("/mint")
     }
   }
 
-  const handleWalletConnect = () => {
-    setIsConnected(true)
-    toast({
-      title: "Wallet Connected",
-      description: "Redirecting to dashboard...",
-    })
-    setWalletModalOpen(false)
-    setTimeout(() => {
-      router.push("/dashboard")
-    }, 500)
+  const handleDisclaimerClose = () => {
+    localStorage.setItem('bingepi-disclaimer-accepted', 'true')
+    setDisclaimerOpen(false)
   }
 
 
@@ -103,8 +103,6 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar isConnected={isConnected || isAuthenticated} onConnect={() => setWalletModalOpen(true)} />
-
       <div className="container mx-auto px-4 pt-24 pb-12">
         {/* Search and Actions */}
         <div className="flex flex-col md:flex-row gap-4 mb-3">
@@ -267,7 +265,7 @@ export default function LandingPage() {
         )}
       </div>
 
-      <ConnectWalletModal open={walletModalOpen} onOpenChange={setWalletModalOpen} onConnect={handleWalletConnect} />
+      <DisclaimerPopup open={disclaimerOpen} onOpenChange={handleDisclaimerClose} />
     </div>
   )
 }
