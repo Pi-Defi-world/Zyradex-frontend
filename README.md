@@ -11,7 +11,7 @@ A Next.js 15 application that consumes the Pi DEX backend to offer portfolio tra
 ## Installation
 
 ```bash
-npm install
+pnpm install
 ```
 
 This project relies on the following environment variable:
@@ -24,7 +24,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 ## Development
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 ## Admin Authentication
