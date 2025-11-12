@@ -9,36 +9,38 @@ import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { useLogger } from "@/hooks/use-logger"
 import { Loader2 } from "lucide-react"
+import { useTrustline } from "@/hooks/useTokenRegistry"
 
 export function TrustlineForm() {
   const { toast } = useToast()
   const { addLog } = useLogger()
-  const [loading, setLoading] = useState(false)
+  const { establishTrustline, isLoading, error } = useTrustline()
   const [formData, setFormData] = useState({
     userSecret: "",
     assetCode: "",
     issuer: "",
-    limit: "",
+    limit: "100000000",
   })
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault()
 
-    addLog("info", "Establishing trustline...")
-    addLog("info", `Asset: ${formData.assetCode}`)
-    addLog("info", `Limit: ${formData.limit}`)
-
-    // Simulate API call
-    setTimeout(() => {
-      addLog("success", "Trustline established successfully!")
-      toast({
-        title: "Success!",
-        description: `Trustline for ${formData.assetCode} established`,
+    try {
+      addLog("info", `Establishing trustline for ${formData.assetCode}`)
+      await establishTrustline({
+        userSecret: formData.userSecret,
+        assetCode: formData.assetCode,
+        issuer: formData.issuer,
+        limit: formData.limit,
       })
-      setLoading(false)
-      setFormData({ userSecret: "", assetCode: "", issuer: "", limit: "" })
-    }, 2000)
+      addLog("success", "Trustline established successfully")
+      toast({ title: "Trustline established", description: `${formData.assetCode} is now trusted.` })
+      setFormData({ userSecret: "", assetCode: "", issuer: "", limit: "100000000" })
+    } catch (err) {
+      const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Failed to establish trustline"
+      addLog("error", message)
+      toast({ title: "Trustline failed", description: message, variant: "destructive" })
+    }
   }
 
   return (
@@ -50,7 +52,7 @@ export function TrustlineForm() {
           type="password"
           placeholder="S..."
           value={formData.userSecret}
-          onChange={(e) => setFormData({ ...formData, userSecret: e.target.value })}
+          onChange={(event) => setFormData({ ...formData, userSecret: event.target.value })}
           required
         />
       </div>
@@ -61,7 +63,7 @@ export function TrustlineForm() {
           id="trustAssetCode"
           placeholder="e.g., PIUSD"
           value={formData.assetCode}
-          onChange={(e) => setFormData({ ...formData, assetCode: e.target.value })}
+          onChange={(event) => setFormData({ ...formData, assetCode: event.target.value })}
           required
         />
       </div>
@@ -72,7 +74,7 @@ export function TrustlineForm() {
           id="issuer"
           placeholder="G..."
           value={formData.issuer}
-          onChange={(e) => setFormData({ ...formData, issuer: e.target.value })}
+          onChange={(event) => setFormData({ ...formData, issuer: event.target.value })}
           required
         />
       </div>
@@ -82,16 +84,17 @@ export function TrustlineForm() {
         <Input
           id="limit"
           type="number"
-          placeholder="10000"
+          placeholder="100000000"
           value={formData.limit}
-          onChange={(e) => setFormData({ ...formData, limit: e.target.value })}
-          required
+          onChange={(event) => setFormData({ ...formData, limit: event.target.value })}
         />
       </div>
 
-      <Button type="submit" className="w-full" disabled={loading}>
-        {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        {loading ? "Establishing..." : "Establish Trustline"}
+      {error && <p className="text-sm text-destructive">{error.message}</p>}
+
+      <Button type="submit" className="w-full" disabled={isLoading}>
+        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        {isLoading ? "Establishing..." : "Establish Trustline"}
       </Button>
     </form>
   )

@@ -9,11 +9,18 @@ interface PiUser {
   authenticated_at?: Date
 }
 
+interface PiAuthResult {
+  accessToken: string
+  user: PiUser
+}
+
 interface PiContextType {
   user: PiUser | null
+  accessToken: string | null
+  authResult: PiAuthResult | null
   isAuthenticated: boolean
   isLoading: boolean
-  authenticate: () => Promise<void>
+  authenticate: () => Promise<PiAuthResult>
   signOut: () => void
   createPayment: (amount: number, memo: string, metadata?: any) => Promise<any>
   clearAuth: () => void
@@ -23,80 +30,70 @@ const PiContext = createContext<PiContextType | undefined>(undefined)
 
 export function PiProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<PiUser | null>(null)
+  const [accessToken, setAccessToken] = useState<string | null>(null)
+  const [authResult, setAuthResult] = useState<PiAuthResult | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
-  // Check for existing authentication on mount
   useEffect(() => {
-    const checkExistingAuth = () => {
-      if (typeof window !== 'undefined') {
-        const savedToken = localStorage.getItem('pi_access_token')
-        const savedUser = localStorage.getItem('pi_user')
-        
-        if (savedToken && savedUser) {
-          try {
-            const userData = JSON.parse(savedUser)
-            setUser(userData)
-            setIsAuthenticated(true)
-            console.log('✅ Restored authentication from localStorage')
-          } catch (error) {
-            console.error('Error restoring saved authentication:', error)
-            localStorage.removeItem('pi_access_token')
-            localStorage.removeItem('pi_user')
-          }
-        }
+    if (typeof window === "undefined") return
+
+    const savedToken = localStorage.getItem("pi_access_token")
+    const savedUser = localStorage.getItem("pi_user")
+
+    if (savedToken && savedUser) {
+      try {
+        const userData: PiUser = JSON.parse(savedUser)
+        setUser(userData)
+        setAccessToken(savedToken)
+        setAuthResult({ accessToken: savedToken, user: userData })
+        setIsAuthenticated(true)
+      } catch (error) {
+        console.error("Error restoring saved authentication:", error)
+        localStorage.removeItem("pi_access_token")
+        localStorage.removeItem("pi_user")
       }
     }
-
-    checkExistingAuth()
   }, [])
 
-  const authenticate = async () => {
-    if (typeof window === 'undefined') {
-      throw new Error('Window not available. Please refresh the page.')
+  const authenticate = async (): Promise<PiAuthResult> => {
+    if (typeof window === "undefined") {
+      throw new Error("Window not available. Please refresh the page.")
     }
 
     if (!window.Pi) {
-      throw new Error('Pi SDK not available. Please open this app in Pi Browser.')
+      throw new Error("Pi SDK not available. Please open this app in Pi Browser.")
     }
 
     setIsLoading(true)
     try {
-      
-      // Initialize Pi SDK directly
       window.Pi.init({ version: "2.0", sandbox: true })
-      
-      // Handle incomplete payments callback
+
       const onIncompletePaymentFound = (payment: any) => {
-        console.log('⚠️ Incomplete payment found:', payment)
-        // Handle incomplete payment if needed
+        console.log("⚠️ Incomplete payment found:", payment)
       }
-      
-      // Authenticate with Pi Network directly using Pi SDK
-      const auth = await window.Pi.authenticate(
-        ["username", "payments", "wallet_address"],
-        onIncompletePaymentFound
-      )
-      
-      console.log('✅ Pi authentication completed successfully')
-      
-      // Since Pi SDK already authenticates, we can trust the result
-      const userData = auth.user
-      
-      // Save authentication data locally
+
+      const auth = await window.Pi.authenticate(["username", "payments", "wallet_address"], onIncompletePaymentFound)
+
+      const userData: PiUser = auth.user
+      const result: PiAuthResult = {
+        accessToken: auth.accessToken,
+        user: userData,
+      }
+
       setUser(userData)
+      setAccessToken(auth.accessToken)
+      setAuthResult(result)
       setIsAuthenticated(true)
-      
-      // Store in localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('pi_access_token', auth.accessToken)
-        localStorage.setItem('pi_user', JSON.stringify(userData))
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem("pi_access_token", auth.accessToken)
+        localStorage.setItem("pi_user", JSON.stringify(userData))
       }
-      
-      console.log('💾 Authentication data saved to localStorage')
-      
+
+      return result
     } catch (error) {
-      console.error('Pi Network authentication failed:', error)
+      console.error("Pi Network authentication failed:", error)
       throw error
     } finally {
       setIsLoading(false)
@@ -105,25 +102,27 @@ export function PiProvider({ children }: { children: ReactNode }) {
 
   const signOut = () => {
     setUser(null)
+    setAccessToken(null)
+    setAuthResult(null)
     setIsAuthenticated(false)
-    
-    // Clear localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('pi_access_token')
-      localStorage.removeItem('pi_user')
+
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("pi_access_token")
+      localStorage.removeItem("pi_user")
     }
   }
 
   const clearAuth = () => {
-    console.log('🧹 Clearing all authentication data...')
+    console.log("🧹 Clearing all authentication data...")
     setUser(null)
+    setAccessToken(null)
+    setAuthResult(null)
     setIsAuthenticated(false)
-    
-    // Clear localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('pi_access_token')
-      localStorage.removeItem('pi_user')
-      localStorage.removeItem('pi_has_authenticated')
+
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("pi_access_token")
+      localStorage.removeItem("pi_user")
+      localStorage.removeItem("pi_has_authenticated")
     }
   }
 
@@ -132,44 +131,43 @@ export function PiProvider({ children }: { children: ReactNode }) {
       throw new Error("Not authenticated")
     }
 
-    if (typeof window === 'undefined' || !window.Pi) {
-      throw new Error('Pi SDK not available. Please open in Pi Browser.')
+    if (typeof window === "undefined" || !window.Pi) {
+      throw new Error("Pi SDK not available. Please open in Pi Browser.")
     }
 
     try {
-      // Initialize Pi SDK if not already done
       window.Pi.init({ version: "2.0", sandbox: true })
 
       return new Promise((resolve, reject) => {
         const callbacks = {
           onReadyForServerApproval: async (paymentId: string) => {
-            console.log('Payment ready for approval:', paymentId)
-            // In a real app, you would call your backend to approve the payment
+            console.log("Payment ready for approval:", paymentId)
           },
 
           onReadyForServerCompletion: async (paymentId: string, txid: string) => {
-            console.log('Payment ready for completion:', paymentId, txid)
-            // In a real app, you would call your backend to complete the payment
+            console.log("Payment ready for completion:", paymentId, txid)
             resolve({ success: true, paymentId, txid })
           },
 
           onCancel: (paymentId: string) => {
-            console.log('Payment cancelled:', paymentId)
-            reject(new Error('Payment was cancelled'))
+            console.log("Payment cancelled:", paymentId)
+            reject(new Error("Payment was cancelled"))
           },
 
           onError: (error: Error, payment?: any) => {
-            console.error('Payment error:', error, payment)
+            console.error("Payment error:", error, payment)
             reject(error)
-          }
+          },
         }
 
-        // Create the payment using Pi SDK
-        window.Pi.createPayment({
-          amount,
-          memo,
-          metadata: metadata || { productId: "token_mint" }
-        }, callbacks)
+        window.Pi.createPayment(
+          {
+            amount,
+            memo,
+            metadata: metadata || { productId: "token_mint" },
+          },
+          callbacks
+        )
       })
     } catch (error) {
       console.error("Payment creation failed:", error)
@@ -181,6 +179,8 @@ export function PiProvider({ children }: { children: ReactNode }) {
     <PiContext.Provider
       value={{
         user,
+        accessToken,
+        authResult,
         isAuthenticated,
         isLoading,
         authenticate,

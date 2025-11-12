@@ -1,5 +1,3 @@
-// Mock API utilities for future backend integration
-
 export const API_BASE_URL = "/api"
 
 export async function mintToken(data: {
@@ -8,7 +6,6 @@ export async function mintToken(data: {
   assetCode: string
   amount: string
 }) {
-  // Mock API call - replace with actual backend call later
   return new Promise((resolve) => {
     setTimeout(() => {
       resolve({
@@ -26,7 +23,6 @@ export async function establishTrustline(data: {
   issuer: string
   limit: string
 }) {
-  // Mock API call - replace with actual backend call later
   return new Promise((resolve) => {
     setTimeout(() => {
       resolve({
@@ -39,7 +35,6 @@ export async function establishTrustline(data: {
 }
 
 export async function getBalance(publicKey: string) {
-  // Mock API call
   return new Promise((resolve) => {
     setTimeout(() => {
       resolve({

@@ -1,9 +1,10 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit"
-import type { IAssetRecord } from "@/lib/types"
-import { api } from "@/lib/api"
+import type { TokenRecord } from "@/lib/api/tokens"
+import { fetchTokens as fetchTokensApi } from "@/lib/api/tokens"
+import { toApiError } from "@/lib/api"
 
 interface MyTokensState {
-  tokens: IAssetRecord[]
+  tokens: TokenRecord[]
   loading: boolean
   error: string | null
 }
@@ -14,9 +15,14 @@ const initialState: MyTokensState = {
   error: null,
 }
 
-export const fetchMyTokens = createAsyncThunk("myTokens/fetchMyTokens", async () => {
-  const response = await api.fetchMyTokens()
-  return response
+export const fetchMyTokens = createAsyncThunk("myTokens/fetchMyTokens", async (_, { rejectWithValue }) => {
+  try {
+    const response = await fetchTokensApi()
+    return response.tokens
+  } catch (error) {
+    const apiError = toApiError(error)
+    return rejectWithValue(apiError.message)
+  }
 })
 
 const myTokensSlice = createSlice({
@@ -35,7 +41,7 @@ const myTokensSlice = createSlice({
       })
       .addCase(fetchMyTokens.rejected, (state, action) => {
         state.loading = false
-        state.error = action.error.message || "Failed to fetch my tokens"
+        state.error = (action.payload as string) || action.error.message || "Failed to fetch my tokens"
       })
   },
 })
