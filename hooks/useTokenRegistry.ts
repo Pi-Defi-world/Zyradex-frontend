@@ -14,6 +14,7 @@ import {
 } from "@/lib/api/tokens"
 import type { ApiError } from "@/lib/api"
 import { toApiError } from "@/lib/api"
+import { useAdminAuth } from "@/hooks/useAdminAuth"
 
 interface MutationState<T> {
   data: T | null
@@ -41,12 +42,23 @@ const useMutation = <Payload, Result>(perform: (payload: Payload) => Promise<Res
 }
 
 export const useTokenRegistry = () => {
+  const { isAdmin } = useAdminAuth()
   const [data, setData] = useState<FetchTokensResponse | null>(null)
   const [error, setError] = useState<ApiError | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
     let cancelled = false
+
+    if (!isAdmin) {
+      setData(null)
+      setError(null)
+      setIsLoading(false)
+      return () => {
+        cancelled = true
+      }
+    }
+
     setIsLoading(true)
     setError(null)
 
@@ -70,7 +82,7 @@ export const useTokenRegistry = () => {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [isAdmin])
 
   const tokens = useMemo<TokenRecord[]>(() => data?.tokens ?? [], [data])
 
@@ -79,6 +91,7 @@ export const useTokenRegistry = () => {
     error,
     isLoading,
     tokens,
+    isAdminOnly: true,
   }
 }
 

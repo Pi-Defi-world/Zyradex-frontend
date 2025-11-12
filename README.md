@@ -38,6 +38,10 @@ Administrative actions (minting tokens, managing fees, etc.) require a backend J
 
 To revoke access, use **Sign out of admin** in the same card.
 
+## Account Import
+
+Profile → Account Service allows a user to call `/v1/account/import` by providing either a secret key or mnemonic. The backend responds with the derived public key, which the frontend stores locally (no secrets are persisted). This is the recommended way to register the wallet used across dashboard, swap, and liquidity tools.
+
 ## QA Checklist
 
 Manual checks to verify the integration:

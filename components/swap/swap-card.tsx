@@ -5,11 +5,16 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowDown, Settings, Loader2 } from "lucide-react"
-import { useTokenRegistry } from "@/hooks/useTokenRegistry"
-import { usePoolsForPair, useSwapQuote, useExecuteSwap } from "@/hooks/useSwapData"
+import { usePi } from "@/components/providers/pi-provider"
+import { useAccountBalances } from "@/hooks/useAccountData"
 import { useToast } from "@/hooks/use-toast"
+import { usePoolsForPair, useSwapQuote, useExecuteSwap } from "@/hooks/useSwapData"
+
+const getStoredWallet = () => {
+  if (typeof window === "undefined") return null
+  return localStorage.getItem("bingepi-wallet-address")
+}
 
 interface AssetOption {
   code: string
@@ -17,57 +22,76 @@ interface AssetOption {
   label: string
 }
 
-const buildOptions = (tokens: ReturnType<typeof useTokenRegistry>["tokens"]): AssetOption[] => {
-  const defaults: AssetOption[] = [{ code: "native", label: "PI (native)" }]
-  const registry = tokens.map((token) => ({
-    code: token.assetCode,
-    issuer: token.issuer,
-    label: `${token.assetCode} (${token.issuer.slice(0, 6)}...)`,
-  }))
-  return [...defaults, ...registry]
-}
-
-const stringifyAsset = (asset: AssetOption) =>
-  asset.code === "native" ? "native" : `${asset.code}:${asset.issuer ?? ""}`
+const formatAssetLabel = (code: string, issuer?: string | null) =>
+  issuer ? `${code} (${issuer.slice(0, 6)}...)` : code === "native" ? "PI (native)" : code
 
 export function SwapCard() {
+  const { user } = usePi()
   const { toast } = useToast()
-  const { tokens, isLoading: tokensLoading } = useTokenRegistry()
-  const assetOptions = useMemo(() => buildOptions(tokens), [tokens])
+  const [localWallet, setLocalWallet] = useState<string | null>(null)
 
-  const [fromAsset, setFromAsset] = useState<AssetOption>(assetOptions[0] ?? { code: "native", label: "PI (native)" })
-  const [toAsset, setToAsset] = useState<AssetOption>(assetOptions[1] ?? assetOptions[0] ?? { code: "native", label: "PI (native)" })
+  useEffect(() => {
+    setLocalWallet(getStoredWallet())
+  }, [])
+
+  const publicKey = user?.wallet_address || localWallet || undefined
+  const { balances } = useAccountBalances(publicKey)
+
+  const assetOptions = useMemo<AssetOption[]>(() => {
+    const assets: AssetOption[] = [{ code: "native", label: "PI (native)" }]
+    balances.forEach((balance) => {
+      if (balance.assetType === "native") return
+      assets.push({
+        code: balance.assetCode,
+        issuer: balance.assetIssuer ?? undefined,
+        label: formatAssetLabel(balance.assetCode, balance.assetIssuer),
+      })
+    })
+    return assets
+  }, [balances])
+
+  const firstOption = assetOptions[0]
+  const secondOption = assetOptions[1] ?? assetOptions[0]
+
+  const [fromAssetCode, setFromAssetCode] = useState(firstOption?.code ?? "native")
+  const [fromAssetIssuer, setFromAssetIssuer] = useState<string>(firstOption?.issuer ?? "")
+  const [toAssetCode, setToAssetCode] = useState(secondOption?.code ?? "native")
+  const [toAssetIssuer, setToAssetIssuer] = useState<string>(secondOption?.issuer ?? "")
   const [fromAmount, setFromAmount] = useState("")
   const [userSecret, setUserSecret] = useState("")
 
   useEffect(() => {
-    if (assetOptions.length && !assetOptions.find((option) => option.code === fromAsset.code && option.issuer === fromAsset.issuer)) {
-      setFromAsset(assetOptions[0])
+    if (!firstOption) return
+    setFromAssetCode(firstOption.code)
+    setFromAssetIssuer(firstOption.issuer ?? "")
+    if (secondOption) {
+      setToAssetCode(secondOption.code)
+      setToAssetIssuer(secondOption.issuer ?? "")
     }
-    if (assetOptions.length && !assetOptions.find((option) => option.code === toAsset.code && option.issuer === toAsset.issuer)) {
-      setToAsset(assetOptions[1] ?? assetOptions[0])
-    }
-  }, [assetOptions])
+  }, [firstOption?.code, firstOption?.issuer, secondOption?.code, secondOption?.issuer])
 
-  const poolsQueryEnabled = fromAsset.code !== toAsset.code
+  const fromDescriptor = fromAssetCode === "native" ? "native" : `${fromAssetCode}:${fromAssetIssuer}`
+  const toDescriptor = toAssetCode === "native" ? "native" : `${toAssetCode}:${toAssetIssuer}`
+
+  const poolsEnabled = Boolean(fromAssetCode && toAssetCode && fromAssetCode !== toAssetCode)
   const { pools } = usePoolsForPair(
-    poolsQueryEnabled
+    poolsEnabled
       ? {
-          tokenA: fromAsset.code,
-          tokenB: toAsset.code,
+          tokenA: fromAssetCode,
+          tokenB: toAssetCode,
         }
       : undefined
   )
 
   const selectedPoolId = pools?.[0]?.id
-  const quoteEnabled = Boolean(selectedPoolId && fromAmount)
+  const quoteEnabled = Boolean(selectedPoolId && fromAmount && Number(fromAmount) > 0)
 
   const { quote, isLoading: quoting } = useSwapQuote(
     quoteEnabled
       ? {
           poolId: selectedPoolId,
-          from: stringifyAsset(fromAsset),
-          to: stringifyAsset(toAsset),
+          from: fromDescriptor,
+          to: toDescriptor,
           amount: fromAmount,
         }
       : undefined
@@ -76,8 +100,14 @@ export function SwapCard() {
   const { executeSwap, isLoading: executing } = useExecuteSwap()
 
   const handleSwapTokens = () => {
-    setFromAsset(toAsset)
-    setToAsset(fromAsset)
+    setFromAssetCode(toAssetCode)
+    setFromAssetIssuer(toAssetIssuer)
+    setToAssetCode(fromAssetCode)
+    setToAssetIssuer(fromAssetIssuer)
+  }
+
+  const applySuggestedAsset = (setter: (code: string, issuer?: string) => void, asset: AssetOption) => {
+    setter(asset.code, asset.issuer)
   }
 
   const handleSubmit = async () => {
@@ -93,8 +123,8 @@ export function SwapCard() {
       await executeSwap({
         userSecret,
         poolId: selectedPoolId,
-        from: stringifyAsset(fromAsset),
-        to: stringifyAsset(toAsset),
+        from: fromDescriptor,
+        to: toDescriptor,
         sendAmount: fromAmount,
       })
       toast({ title: "Swap executed", description: "The transaction was submitted to the network." })
@@ -105,8 +135,8 @@ export function SwapCard() {
     }
   }
 
-  const secondaryText = () => {
-    if (!poolsQueryEnabled) return "Select two distinct assets to view pools."
+  const poolSummary = () => {
+    if (!poolsEnabled) return "Select two distinct assets to view pools."
     if (!pools?.length) return "No pools found for this pair."
     return `${pools.length} pool${pools.length > 1 ? "s" : ""} available`
   }
@@ -127,39 +157,56 @@ export function SwapCard() {
             </Button>
           </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>{secondaryText()}</span>
+            <span>{poolSummary()}</span>
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label className="text-sm font-medium text-muted-foreground">From</Label>
-            <div className="flex items-center gap-2">
-              <Select
-                value={JSON.stringify(fromAsset)}
-                onValueChange={(value) => setFromAsset(JSON.parse(value))}
-                disabled={tokensLoading}
-              >
-                <SelectTrigger className="w-[160px] h-12 bg-muted/30 border-border/50 hover:border-border transition-colors">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {assetOptions.map((option) => (
-                    <SelectItem key={`${option.code}-${option.issuer}`} value={JSON.stringify(option)}>
-                      {option.label}
-                    </SelectItem>
+        <CardContent className="space-y-6">
+          <div className="space-y-3">
+            <Label className="text-sm font-medium text-muted-foreground">From Asset</Label>
+            <div className="grid gap-2">
+              <div className="grid md:grid-cols-2 gap-2">
+                <Input
+                  placeholder="Asset code"
+                  value={fromAssetCode}
+                  onChange={(event) => setFromAssetCode(event.target.value.toUpperCase())}
+                />
+                <Input
+                  placeholder="Issuer (optional)"
+                  value={fromAssetIssuer}
+                  onChange={(event) => setFromAssetIssuer(event.target.value)}
+                  disabled={fromAssetCode === "native"}
+                />
+              </div>
+              {assetOptions.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {assetOptions.map((asset) => (
+                    <Button
+                      key={`from-${asset.code}-${asset.issuer ?? "native"}`}
+                      type="button"
+                      size="sm"
+                      variant={fromAssetCode === asset.code && (asset.issuer ?? "") === fromAssetIssuer ? "default" : "outline"}
+                      onClick={() => applySuggestedAsset((code, issuer) => {
+                        setFromAssetCode(code)
+                        setFromAssetIssuer(issuer ?? "")
+                      }, asset)}
+                    >
+                      {asset.label}
+                    </Button>
                   ))}
-                </SelectContent>
-              </Select>
-              <Input
-                type="number"
-                min="0"
-                step="any"
-                placeholder="0.00"
-                value={fromAmount}
-                onChange={(event) => setFromAmount(event.target.value)}
-                className="h-12 bg-muted/30 border-border/50 hover:border-border transition-colors text-right"
-              />
+                </div>
+              )}
+              <div className="grid gap-2">
+                <Label className="text-xs text-muted-foreground">Amount</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder="0.00"
+                  value={fromAmount}
+                  onChange={(event) => setFromAmount(event.target.value)}
+                />
+              </div>
             </div>
           </div>
 
@@ -174,30 +221,54 @@ export function SwapCard() {
             </Button>
           </div>
 
-          <div className="space-y-2">
-            <Label className="text-sm font-medium text-muted-foreground">To</Label>
-            <div className="flex items-center gap-2">
-              <Select
-                value={JSON.stringify(toAsset)}
-                onValueChange={(value) => setToAsset(JSON.parse(value))}
-                disabled={tokensLoading}
-              >
-                <SelectTrigger className="w-[160px] h-12 bg-muted/30 border-border/50 hover:border-border transition-colors">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {assetOptions.map((option) => (
-                    <SelectItem key={`${option.code}-${option.issuer}`} value={JSON.stringify(option)}>
-                      {option.label}
-                    </SelectItem>
+          <div className="space-y-3">
+            <Label className="text-sm font-medium text-muted-foreground">To Asset</Label>
+            <div className="grid gap-2">
+              <div className="grid md:grid-cols-2 gap-2">
+                <Input
+                  placeholder="Asset code"
+                  value={toAssetCode}
+                  onChange={(event) => setToAssetCode(event.target.value.toUpperCase())}
+                />
+                <Input
+                  placeholder="Issuer (optional)"
+                  value={toAssetIssuer}
+                  onChange={(event) => setToAssetIssuer(event.target.value)}
+                  disabled={toAssetCode === "native"}
+                />
+              </div>
+              {assetOptions.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {assetOptions.map((asset) => (
+                    <Button
+                      key={`to-${asset.code}-${asset.issuer ?? "native"}`}
+                      type="button"
+                      size="sm"
+                      variant={toAssetCode === asset.code && (asset.issuer ?? "") === toAssetIssuer ? "default" : "outline"}
+                      onClick={() => applySuggestedAsset((code, issuer) => {
+                        setToAssetCode(code)
+                        setToAssetIssuer(issuer ?? "")
+                      }, asset)}
+                    >
+                      {asset.label}
+                    </Button>
                   ))}
-                </SelectContent>
-              </Select>
-              <Input
-                readOnly
-                value={quote?.expectedOutput ?? "0.00"}
-                className="h-12 bg-muted/30 border-border/50 text-right"
-              />
+                </div>
+              )}
+            </div>
+            <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Estimated Output</span>
+                <span className="font-medium">{quote?.expectedOutput ?? "0.00"} {toAssetCode}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Min Received</span>
+                <span className="font-medium text-green-500">{quote?.minOut ?? "0.00"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Pool Fee</span>
+                <span className="font-medium">{quote?.fee ?? 0}%</span>
+              </div>
             </div>
           </div>
 
@@ -213,31 +284,10 @@ export function SwapCard() {
             />
           </div>
 
-          {quote && (
-            <div className="p-3 rounded-lg bg-muted/20 border border-border/30 space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Rate</span>
-                <span className="font-medium">
-                  1 {fromAsset.code} ≈ {Number(quote.expectedOutput) / Number(fromAmount || 1) || 0}
-                  {" "}
-                  {toAsset.code}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Min Received</span>
-                <span className="font-medium text-green-500">{quote.minOut} {toAsset.code}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Pool Fee</span>
-                <span className="font-medium">{quote.fee}%</span>
-              </div>
-            </div>
-          )}
-
           <Button
             className="w-full h-12 btn-gradient-primary font-semibold shadow-lg"
             onClick={handleSubmit}
-            disabled={executing || tokensLoading || !fromAmount || !quoteEnabled}
+            disabled={executing || quoting || !quoteEnabled}
           >
             {executing ? (
               <>

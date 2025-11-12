@@ -19,6 +19,7 @@ export interface AdminUser {
   role: "user" | "creator" | "admin"
   verified: boolean
   public_key?: string
+  avatarUrl?: string
 }
 
 export interface SignInResponse {

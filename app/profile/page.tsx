@@ -14,71 +14,93 @@ import {
   Loader2,
   Users,
   Star,
-  Calendar,
-  Trophy,
   Rocket,
   LayoutDashboard,
   Coins,
   Droplets,
   User,
-  Wallet,
+  Shield,
 } from "lucide-react"
 import { usePi } from "@/components/providers/pi-provider"
-import { CollectWallet } from "@/components/collect-wallet"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useAccountBalances } from "@/hooks/useAccountData"
-import { useTokenRegistry } from "@/hooks/useTokenRegistry"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { useImportAccount } from "@/hooks/useAccountData"
+import { useUserProfile } from "@/hooks/useUserProfile"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
   return localStorage.getItem("bingepi-wallet-address")
 }
 
-const formatDate = (value?: Date | string) => {
-  if (!value) return "Unknown"
-  const date = value instanceof Date ? value : new Date(value)
-  return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
-}
+const normalizeMnemonic = (value: string) =>
+  value
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .join(" ")
 
 const ProfilePage: React.FC = () => {
   const { user, isAuthenticated, authenticate, signOut } = usePi()
+  const { profile, isLoading: profileLoading, refresh: refreshProfile } = useUserProfile()
   const { toast } = useToast()
-  const [showCollectWallet, setShowCollectWallet] = useState(false)
   const [storedWalletAddress, setStoredWalletAddress] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [secretInput, setSecretInput] = useState("")
+  const [mnemonicInput, setMnemonicInput] = useState("")
+  const { importAccount, isLoading: importingAccount, error: importError } = useImportAccount()
 
   useEffect(() => {
     setStoredWalletAddress(getStoredWallet())
   }, [])
 
-  const walletForData = storedWalletAddress || user?.wallet_address || undefined
-  const { balances, totalBalance, isLoading: balancesLoading } = useAccountBalances(walletForData)
-  const { tokens } = useTokenRegistry()
+  useEffect(() => {
+    if (profile?.public_key) {
+      setStoredWalletAddress(profile.public_key)
+      if (typeof window !== "undefined") {
+        localStorage.setItem("bingepi-wallet-address", profile.public_key)
+      }
+      return
+    }
+
+    if (!storedWalletAddress && user?.wallet_address) {
+      setStoredWalletAddress(user.wallet_address)
+    }
+  }, [profile?.public_key, user?.wallet_address, storedWalletAddress])
+
+  const { balances, totalBalance, isLoading: balancesLoading } = useAccountBalances(storedWalletAddress ?? user?.wallet_address ?? undefined)
 
   const stats = useMemo(
     () => [
       { label: "Assets", value: balances.length, icon: Users },
       { label: "Total Balance", value: totalBalance.toLocaleString(undefined, { maximumFractionDigits: 2 }), icon: Coins },
-      { label: "Minted Tokens", value: tokens.length, icon: Trophy },
+      { label: "Liquidity Pools", value: "–", icon: Droplets },
     ],
-    [balances.length, totalBalance, tokens.length]
+    [balances.length, totalBalance]
   )
 
   const handleCopyWalletAddress = () => {
-    if (walletForData) {
-      navigator.clipboard.writeText(walletForData)
-      toast({ title: "Copied!", description: "Wallet address copied to clipboard" })
+    const address = storedWalletAddress || user?.wallet_address
+    if (address) {
+      navigator.clipboard.writeText(address)
+      toast({
+        title: "Copied!",
+        description: "Wallet address copied to clipboard",
+      })
     }
   }
 
-  const handleWalletCollected = (walletAddress: string) => {
+  const handleWalletPersist = (walletAddress: string) => {
     setStoredWalletAddress(walletAddress)
+    if (typeof window !== "undefined") {
+      localStorage.setItem("bingepi-wallet-address", walletAddress)
+    }
   }
 
   const handlePiConnect = async () => {
@@ -97,21 +119,109 @@ const ProfilePage: React.FC = () => {
     }
   }
 
+  const handleAccountImport = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (!secretInput.trim() && !mnemonicInput.trim()) {
+      toast({ title: "Missing credentials", description: "Provide either a secret key or mnemonic.", variant: "destructive" })
+      return
+    }
+    try {
+      const response = await importAccount({
+        secret: secretInput.trim() || undefined,
+        mnemonic: mnemonicInput.trim() || undefined,
+      })
+      handleWalletPersist(response.publicKey)
+      refreshProfile().catch(() => undefined)
+      toast({
+        title: "Account imported",
+        description: `Public key ${response.publicKey.slice(0, 8)}...${response.publicKey.slice(-6)}`,
+      })
+      setSecretInput("")
+      setMnemonicInput("")
+    } catch (err) {
+      const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Import failed"
+      toast({ title: "Import failed", description: message, variant: "destructive" })
+    }
+  }
+
   const mainNavItems = [
-    { title: "Dashboard", description: "View your portfolio and stats", icon: LayoutDashboard, href: "/dashboard", showChevron: true },
-    { title: "My Tokens", description: "Manage your minted tokens", icon: Coins, href: "/my-tokens", showChevron: true },
-    { title: "Mint Token", description: "Create new tokens", icon: Rocket, href: "/mint", showChevron: true },
-    { title: "Liquidity Pools", description: "Manage liquidity pools", icon: Droplets, href: "/liquidity", showChevron: true },
-    { title: "Swap Tokens", description: "Exchange tokens", icon: Users, href: "/swap", showChevron: true },
-    { title: "Settings", description: "Account and app settings", icon: Settings, href: "/settings", showChevron: true },
+    // {
+    //   title: "Dashboard",
+    //   description: "View your portfolio and stats",
+    //   icon: LayoutDashboard,
+    //   href: "/dashboard",
+    //   showChevron: true,
+    // },
+    {
+      title: "My Tokens",
+      description: "Manage your minted tokens",
+      icon: Coins,
+      href: "/my-tokens",
+      showChevron: true,
+    },
+    {
+      title: "Mint Token",
+      description: "Create new tokens",
+      icon: Rocket,
+      href: "/mint",
+      showChevron: true,
+    },
+    {
+      title: "Liquidity Pools",
+      description: "Manage liquidity pools",
+      icon: Droplets,
+      href: "/liquidity",
+      showChevron: true,
+    },
+    {
+      title: "Swap Tokens",
+      description: "Exchange tokens",
+      icon: Users,
+      href: "/swap",
+      showChevron: true,
+    },
+    {
+      title: "Settings",
+      description: "Account and app settings",
+      icon: Settings,
+      href: "/settings",
+      showChevron: true,
+    },
   ]
 
   const additionalMenuItems = [
-    { title: "Terms of Service", description: "Read our terms and conditions", icon: FileText, href: "/terms", showChevron: true },
-    { title: "Privacy Policy", description: "Learn about our privacy practices", icon: FileText, href: "/privacy", showChevron: true },
-    { title: "API Documentation", description: "Pi Network Oracle API docs", icon: BookOpen, href: "/api-docs", showChevron: true },
-    { title: "Contact Us", description: "Get help and support", icon: MessageCircle, href: "/contact", showChevron: true },
+    {
+      title: "Terms of Service",
+      description: "Read our terms and conditions",
+      icon: FileText,
+      href: "/terms",
+      showChevron: true,
+    },
+    {
+      title: "Privacy Policy",
+      description: "Learn about our privacy practices",
+      icon: FileText,
+      href: "/privacy",
+      showChevron: true,
+    },
+    {
+      title: "API Documentation",
+      description: "Pi Network Oracle API docs",
+      icon: BookOpen,
+      href: "/api-docs",
+      showChevron: true,
+    },
+    {
+      title: "Contact Us",
+      description: "Get help and support",
+      icon: MessageCircle,
+      href: "/contact",
+      showChevron: true,
+    },
   ]
+
+  const walletDisplay = storedWalletAddress || user?.wallet_address
+  const truncatedWallet = walletDisplay ? `${walletDisplay.slice(0, 6)}...${walletDisplay.slice(-6)}` : null
 
   return (
     <div className="min-h-screen premium-gradient pt-16 pb-20 p-3 sm:p-4">
@@ -137,6 +247,9 @@ const ProfilePage: React.FC = () => {
           <CardContent className="space-y-4">
             <div className="flex items-center gap-4">
               <Avatar className="h-16 w-16">
+                {profile?.avatarUrl && !profileLoading && (
+                  <AvatarImage src={profile.avatarUrl} alt={profile?.username || "Profile avatar"} className="object-cover" />
+                )}
                 <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
                   {(user?.username || "Guest").slice(0, 2).toUpperCase()}
                 </AvatarFallback>
@@ -146,8 +259,18 @@ const ProfilePage: React.FC = () => {
                   {isLoading ? "Authenticating..." : user?.username ? `@${user.username}` : "Unauthenticated"}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Member since {formatDate(user?.authenticated_at)}
+                  Wallets tracked: {balancesLoading ? "..." : stats[0].value}
                 </div>
+                {walletDisplay && (
+                  <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground font-mono">
+                    <span className="truncate max-w-[160px]" title={walletDisplay}>
+                      {truncatedWallet}
+                    </span>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyWalletAddress()}>
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
             <Separator />
@@ -165,53 +288,41 @@ const ProfilePage: React.FC = () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Wallet className="h-5 w-5" />
-              Wallet Connection
+              <Shield className="h-5 w-5" />
+              Account Service
             </CardTitle>
-            <CardDescription>Manage your connected wallet</CardDescription>
+            <CardDescription>Import your account using a secret key or mnemonic</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              {walletForData
-                ? "This address is used to load balances and swap history."
-                : "Connect or enter a wallet address to unlock portfolio insights."}
-            </p>
-            {walletForData ? (
-              <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
-                <div>
-                  <p className="text-sm font-medium">Connected Wallet</p>
-                  <p className="text-xs text-muted-foreground font-mono break-all">
-                    {walletForData}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={handleCopyWalletAddress}>
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                  <Button variant="destructive" size="sm" onClick={signOut}>
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Disconnect
-                  </Button>
-                </div>
+            {importError && <p className="text-sm text-destructive">{importError.message}</p>}
+            <form className="space-y-3" onSubmit={handleAccountImport}>
+              <div className="space-y-2">
+                <Label htmlFor="secret-key">Secret Key</Label>
+                <Input
+                  id="secret-key"
+                  type="password"
+                  placeholder="SXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+                  value={secretInput}
+                  onChange={(event) => setSecretInput(event.target.value)}
+                />
               </div>
-            ) : (
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  Connect your Pi wallet to access balances, swaps, and token management.
-                </AlertDescription>
-              </Alert>
-            )}
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                onClick={() => setShowCollectWallet(true)}
-                className="w-full btn-gradient-primary"
-              >
-                <Wallet className="mr-2 h-4 w-4" />
-                Enter Wallet Address
+              <div className="space-y-2">
+                <Label htmlFor="mnemonic">Mnemonic (optional)</Label>
+                <Input
+                  id="mnemonic"
+                  placeholder="word1 word2 word3 ..."
+                  value={mnemonicInput}
+                  onChange={(event) => setMnemonicInput(normalizeMnemonic(event.target.value))}
+                />
+              </div>
+              <Button type="submit" className="btn-gradient-primary w-full" disabled={importingAccount}>
+                {importingAccount && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Import Account
               </Button>
-            </div>
+            </form>
+            <p className="text-xs text-muted-foreground">
+              The backend derives your public key and returns it securely. Secrets are not stored in the browser beyond this session.
+            </p>
           </CardContent>
         </Card>
 
@@ -242,13 +353,13 @@ const ProfilePage: React.FC = () => {
               <div className="bg-card rounded-xl p-4 hover:bg-muted/50 transition-colors border border-border/30 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3 min-w-0 flex-1">
-                    <item.icon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                    <item.icon className="h-5 w-5 text-muted-foreground shrink-0" />
                     <div className="min-w-0 flex-1">
                       <div className="font-semibold text-sm text-foreground truncate">{item.title}</div>
                       <div className="text-xs text-muted-foreground mt-0.5">{item.description}</div>
                     </div>
                   </div>
-                  {item.showChevron && <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />}
+                  {item.showChevron && <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 ml-2" />}
                 </div>
               </div>
             </Link>
@@ -262,13 +373,13 @@ const ProfilePage: React.FC = () => {
               <div className="bg-card rounded-xl p-4 hover:bg-muted/50 transition-colors border border-border/30 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3 min-w-0 flex-1">
-                    <item.icon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                    <item.icon className="h-5 w-5 text-muted-foreground shrink-0" />
                     <div className="min-w-0 flex-1">
                       <div className="font-semibold text-sm text-foreground truncate">{item.title}</div>
                       <div className="text-xs text-muted-foreground mt-0.5">{item.description}</div>
                     </div>
                   </div>
-                  {item.showChevron && <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />}
+                  {item.showChevron && <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 ml-2" />}
                 </div>
               </div>
             </Link>
@@ -282,7 +393,7 @@ const ProfilePage: React.FC = () => {
               className="w-full flex items-center justify-between p-4 bg-card rounded-xl hover:bg-muted/50 transition-colors border border-border/30 shadow-sm text-destructive"
             >
               <div className="flex items-center space-x-3 min-w-0 flex-1">
-                <LogOut className="h-5 w-5 text-destructive flex-shrink-0" />
+                <LogOut className="h-5 w-5 text-destructive shrink-0" />
                 <div className="min-w-0 flex-1">
                   <div className="font-semibold text-sm text-destructive truncate">Disconnect Pi Account</div>
                   <div className="text-xs text-muted-foreground mt-0.5">Logout from your Pi account</div>
@@ -292,8 +403,6 @@ const ProfilePage: React.FC = () => {
           </div>
         )}
       </div>
-
-      <CollectWallet open={showCollectWallet} onOpenChange={setShowCollectWallet} onWalletCollected={handleWalletCollected} />
     </div>
   )
 }

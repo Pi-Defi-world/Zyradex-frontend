@@ -13,6 +13,7 @@ import { useTokenRegistry } from "@/hooks/useTokenRegistry"
 import { useLiquidityPools } from "@/hooks/useLiquidityData"
 import { usePi } from "@/components/providers/pi-provider"
 import { useAccountBalances } from "@/hooks/useAccountData"
+import { useAdminAuth } from "@/hooks/useAdminAuth"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 const buildTokenSummary = (token: ReturnType<typeof useTokenRegistry>["tokens"][number]): TokenSummary => ({
@@ -30,26 +31,26 @@ export default function LandingPage() {
   const { toast } = useToast()
   const router = useRouter()
   const { user, isAuthenticated } = usePi()
+  const { isAdmin, signIn: signInAdmin, isLoading: adminLoading } = useAdminAuth()
 
   const { tokens, isLoading: tokensLoading } = useTokenRegistry()
   const { pools, isLoading: poolsLoading } = useLiquidityPools({ limit: 20 })
   const { balances } = useAccountBalances(user?.wallet_address ?? undefined)
 
-  const tokenSummaries = useMemo(() => tokens.map(buildTokenSummary), [tokens])
+  const tokenSummaries = useMemo(() => (isAdmin ? tokens.map(buildTokenSummary) : []), [tokens, isAdmin])
   const trendingTokens = tokenSummaries.slice(0, 6)
 
   const filteredTokens = useMemo(() => {
+    if (!isAdmin) return []
     if (!searchInput.trim()) return tokenSummaries
     const query = searchInput.trim().toUpperCase()
     return tokenSummaries.filter((token) => token.code.toUpperCase().includes(query))
-  }, [tokenSummaries, searchInput])
+  }, [tokenSummaries, searchInput, isAdmin])
 
   const filteredPools = useMemo(() => {
     if (!searchInput.trim()) return pools.map((pool) => pool)
     const query = searchInput.trim().toUpperCase()
-    return pools.filter((pool) =>
-      pool.reserves.some((reserve) => reserve.asset.toUpperCase().includes(query))
-    )
+    return pools.filter((pool) => pool.reserves.some((reserve) => reserve.asset.toUpperCase().includes(query)))
   }, [pools, searchInput])
 
   useEffect(() => {
@@ -127,7 +128,24 @@ export default function LandingPage() {
           </Button>
         </div>
 
-        {!searchInput && (
+        {!isAdmin && (
+          <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm text-muted-foreground">
+            Token registry data requires admin access.
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={signInAdmin} disabled={adminLoading}>
+                {adminLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Sign in as admin
+              </Button>
+              {balances.length > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  Tip: connect a wallet to see your balances ({balances.length} assets detected).
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {isAdmin && !searchInput && (
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-primary" />
@@ -137,11 +155,14 @@ export default function LandingPage() {
               {trendingTokens.map((token, index) => (
                 <TokenCard key={`${token.code}-${index}`} token={token} index={index} variant="compact" />
               ))}
+              {!trendingTokens.length && (
+                <p className="col-span-full text-sm text-muted-foreground">No tokens available yet.</p>
+              )}
             </div>
           </div>
         )}
 
-        {(searchType === "tokens" || !searchInput) && (
+        {isAdmin && (searchType === "tokens" || !searchInput) && (
           <Card>
             <CardHeader>
               <CardTitle>{searchInput ? `Token Results for "${searchInput}"` : "Recent Tokens"}</CardTitle>

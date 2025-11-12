@@ -8,7 +8,6 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { Navbar } from "@/components/navbar"
 import { Suspense } from "react"
 import { PiProvider } from "@/components/providers/pi-provider"
-import { Providers } from "@/lib/providers"
 import Script from 'next/script'
 import "./globals.css"
 
@@ -41,17 +40,15 @@ export default function RootLayout({
             }
           `}
         </Script>
-        <Providers>
-          <PiProvider>
-            <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
-              <Suspense fallback={null}>
-                <Navbar />
-                {children}
-                <Toaster />
-              </Suspense>
-            </ThemeProvider>
-          </PiProvider>
-        </Providers>
+        <PiProvider>
+          <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+            <Suspense fallback={null}>
+              <Navbar />
+              {children}
+              <Toaster />
+            </Suspense>
+          </ThemeProvider>
+        </PiProvider>
         <Analytics />
       </body>
     </html>

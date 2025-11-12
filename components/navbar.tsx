@@ -118,7 +118,7 @@ export function Navbar({ isConnected = false, onConnect }: NavbarProps) {
       <nav className="fixed top-0 w-full z-50 border-b border-border bg-background/95 backdrop-blur-sm">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <span className="font-bold text-xl">BINGEPi</span>
+            <span className="font-bold text-xl">ZyraDex</span>
           </Link>
 
           {/* Desktop Navigation */}

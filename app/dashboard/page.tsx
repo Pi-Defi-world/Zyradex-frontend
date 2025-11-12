@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Wallet, Activity, Coins, TrendingUp, Droplets } from "lucide-react"
+import { Wallet, Activity, Coins, TrendingUp, Droplets, Shield, Loader2 } from "lucide-react"
 
 import { TokenCard, type TokenSummary } from "@/components/token-card"
 import { TransactionHistory } from "@/components/transaction-history"
@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import { usePi } from "@/components/providers/pi-provider"
 import { useAccountBalances, useAccountOperations } from "@/hooks/useAccountData"
 import { useTokenRegistry } from "@/hooks/useTokenRegistry"
+import { useAdminAuth } from "@/hooks/useAdminAuth"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -20,15 +21,16 @@ const getStoredWallet = () => {
 }
 
 const formatBalanceCard = (asset: {
+  assetType: string
   assetCode: string
   assetIssuer: string | null
   amount: number
-  assetType: string
+  asset: string
 }): TokenSummary => ({
-  code: asset.assetCode,
+  code: asset.assetType === "native" ? "native" : asset.assetCode,
   issuer: asset.assetIssuer ?? undefined,
   totalSupply: asset.amount,
-  description: asset.assetType === "native" ? "Pi Testnet" : asset.assetType,
+  description: asset.assetType === "native" ? "Pi Testnet" : asset.asset,
 })
 
 const formatMintedToken = (token: TokenSummary): TokenSummary => ({
@@ -36,7 +38,6 @@ const formatMintedToken = (token: TokenSummary): TokenSummary => ({
   issuer: token.issuer,
   name: token.name,
   totalSupply: token.totalSupply,
-  liquidityPools: token.liquidityPools,
   description: token.description,
 })
 
@@ -62,6 +63,7 @@ const buildActivitySeries = (operations: ReturnType<typeof useAccountOperations>
 export default function DashboardPage() {
   const { user, isAuthenticated } = usePi()
   const [localWallet, setLocalWallet] = useState<string | null>(null)
+  const { isAdmin, signIn: signInAdmin, isLoading: adminLoading } = useAdminAuth()
 
   useEffect(() => {
     setLocalWallet(getStoredWallet())
@@ -81,7 +83,7 @@ export default function DashboardPage() {
     isLoading: operationsLoading,
     error: operationsError,
   } = useAccountOperations(publicKey, { limit: 50 })
-  const { tokens: mintedTokens, isLoading: tokensLoading, error: tokensError } = useTokenRegistry()
+  const { tokens: mintedTokens, isLoading: tokensLoading } = useTokenRegistry()
 
   const balanceCards = useMemo<TokenSummary[]>(
     () => balances.map((balance) => formatBalanceCard(balance)),
@@ -89,15 +91,14 @@ export default function DashboardPage() {
   )
 
   const mintedSummaries = useMemo<TokenSummary[]>(
-    () =>
-      mintedTokens.map((token) => ({
-        code: token.assetCode,
-        issuer: token.issuer,
-        name: token.name,
-        totalSupply: token.totalSupply,
-        description: token.description,
-      })),
-    [mintedTokens]
+    () => (isAdmin ? mintedTokens.map((token) => formatMintedToken({
+          code: token.assetCode,
+          issuer: token.issuer,
+          name: token.name,
+          totalSupply: token.totalSupply,
+          description: token.description,
+        })) : []),
+    [mintedTokens, isAdmin]
   )
 
   const activitySeries = useMemo(() => buildActivitySeries(operations), [operations])
@@ -123,9 +124,9 @@ export default function DashboardPage() {
     },
     {
       label: "Minted Tokens",
-      value: `${mintedSummaries.length}`,
+      value: isAdmin ? `${mintedSummaries.length}` : "Admin only",
       icon: TrendingUp,
-      hint: tokensLoading ? "Loading minted tokens" : "Registered platform tokens",
+      hint: isAdmin ? "Registered platform tokens" : "Requires admin session",
     },
   ]
 
@@ -253,24 +254,31 @@ export default function DashboardPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Platform Tokens</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                Platform Tokens
+              </CardTitle>
               <CardDescription>Tokens issued through the DEX toolkit</CardDescription>
             </CardHeader>
             <CardContent>
-              {tokensError ? (
-                <p className="text-destructive text-sm">{tokensError.message}</p>
-              ) : (
+              {!isAdmin ? (
+                <div className="space-y-3 text-sm text-muted-foreground">
+                  <p>Sign in as an admin to view and manage minted tokens.</p>
+                  <Button variant="outline" size="sm" onClick={signInAdmin} disabled={adminLoading}>
+                    {adminLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Sign in as admin
+                  </Button>
+                </div>
+              ) : tokensLoading && !mintedSummaries.length ? (
+                <p className="text-sm text-muted-foreground">Loading token registry...</p>
+              ) : mintedSummaries.length ? (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {tokensLoading && !mintedSummaries.length && (
-                    <p className="text-sm text-muted-foreground">Loading token registry...</p>
-                  )}
                   {mintedSummaries.map((token, idx) => (
                     <TokenCard key={`${token.code}-${idx}`} token={token} index={idx} variant="compact" />
                   ))}
-                  {!tokensLoading && !mintedSummaries.length && (
-                    <p className="text-sm text-muted-foreground">No platform tokens found.</p>
-                  )}
                 </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No platform tokens found.</p>
               )}
             </CardContent>
           </Card>

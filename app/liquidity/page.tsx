@@ -448,8 +448,8 @@ export default function LiquidityPage() {
                       </DialogContent>
                     </Dialog>
 
-                    <Dialog>
-                      <DialogTrigger asChild>
+                      <Dialog>
+                        <DialogTrigger asChild>
                         <Button
                           variant="outline"
                           size="sm"
@@ -458,15 +458,15 @@ export default function LiquidityPage() {
                             setWithdrawForm(defaultWithdrawForm)
                           }}
                         >
-                          <Minus className="mr-2 h-4 w-4" />
-                          Withdraw
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Withdraw from {pool.pair}</DialogTitle>
+                            <Minus className="mr-2 h-4 w-4" />
+                            Withdraw
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Withdraw from {pool.pair}</DialogTitle>
                           <DialogDescription>Redeem liquidity by providing your pool share percentage.</DialogDescription>
-                        </DialogHeader>
+                          </DialogHeader>
                         <form className="space-y-4" onSubmit={(event) => handleWithdraw(event, pool)}>
                           <div className="space-y-2">
                             <Label htmlFor="withdraw-secret">User Secret</Label>
@@ -477,7 +477,7 @@ export default function LiquidityPage() {
                               required
                             />
                           </div>
-                          <div className="space-y-2">
+                            <div className="space-y-2">
                             <Label>Pool Share to Withdraw</Label>
                             <Input
                               type="number"
@@ -488,14 +488,14 @@ export default function LiquidityPage() {
                               onChange={(event) => setWithdrawForm((prev) => ({ ...prev, shareAmount: event.target.value }))}
                               required
                             />
-                          </div>
+                            </div>
                           <Button type="submit" className="w-full" variant="destructive" disabled={withdrawing}>
                             {withdrawing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                            Withdraw Liquidity
-                          </Button>
-                        </form>
-                      </DialogContent>
-                    </Dialog>
+                              Withdraw Liquidity
+                            </Button>
+                          </form>
+                        </DialogContent>
+                      </Dialog>
                   </div>
                 </div>
               ))}
