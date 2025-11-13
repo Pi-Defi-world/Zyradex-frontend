@@ -36,7 +36,7 @@ import { useUserProfile } from "@/hooks/useUserProfile"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
-  return localStorage.getItem("bingepi-wallet-address")
+  return localStorage.getItem("zyradex-wallet-address")
 }
 
 const normalizeMnemonic = (value: string) =>
@@ -64,7 +64,7 @@ const ProfilePage: React.FC = () => {
     if (profile?.public_key) {
       setStoredWalletAddress(profile.public_key)
       if (typeof window !== "undefined") {
-        localStorage.setItem("bingepi-wallet-address", profile.public_key)
+        localStorage.setItem("zyradex-wallet-address", profile.public_key)
       }
       return
     }
@@ -99,7 +99,7 @@ const ProfilePage: React.FC = () => {
   const handleWalletPersist = (walletAddress: string) => {
     setStoredWalletAddress(walletAddress)
     if (typeof window !== "undefined") {
-      localStorage.setItem("bingepi-wallet-address", walletAddress)
+      localStorage.setItem("zyradex-wallet-address", walletAddress)
     }
   }
 
@@ -153,36 +153,36 @@ const ProfilePage: React.FC = () => {
     //   showChevron: true,
     // },
     {
-      title: "My Tokens",
-      description: "Manage your minted tokens",
+      title: "My Assets",
+      description: "Manage your assets",
       icon: Coins,
       href: "/my-tokens",
       showChevron: true,
     },
     {
-      title: "Mint Token",
-      description: "Create new tokens",
+      title: "Create Asset",
+      description: "Create new assets",
       icon: Rocket,
       href: "/mint",
       showChevron: true,
     },
     {
       title: "Liquidity Pools",
-      description: "Manage liquidity pools",
+      description: "Manage LP Holdings",
       icon: Droplets,
       href: "/liquidity",
       showChevron: true,
     },
     {
-      title: "Swap Tokens",
-      description: "Exchange tokens",
+      title: "Swap Assets",
+      description: "Exchange assets",
       icon: Users,
       href: "/swap",
       showChevron: true,
     },
     {
       title: "Settings",
-      description: "Account and app settings",
+      description: "Wallet settings",
       icon: Settings,
       href: "/settings",
       showChevron: true,
@@ -204,13 +204,13 @@ const ProfilePage: React.FC = () => {
       href: "/privacy",
       showChevron: true,
     },
-    {
-      title: "API Documentation",
-      description: "Pi Network Oracle API docs",
-      icon: BookOpen,
-      href: "/api-docs",
-      showChevron: true,
-    },
+    // {
+    //   title: "API Documentation",
+    //   description: "Pi Network Oracle API docs",
+    //   icon: BookOpen,
+    //   href: "/api-docs",
+    //   showChevron: true,
+    // },
     {
       title: "Contact Us",
       description: "Get help and support",
@@ -240,9 +240,9 @@ const ProfilePage: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />
-              Account Overview
+              Wallet
             </CardTitle>
-            <CardDescription>Summary of your Pi profile</CardDescription>
+            <CardDescription> Your ZyraDex Profile</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-4">
@@ -289,15 +289,24 @@ const ProfilePage: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5" />
-              Account Service
+              Account Import
             </CardTitle>
             <CardDescription>Import your account using a secret key or mnemonic</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {importError && <p className="text-sm text-destructive">{importError.message}</p>}
             <form className="space-y-3" onSubmit={handleAccountImport}>
+            <div className="space-y-2">
+                <Label htmlFor="mnemonic">Mnemonic</Label>
+                <Input
+                  id="mnemonic"
+                  placeholder="word1 word2 word3 ..."
+                  value={mnemonicInput}
+                  onChange={(event) => setMnemonicInput(normalizeMnemonic(event.target.value))}
+                />
+              </div>
               <div className="space-y-2">
-                <Label htmlFor="secret-key">Secret Key</Label>
+                <Label htmlFor="secret-key">Secret Key (optional)</Label>
                 <Input
                   id="secret-key"
                   type="password"
@@ -306,23 +315,11 @@ const ProfilePage: React.FC = () => {
                   onChange={(event) => setSecretInput(event.target.value)}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="mnemonic">Mnemonic (optional)</Label>
-                <Input
-                  id="mnemonic"
-                  placeholder="word1 word2 word3 ..."
-                  value={mnemonicInput}
-                  onChange={(event) => setMnemonicInput(normalizeMnemonic(event.target.value))}
-                />
-              </div>
               <Button type="submit" className="btn-gradient-primary w-full" disabled={importingAccount}>
                 {importingAccount && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Import Account
               </Button>
             </form>
-            <p className="text-xs text-muted-foreground">
-              The backend derives your public key and returns it securely. Secrets are not stored in the browser beyond this session.
-            </p>
           </CardContent>
         </Card>
 
@@ -330,17 +327,17 @@ const ProfilePage: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Star className="h-5 w-5" />
-              Highlights
+              Holdings
             </CardTitle>
-            <CardDescription>Your recent account activity</CardDescription>
+            <CardDescription>Your holdings on the ZyraDex</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-3 text-sm text-muted-foreground">
             <div className="p-3 rounded-lg bg-muted/40">
-              <p className="font-medium text-foreground">Balances Tracked</p>
+              <p className="font-medium text-foreground">Assets Tracked</p>
               <p>{balancesLoading ? "Loading..." : balances.length ? `${balances.length} assets` : "None yet"}</p>
             </div>
             <div className="p-3 rounded-lg bg-muted/40">
-              <p className="font-medium text-foreground">Total Supply</p>
+              <p className="font-medium text-foreground">Total Value</p>
               <p>{balancesLoading ? "Loading..." : totalBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
             </div>
           </CardContent>
@@ -395,8 +392,8 @@ const ProfilePage: React.FC = () => {
               <div className="flex items-center space-x-3 min-w-0 flex-1">
                 <LogOut className="h-5 w-5 text-destructive shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <div className="font-semibold text-sm text-destructive truncate">Disconnect Pi Account</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">Logout from your Pi account</div>
+                  <div className="font-semibold text-sm text-destructive truncate">Disconnect Wallet</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Logout from your ZyraDex wallet</div>
                 </div>
               </div>
             </button>

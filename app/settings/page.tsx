@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
-  return localStorage.getItem("bingepi-wallet-address")
+  return localStorage.getItem("zyradex-wallet-address")
 }
 
 export default function SettingsPage() {
@@ -25,8 +25,6 @@ export default function SettingsPage() {
   const { user, signOut } = usePi()
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
   const [notifications, setNotifications] = useState(true)
-  const [twoFactor, setTwoFactor] = useState(false)
-  const [email, setEmail] = useState("")
   const [username, setUsername] = useState("")
   const {
     isAdmin,
@@ -96,16 +94,6 @@ export default function SettingsPage() {
                 placeholder="Enter username"
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="Enter email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
               />
             </div>
             <Button className="btn-gradient-primary">Save Changes</Button>
@@ -195,20 +183,9 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label htmlFor="2fa">Two-Factor Authentication</Label>
-                <p className="text-sm text-muted-foreground">Add an extra layer of security</p>
+                <p className="text-sm text-muted-foreground">Add an extra layer of security coming soon</p>
               </div>
-              <Switch id="2fa" checked={twoFactor} onCheckedChange={setTwoFactor} />
             </div>
-            <Separator />
-            <div className="space-y-2">
-              <Label htmlFor="current-password">Current Password</Label>
-              <Input id="current-password" type="password" placeholder="Enter current password" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="new-password">New Password</Label>
-              <Input id="new-password" type="password" placeholder="Enter new password" />
-            </div>
-            <Button className="btn-gradient-primary">Update Password</Button>
           </CardContent>
         </Card>
 

@@ -17,7 +17,7 @@ import { useAdminAuth } from "@/hooks/useAdminAuth"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
-  return localStorage.getItem("bingepi-wallet-address")
+  return localStorage.getItem("zyradex-wallet-address")
 }
 
 const formatBalanceCard = (asset: {

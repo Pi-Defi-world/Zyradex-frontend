@@ -2,7 +2,6 @@ import type React from "react"
 import type { Metadata } from "next"
 import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
-import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from "@/components/ui/toaster"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Navbar } from "@/components/navbar"
@@ -12,9 +11,9 @@ import Script from 'next/script'
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "Bingepi - Build DeFi on Pi Network",
+  title: "ZyraDex - Build DeFi on Pi Network",
   description: "Mint tokens, create liquidity pools, and manage assets on Pi Network",
-  generator: "Solie, Junman, RichAdams, ",
+  generator: "Solie, Junman, RichAdams, Tm-Daniel ",
 }
 
 export default function RootLayout({
@@ -49,7 +48,6 @@ export default function RootLayout({
             </Suspense>
           </ThemeProvider>
         </PiProvider>
-        <Analytics />
       </body>
     </html>
   )

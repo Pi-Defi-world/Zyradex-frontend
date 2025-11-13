@@ -54,7 +54,7 @@ export default function LandingPage() {
   }, [pools, searchInput])
 
   useEffect(() => {
-    const disclaimerAccepted = localStorage.getItem("bingepi-disclaimer-accepted")
+    const disclaimerAccepted = localStorage.getItem("zyradex-disclaimer-accepted")
     if (!disclaimerAccepted) {
       setDisclaimerOpen(true)
     }
@@ -73,7 +73,7 @@ export default function LandingPage() {
   }
 
   const handleDisclaimerClose = () => {
-    localStorage.setItem("bingepi-disclaimer-accepted", "true")
+    localStorage.setItem("zyradex-disclaimer-accepted", "true")
     setDisclaimerOpen(false)
   }
 

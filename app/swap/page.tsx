@@ -9,7 +9,7 @@ import { usePi } from "@/components/providers/pi-provider"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
-  return localStorage.getItem("bingepi-wallet-address")
+  return localStorage.getItem("zyradex-wallet-address")
 }
 
 const computePriceSeries = (operations: ReturnType<typeof useAccountOperations>["operations"]): PricePoint[] => {
