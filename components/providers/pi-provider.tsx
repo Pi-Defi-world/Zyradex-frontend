@@ -109,6 +109,10 @@ export function PiProvider({ children }: { children: ReactNode }) {
     if (typeof window !== "undefined") {
       localStorage.removeItem("pi_access_token")
       localStorage.removeItem("pi_user")
+      localStorage.removeItem("zyradex-wallet-address")
+      localStorage.removeItem("bingepi-wallet-address")
+      localStorage.removeItem("dex_user_token")
+      localStorage.removeItem("dex_user_profile")
     }
   }
 
@@ -123,6 +127,10 @@ export function PiProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem("pi_access_token")
       localStorage.removeItem("pi_user")
       localStorage.removeItem("pi_has_authenticated")
+      localStorage.removeItem("zyradex-wallet-address")
+      localStorage.removeItem("bingepi-wallet-address")
+      localStorage.removeItem("dex_user_token")
+      localStorage.removeItem("dex_user_profile")
     }
   }
 

@@ -13,15 +13,26 @@ export const storeEncryptedSecret = async (
 ): Promise<void> => {
   try {
     console.log('📦 Storing encrypted secret to backend for:', publicKey)
-    await api.storeEncryptedSecret({
+    console.log('📦 Payload:', { 
+      publicKey, 
+      encryptedSecretLength: encryptedSecret.length,
+      ivLength: iv.length,
+      saltLength: salt.length 
+    })
+    const result = await api.storeEncryptedSecret({
       publicKey,
       encryptedSecret,
       iv,
       salt,
     })
-    console.log('✅ Encrypted secret stored successfully on backend')
-  } catch (error) {
+    console.log('✅ Encrypted secret stored successfully on backend:', result)
+  } catch (error: any) {
     console.error('❌ Error storing encrypted secret:', error)
+    console.error('❌ Error details:', {
+      message: error?.message,
+      status: error?.status,
+      details: error?.details
+    })
     throw error
   }
 }

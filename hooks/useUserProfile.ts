@@ -69,6 +69,8 @@ export const useUserProfile = (): UseUserProfileReturn => {
       if (typeof window !== "undefined") {
         localStorage.removeItem(USER_TOKEN_KEY)
         localStorage.removeItem(USER_PROFILE_KEY)
+        localStorage.removeItem("zyradex-wallet-address")
+        localStorage.removeItem("bingepi-wallet-address")
       }
     }
   }, [piAuthenticated])

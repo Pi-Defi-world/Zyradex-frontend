@@ -151,11 +151,18 @@ export function MintForm() {
         return
       }
 
+      // Convert totalSupply to number
+      const totalSupplyNum = parseFloat(formData.totalSupply)
+      if (isNaN(totalSupplyNum) || totalSupplyNum <= 0) {
+        toast({ title: "Invalid total supply", description: "Total supply must be a positive number.", variant: "destructive" })
+        return
+      }
+
       addLog("info", `Minting ${formData.totalSupply} ${formData.assetCode}`)
       await mintToken({
         distributorSecret: secretToUse,
         assetCode: formData.assetCode,
-        totalSupply: formData.totalSupply,
+        totalSupply: totalSupplyNum,
         name: formData.tokenName || formData.assetCode,
         description: formData.description || `${formData.assetCode} token`,
         homeDomain: formData.homeDomain || undefined,

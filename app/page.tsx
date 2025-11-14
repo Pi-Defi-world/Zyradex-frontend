@@ -22,7 +22,7 @@ const getStoredWallet = () => {
 export default function HomePage() {
   const router = useRouter()
   const { toast } = useToast()
-  const { user } = usePi()
+  const { user, isAuthenticated } = usePi()
   const [localWallet, setLocalWallet] = useState<string | null>(null)
   const [receiveModalOpen, setReceiveModalOpen] = useState(false)
   const [disclaimerOpen, setDisclaimerOpen] = useState(false)
@@ -30,8 +30,13 @@ export default function HomePage() {
   const { price: piPrice, isLoading: priceLoading } = usePiPrice()
 
   useEffect(() => {
-    setLocalWallet(getStoredWallet())
-  }, [])
+    // Only restore wallet if user is authenticated
+    if (isAuthenticated) {
+      setLocalWallet(getStoredWallet())
+    } else {
+      setLocalWallet(null)
+    }
+  }, [isAuthenticated])
 
   useEffect(() => {
     const disclaimerAccepted = localStorage.getItem("zyradex-disclaimer-accepted")
@@ -40,7 +45,8 @@ export default function HomePage() {
     }
   }, [])
 
-  const publicKey = user?.wallet_address || localWallet || undefined
+  // Only show wallet address if user is authenticated
+  const publicKey = isAuthenticated ? (user?.wallet_address || localWallet || undefined) : undefined
   const { balances, totalBalance, isLoading: balancesLoading } = useAccountBalances(publicKey)
   const { tokens, isLoading: tokensLoading } = useTokenRegistry()
 

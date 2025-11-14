@@ -211,21 +211,6 @@ export function SwapCard() {
       toast({ title: "Swap failed", description: message, variant: "destructive" })
     }
   }
-  
-  const handleAuthenticate = async () => {
-    if (!walletAddress) {
-      toast({ title: "No wallet", description: "Please import your account first.", variant: "destructive" })
-      return
-    }
-    try {
-      const secret = await getSecretFromAuth(walletAddress)
-      setUserSecret(secret)
-      toast({ title: "Authenticated", description: "Secret key retrieved using PIN/password." })
-    } catch (err) {
-      const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Authentication failed"
-      toast({ title: "Authentication failed", description: message, variant: "destructive" })
-    }
-  }
 
   const handlePasswordSubmit = async (password: string) => {
     if (passwordResolve) {

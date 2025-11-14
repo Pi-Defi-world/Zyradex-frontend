@@ -75,10 +75,21 @@ const ProfilePage: React.FC = () => {
   const [pendingSecret, setPendingSecret] = useState<string | null>(null)
 
   useEffect(() => {
-    setStoredWalletAddress(getStoredWallet())
-  }, [])
+    // Only restore wallet if user is authenticated
+    if (isAuthenticated) {
+      setStoredWalletAddress(getStoredWallet())
+    } else {
+      setStoredWalletAddress(null)
+    }
+  }, [isAuthenticated])
 
   useEffect(() => {
+    // Only set wallet address if user is authenticated
+    if (!isAuthenticated) {
+      setStoredWalletAddress(null)
+      return
+    }
+
     if (profile?.public_key) {
       setStoredWalletAddress(profile.public_key)
       if (typeof window !== "undefined") {
@@ -90,7 +101,7 @@ const ProfilePage: React.FC = () => {
     if (!storedWalletAddress && user?.wallet_address) {
       setStoredWalletAddress(user.wallet_address)
     }
-  }, [profile?.public_key, user?.wallet_address, storedWalletAddress])
+  }, [profile?.public_key, user?.wallet_address, storedWalletAddress, isAuthenticated])
 
   const { balances, totalBalance, isLoading: balancesLoading } = useAccountBalances(storedWalletAddress ?? user?.wallet_address ?? undefined)
 
