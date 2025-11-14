@@ -1,5 +1,6 @@
 import { axiosClient, toApiError } from "../api"
 import type { ILiquidityPool } from "../types"
+import { registerPair } from "./pairs"
 
 export interface AssetRef {
   code: string
@@ -72,6 +73,22 @@ export interface WithdrawLiquidityPayload {
 export const createLiquidityPool = async (payload: CreateLiquidityPoolPayload) => {
   try {
     const { data } = await axiosClient.post<LiquidityTransactionResponse>("/liquidity-pools", payload)
+    
+    // Register the pair in the DEX registry after pool creation
+    if (data.poolId) {
+      try {
+        await registerPair({
+          baseToken: payload.tokenA.code,
+          quoteToken: payload.tokenB.code,
+          poolId: data.poolId,
+          source: "internal",
+        })
+      } catch (pairError) {
+        // Log but don't fail the pool creation if pair registration fails
+        console.warn("Failed to register pair after pool creation:", pairError)
+      }
+    }
+    
     return data
   } catch (error) {
     throw toApiError(error)

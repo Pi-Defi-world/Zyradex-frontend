@@ -56,7 +56,7 @@ export default function SwapPage() {
 
         <div className="lg:hidden space-y-6">
           <SwapCard />
-          <PriceChart series={chartSeries} isLoading={isLoading} />
+          {/* <PriceChart series={chartSeries} isLoading={isLoading} /> */}
         </div>
 
         <div className="mt-6">

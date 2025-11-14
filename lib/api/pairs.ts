@@ -15,6 +15,7 @@ export interface RegisterPairPayload {
   baseToken: string
   quoteToken: string
   poolId: string
+  source: "internal" | "external"
 }
 
 export interface RegisterPairResponse {

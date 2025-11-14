@@ -33,6 +33,17 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useImportAccount } from "@/hooks/useAccountData"
 import { useUserProfile } from "@/hooks/useUserProfile"
+import { usePasskeyRegistration } from "@/hooks/usePasskey"
+import { storeEncryptedSecret } from "@/lib/passkey/storage"
+import { encryptSecret, generateKey } from "@/lib/passkey/encryption"
+import { setEncryptionKey } from "@/lib/passkey/transaction"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -55,6 +66,10 @@ const ProfilePage: React.FC = () => {
   const [secretInput, setSecretInput] = useState("")
   const [mnemonicInput, setMnemonicInput] = useState("")
   const { importAccount, isLoading: importingAccount, error: importError } = useImportAccount()
+  const { register: registerPasskey, isLoading: registeringPasskey } = usePasskeyRegistration()
+  const [showPasskeyDialog, setShowPasskeyDialog] = useState(false)
+  const [pendingPublicKey, setPendingPublicKey] = useState<string | null>(null)
+  const [pendingSecret, setPendingSecret] = useState<string | null>(null)
 
   useEffect(() => {
     setStoredWalletAddress(getStoredWallet())
@@ -130,17 +145,54 @@ const ProfilePage: React.FC = () => {
         secret: secretInput.trim() || undefined,
         mnemonic: mnemonicInput.trim() || undefined,
       })
+      
+      // Store public key and secret for passkey registration
+      setPendingPublicKey(response.publicKey)
+      setPendingSecret(response.secret)
+      
+      // Encrypt and store secret in IndexedDB
+      try {
+        const key = await generateKey()
+        const { encrypted, iv } = await encryptSecret(response.secret, key)
+        await storeEncryptedSecret(response.publicKey, encrypted, iv)
+        // Store encryption key in memory for later decryption
+        setEncryptionKey(response.publicKey, key)
+      } catch (encryptError) {
+        console.error("Failed to encrypt secret:", encryptError)
+        toast({
+          title: "Warning",
+          description: "Account imported but secret encryption failed. Please set up passkey.",
+          variant: "destructive",
+        })
+      }
+      
       handleWalletPersist(response.publicKey)
       refreshProfile().catch(() => undefined)
-      toast({
-        title: "Account imported",
-        description: `Public key ${response.publicKey.slice(0, 8)}...${response.publicKey.slice(-6)}`,
-      })
+      
+      // Show passkey registration dialog
+      setShowPasskeyDialog(true)
+      
       setSecretInput("")
       setMnemonicInput("")
     } catch (err) {
       const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Import failed"
       toast({ title: "Import failed", description: message, variant: "destructive" })
+    }
+  }
+
+  const handlePasskeyRegistration = async () => {
+    try {
+      await registerPasskey()
+      setShowPasskeyDialog(false)
+      setPendingPublicKey(null)
+      setPendingSecret(null)
+      toast({
+        title: "Success",
+        description: "Passkey registered successfully. You can now use it for transactions.",
+      })
+    } catch (err) {
+      const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Passkey registration failed"
+      toast({ title: "Registration failed", description: message, variant: "destructive" })
     }
   }
 
@@ -400,6 +452,43 @@ const ProfilePage: React.FC = () => {
           </div>
         )}
       </div>
+
+      <Dialog open={showPasskeyDialog} onOpenChange={setShowPasskeyDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Set Up Passkey</DialogTitle>
+            <DialogDescription>
+              To secure your account and enable passwordless transactions, please register a passkey.
+              This will allow you to sign transactions without entering your secret key each time.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <p className="text-sm text-muted-foreground">
+              Click the button below to create a passkey using your device's biometric authentication
+              (fingerprint, face recognition, or PIN).
+            </p>
+            <Button
+              onClick={handlePasskeyRegistration}
+              disabled={registeringPasskey}
+              className="w-full"
+            >
+              {registeringPasskey && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Register Passkey
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowPasskeyDialog(false)
+                setPendingPublicKey(null)
+                setPendingSecret(null)
+              }}
+              className="w-full"
+            >
+              Skip for Now
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

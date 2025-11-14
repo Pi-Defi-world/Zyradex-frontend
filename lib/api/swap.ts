@@ -1,4 +1,5 @@
 import { axiosClient, toApiError } from "../api"
+import type { ILiquidityPool } from "../types"
 
 export interface SwapQuoteParams {
   poolId: string
@@ -20,8 +21,8 @@ export interface SwapQuoteResponse {
 export interface ExecuteSwapPayload {
   userSecret: string
   poolId: string
-  from: string
-  to: string
+  from: { code: string; issuer?: string }
+  to: { code: string; issuer?: string }
   sendAmount: string | number
   slippagePercent?: number
 }
@@ -54,7 +55,7 @@ export interface PoolsForPairParams {
 
 export interface PoolsForPairResponse {
   success: boolean
-  pools: unknown[]
+  pools: ILiquidityPool[]
 }
 
 export interface DistributeFeesPayload {

@@ -5,25 +5,39 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowDown, Settings, Loader2 } from "lucide-react"
 import { usePi } from "@/components/providers/pi-provider"
-import { useAccountBalances } from "@/hooks/useAccountData"
 import { useToast } from "@/hooks/use-toast"
 import { usePoolsForPair, useSwapQuote, useExecuteSwap } from "@/hooks/useSwapData"
+import { useTransactionAuth } from "@/hooks/useTransactionAuth"
+import { Shield } from "lucide-react"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
   return localStorage.getItem("bingepi-wallet-address")
 }
 
-interface AssetOption {
-  code: string
-  issuer?: string
-  label: string
+// Parse token string (e.g., "native" or "CODE:ISSUER" or just "CODE") into { code, issuer }
+const parseToken = (token: string): { code: string; issuer?: string } => {
+  if (!token || token.trim() === "") return { code: "" }
+  const trimmed = token.trim()
+  if (trimmed === "native") {
+    return { code: "native" }
+  }
+  const parts = trimmed.split(":")
+  if (parts.length === 2) {
+    return { code: parts[0].trim(), issuer: parts[1].trim() }
+  }
+  return { code: trimmed }
 }
 
-const formatAssetLabel = (code: string, issuer?: string | null) =>
-  issuer ? `${code} (${issuer.slice(0, 6)}...)` : code === "native" ? "PI (native)" : code
+// Convert token to descriptor string for quote API
+const tokenToDescriptor = (token: { code: string; issuer?: string }): string => {
+  if (token.code === "native") return "native"
+  if (token.issuer) return `${token.code}:${token.issuer}`
+  return token.code
+}
 
 export function SwapCard() {
   const { user } = usePi()
@@ -34,110 +48,177 @@ export function SwapCard() {
     setLocalWallet(getStoredWallet())
   }, [])
 
-  const publicKey = user?.wallet_address || localWallet || undefined
-  const { balances } = useAccountBalances(publicKey)
-
-  const assetOptions = useMemo<AssetOption[]>(() => {
-    const assets: AssetOption[] = [{ code: "native", label: "PI (native)" }]
-    balances.forEach((balance) => {
-      if (balance.assetType === "native") return
-      assets.push({
-        code: balance.assetCode,
-        issuer: balance.assetIssuer ?? undefined,
-        label: formatAssetLabel(balance.assetCode, balance.assetIssuer),
-      })
-    })
-    return assets
-  }, [balances])
-
-  const firstOption = assetOptions[0]
-  const secondOption = assetOptions[1] ?? assetOptions[0]
-
-  const [fromAssetCode, setFromAssetCode] = useState(firstOption?.code ?? "native")
-  const [fromAssetIssuer, setFromAssetIssuer] = useState<string>(firstOption?.issuer ?? "")
-  const [toAssetCode, setToAssetCode] = useState(secondOption?.code ?? "native")
-  const [toAssetIssuer, setToAssetIssuer] = useState<string>(secondOption?.issuer ?? "")
+  // Token input state
+  const [tokenA, setTokenA] = useState<string>("")
+  const [tokenB, setTokenB] = useState<string>("")
   const [fromAmount, setFromAmount] = useState("")
   const [userSecret, setUserSecret] = useState("")
+  const [selectedPoolId, setSelectedPoolId] = useState<string>("")
+  const [slippagePercent, setSlippagePercent] = useState<number>(1)
+  
+  const walletAddress = localWallet || user?.wallet_address
+  const { getSecret: getSecretFromPasskey, isLoading: authLoading, hasPasskey } = useTransactionAuth(walletAddress || undefined)
 
-  useEffect(() => {
-    if (!firstOption) return
-    setFromAssetCode(firstOption.code)
-    setFromAssetIssuer(firstOption.issuer ?? "")
-    if (secondOption) {
-      setToAssetCode(secondOption.code)
-      setToAssetIssuer(secondOption.issuer ?? "")
-    }
-  }, [firstOption?.code, firstOption?.issuer, secondOption?.code, secondOption?.issuer])
+  // Parse tokens
+  const fromToken = useMemo(() => {
+    if (!tokenA) return null
+    return parseToken(tokenA)
+  }, [tokenA])
 
-  const fromDescriptor = fromAssetCode === "native" ? "native" : `${fromAssetCode}:${fromAssetIssuer}`
-  const toDescriptor = toAssetCode === "native" ? "native" : `${toAssetCode}:${toAssetIssuer}`
+  const toToken = useMemo(() => {
+    if (!tokenB) return null
+    return parseToken(tokenB)
+  }, [tokenB])
 
-  const poolsEnabled = Boolean(fromAssetCode && toAssetCode && fromAssetCode !== toAssetCode)
-  const { pools } = usePoolsForPair(
-    poolsEnabled
+  // Fetch pools for the entered pair - only when both tokens have codes
+  const poolsEnabled = Boolean(
+    fromToken && 
+    toToken && 
+    fromToken.code && 
+    toToken.code && 
+    fromToken.code !== toToken.code
+  )
+  
+  const { pools, isLoading: loadingPools, error: poolsError } = usePoolsForPair(
+    poolsEnabled && fromToken && toToken
       ? {
-          tokenA: fromAssetCode,
-          tokenB: toAssetCode,
+          tokenA: fromToken.code === "native" ? "native" : fromToken.code.toUpperCase(),
+          tokenB: toToken.code === "native" ? "native" : toToken.code.toUpperCase(),
         }
       : undefined
   )
 
-  const selectedPoolId = pools?.[0]?.id
-  const quoteEnabled = Boolean(selectedPoolId && fromAmount && Number(fromAmount) > 0)
+  // Auto-select first pool if available and none selected
+  useEffect(() => {
+    if (pools.length > 0 && !selectedPoolId) {
+      setSelectedPoolId(pools[0].id)
+    } else if (pools.length === 0) {
+      setSelectedPoolId("")
+    }
+  }, [pools, selectedPoolId])
 
-  const { quote, isLoading: quoting } = useSwapQuote(
+  // Get selected pool
+  const selectedPool = useMemo(() => {
+    return pools.find((p) => p.id === selectedPoolId)
+  }, [pools, selectedPoolId])
+
+  // Fetch quote when pool and amount are available
+  const quoteEnabled = Boolean(selectedPoolId && fromAmount && Number(fromAmount) > 0 && fromToken && toToken)
+  const fromDescriptor = fromToken ? tokenToDescriptor(fromToken) : ""
+  const toDescriptor = toToken ? tokenToDescriptor(toToken) : ""
+
+  const { quote, isLoading: quoting, error: quoteError } = useSwapQuote(
     quoteEnabled
       ? {
           poolId: selectedPoolId,
           from: fromDescriptor,
           to: toDescriptor,
           amount: fromAmount,
+          slippagePercent,
         }
       : undefined
   )
 
   const { executeSwap, isLoading: executing } = useExecuteSwap()
 
-  const handleSwapTokens = () => {
-    setFromAssetCode(toAssetCode)
-    setFromAssetIssuer(toAssetIssuer)
-    setToAssetCode(fromAssetCode)
-    setToAssetIssuer(fromAssetIssuer)
+  const handleTokenAChange = (value: string) => {
+    setTokenA(value)
+    setSelectedPoolId("")
+    setFromAmount("")
+    setSlippagePercent(1) // Reset to default
   }
 
-  const applySuggestedAsset = (setter: (code: string, issuer?: string) => void, asset: AssetOption) => {
-    setter(asset.code, asset.issuer)
+  const handleTokenBChange = (value: string) => {
+    setTokenB(value)
+    setSelectedPoolId("")
+    setFromAmount("")
+    setSlippagePercent(1) // Reset to default
+  }
+
+  const handleSwapTokens = () => {
+    const temp = tokenA
+    setTokenA(tokenB)
+    setTokenB(temp)
+    setSelectedPoolId("")
+    setFromAmount("")
   }
 
   const handleSubmit = async () => {
     if (!selectedPoolId) {
-      toast({ title: "No pool available", description: "Select a valid asset pair with available liquidity.", variant: "destructive" })
+      toast({ title: "No pool available", description: "No pools found for this token pair.", variant: "destructive" })
       return
     }
-    if (!userSecret) {
-      toast({ title: "Secret required", description: "Enter the secret key to sign the swap transaction.", variant: "destructive" })
+    if (!fromToken || !toToken) {
+      toast({ title: "Invalid pair", description: "Please enter both tokens to create a trading pair.", variant: "destructive" })
       return
     }
+    
+    let secretToUse = userSecret
+    
+    // Try to get secret from passkey if available and no manual secret provided
+    if (!secretToUse && hasPasskey && walletAddress) {
+      try {
+        secretToUse = await getSecretFromPasskey(walletAddress)
+      } catch (err) {
+        const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Passkey authentication failed"
+        toast({ title: "Authentication failed", description: message, variant: "destructive" })
+        return
+      }
+    }
+    
+    if (!secretToUse) {
+      toast({ title: "Secret required", description: hasPasskey ? "Passkey authentication failed. Please enter your secret key manually." : "Enter the secret key to sign the swap transaction, or set up a passkey.", variant: "destructive" })
+      return
+    }
+    
     try {
-      await executeSwap({
-        userSecret,
+      const result = await executeSwap({
+        userSecret: secretToUse,
         poolId: selectedPoolId,
-        from: fromDescriptor,
-        to: toDescriptor,
+        from: fromToken,
+        to: toToken,
         sendAmount: fromAmount,
+        slippagePercent,
       })
-      toast({ title: "Swap executed", description: "The transaction was submitted to the network." })
+      toast({ 
+        title: "Swap executed successfully", 
+        description: result.data?.txHash 
+          ? `Transaction hash: ${result.data.txHash}` 
+          : "Transaction submitted to the network" 
+      })
       setFromAmount("")
+      setUserSecret("")
     } catch (err) {
       const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Swap failed"
       toast({ title: "Swap failed", description: message, variant: "destructive" })
     }
   }
+  
+  const handleAuthenticateWithPasskey = async () => {
+    if (!walletAddress) {
+      toast({ title: "No wallet", description: "Please import your account first.", variant: "destructive" })
+      return
+    }
+    try {
+      const secret = await getSecretFromPasskey(walletAddress)
+      setUserSecret(secret)
+      toast({ title: "Authenticated", description: "Secret key retrieved using passkey." })
+    } catch (err) {
+      const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Passkey authentication failed"
+      toast({ title: "Authentication failed", description: message, variant: "destructive" })
+    }
+  }
 
   const poolSummary = () => {
-    if (!poolsEnabled) return "Select two distinct assets to view pools."
-    if (!pools?.length) return "No pools found for this pair."
+    if (!tokenA || !tokenB) return "Enter both tokens to check for pools."
+    if (fromToken?.code === toToken?.code) return "Tokens must be different."
+    if (loadingPools) return "Checking for pools..."
+    if (poolsError) return `Error: ${poolsError.message}`
+    if (!pools?.length) {
+      const tokenAStr = fromToken?.code || tokenA
+      const tokenBStr = toToken?.code || tokenB
+      return `No pools found for ${tokenAStr}/${tokenBStr}`
+    }
     return `${pools.length} pool${pools.length > 1 ? "s" : ""} available`
   }
 
@@ -163,51 +244,27 @@ export function SwapCard() {
 
         <CardContent className="space-y-6">
           <div className="space-y-3">
-            <Label className="text-sm font-medium text-muted-foreground">From Asset</Label>
-            <div className="grid gap-2">
-              <div className="grid md:grid-cols-2 gap-2">
-                <Input
-                  placeholder="Asset code"
-                  value={fromAssetCode}
-                  onChange={(event) => setFromAssetCode(event.target.value.toUpperCase())}
-                />
-                <Input
-                  placeholder="Issuer (optional)"
-                  value={fromAssetIssuer}
-                  onChange={(event) => setFromAssetIssuer(event.target.value)}
-                  disabled={fromAssetCode === "native"}
-                />
-              </div>
-              {assetOptions.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {assetOptions.map((asset) => (
-                    <Button
-                      key={`from-${asset.code}-${asset.issuer ?? "native"}`}
-                      type="button"
-                      size="sm"
-                      variant={fromAssetCode === asset.code && (asset.issuer ?? "") === fromAssetIssuer ? "default" : "outline"}
-                      onClick={() => applySuggestedAsset((code, issuer) => {
-                        setFromAssetCode(code)
-                        setFromAssetIssuer(issuer ?? "")
-                      }, asset)}
-                    >
-                      {asset.label}
-                    </Button>
-                  ))}
-                </div>
-              )}
-              <div className="grid gap-2">
-                <Label className="text-xs text-muted-foreground">Amount</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="any"
-                  placeholder="0.00"
-                  value={fromAmount}
-                  onChange={(event) => setFromAmount(event.target.value)}
-                />
-              </div>
-            </div>
+            <Label className="text-sm font-medium text-muted-foreground">Token A</Label>
+            <Input
+              placeholder="e.g., zyra, wpi, native, or CODE:ISSUER"
+              value={tokenA}
+              onChange={(event) => handleTokenAChange(event.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Enter token code (e.g., "zyra") or full format (e.g., "CODE:ISSUER")
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <Label className="text-sm font-medium text-muted-foreground">Amount</Label>
+            <Input
+              type="number"
+              min="0"
+              step="any"
+              placeholder="0.00"
+              value={fromAmount}
+              onChange={(event) => setFromAmount(event.target.value)}
+            />
           </div>
 
           <div className="flex justify-center">
@@ -216,78 +273,199 @@ export function SwapCard() {
               size="icon"
               className="h-10 w-10 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 border-0 hover:scale-105 transition-transform shadow-lg hover:shadow-green-500/25"
               onClick={handleSwapTokens}
+              disabled={!tokenA || !tokenB}
             >
               <ArrowDown className="h-4 w-4 text-white" />
             </Button>
           </div>
 
           <div className="space-y-3">
-            <Label className="text-sm font-medium text-muted-foreground">To Asset</Label>
-            <div className="grid gap-2">
-              <div className="grid md:grid-cols-2 gap-2">
-                <Input
-                  placeholder="Asset code"
-                  value={toAssetCode}
-                  onChange={(event) => setToAssetCode(event.target.value.toUpperCase())}
-                />
-                <Input
-                  placeholder="Issuer (optional)"
-                  value={toAssetIssuer}
-                  onChange={(event) => setToAssetIssuer(event.target.value)}
-                  disabled={toAssetCode === "native"}
-                />
-              </div>
-              {assetOptions.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {assetOptions.map((asset) => (
-                    <Button
-                      key={`to-${asset.code}-${asset.issuer ?? "native"}`}
-                      type="button"
-                      size="sm"
-                      variant={toAssetCode === asset.code && (asset.issuer ?? "") === toAssetIssuer ? "default" : "outline"}
-                      onClick={() => applySuggestedAsset((code, issuer) => {
-                        setToAssetCode(code)
-                        setToAssetIssuer(issuer ?? "")
-                      }, asset)}
-                    >
-                      {asset.label}
-                    </Button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Estimated Output</span>
-                <span className="font-medium">{quote?.expectedOutput ?? "0.00"} {toAssetCode}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Min Received</span>
-                <span className="font-medium text-green-500">{quote?.minOut ?? "0.00"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Pool Fee</span>
-                <span className="font-medium">{quote?.fee ?? 0}%</span>
-              </div>
-            </div>
+            <Label className="text-sm font-medium text-muted-foreground">Token B</Label>
+            <Input
+              placeholder="e.g., zyra, wpi, native, or CODE:ISSUER"
+              value={tokenB}
+              onChange={(event) => handleTokenBChange(event.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Enter token code (e.g., "wpi") or full format (e.g., "CODE:ISSUER")
+            </p>
           </div>
 
+          {tokenA && tokenB && fromToken?.code && toToken?.code && fromToken.code !== toToken.code && (
+            <>
+              <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">From</span>
+                  <span className="font-medium">{tokenA}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">To</span>
+                  <span className="font-medium">{tokenB}</span>
+                </div>
+                <div className="flex justify-between items-center text-xs text-muted-foreground pt-1 border-t border-border/20">
+                  <span>Searching for:</span>
+                  <span className="font-mono">{fromToken.code} / {toToken.code}</span>
+                </div>
+              </div>
+
+              {poolsError && (
+                <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                  <div className="font-medium mb-1">Error fetching pools:</div>
+                  <div>{poolsError.message}</div>
+                  {poolsError.status && (
+                    <div className="text-xs mt-1">Status: {poolsError.status}</div>
+                  )}
+                </div>
+              )}
+
+              {pools.length > 1 && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground">Select Pool</Label>
+                  <Select value={selectedPoolId} onValueChange={setSelectedPoolId}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a pool" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pools.map((pool) => (
+                        <SelectItem key={pool.id} value={pool.id}>
+                          <div className="flex flex-col">
+                            <span>Pool {pool.id.slice(0, 8)}...</span>
+                            <span className="text-xs text-muted-foreground">
+                              Fee: {(pool.fee_bp / 100).toFixed(2)}% | Shares: {pool.total_shares}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {selectedPool && (
+                <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Pool ID</span>
+                    <span className="font-mono text-xs">{selectedPool.id.slice(0, 16)}...</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Pool Fee</span>
+                    <span className="font-medium">{(selectedPool.fee_bp / 100).toFixed(2)}%</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Total Shares</span>
+                    <span className="font-medium">{selectedPool.total_shares}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground">Slippage Tolerance</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      placeholder="1"
+                      value={slippagePercent}
+                      onChange={(event) => {
+                        const value = parseFloat(event.target.value)
+                        if (!isNaN(value) && value >= 0 && value <= 100) {
+                          setSlippagePercent(value)
+                        }
+                      }}
+                      className="w-24"
+                    />
+                    <span className="text-sm text-muted-foreground self-center">%</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Maximum acceptable price slippage (default: 1%)
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm">
+                  {quoting ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      <span className="text-muted-foreground">Fetching quote...</span>
+                    </div>
+                  ) : quoteError ? (
+                    <div className="text-sm text-destructive">
+                      Failed to fetch quote: {quoteError.message || "Unknown error"}
+                    </div>
+                  ) : quote ? (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Estimated Output</span>
+                        <span className="font-medium">
+                          {quote.expectedOutput} {toToken?.code ?? ""}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Min Received</span>
+                        <span className="font-medium text-green-500">{quote.minOut}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Pool Fee</span>
+                        <span className="font-medium">{quote.fee}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Slippage</span>
+                        <span className="font-medium">{quote.slippagePercent}%</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-sm text-muted-foreground">
+                      Enter an amount to see quote
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
           <div className="space-y-2">
-            <Label htmlFor="swap-secret" className="text-sm font-medium text-muted-foreground">
-              User Secret
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="swap-secret" className="text-sm font-medium text-muted-foreground">
+                User Secret
+              </Label>
+              {hasPasskey && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAuthenticateWithPasskey}
+                  disabled={authLoading}
+                  className="h-8"
+                >
+                  {authLoading ? (
+                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                  ) : (
+                    <Shield className="h-3 w-3 mr-1" />
+                  )}
+                  Use Passkey
+                </Button>
+              )}
+            </div>
             <Input
               id="swap-secret"
-              placeholder="SXXXXXXXXXXXXXXXX"
+              type="password"
+              placeholder={hasPasskey ? "Enter secret or use passkey above" : "SXXXXXXXXXXXXXXXX"}
               value={userSecret}
               onChange={(event) => setUserSecret(event.target.value)}
             />
+            {hasPasskey && (
+              <p className="text-xs text-muted-foreground">
+                You can use passkey authentication or enter your secret key manually.
+              </p>
+            )}
           </div>
 
           <Button
             className="w-full h-12 btn-gradient-primary font-semibold shadow-lg"
             onClick={handleSubmit}
-            disabled={executing || quoting || !quoteEnabled}
+            disabled={executing || quoting || !quoteEnabled || !tokenA || !tokenB || !selectedPoolId}
           >
             {executing ? (
               <>
@@ -308,3 +486,4 @@ export function SwapCard() {
     </Card>
   )
 }
+

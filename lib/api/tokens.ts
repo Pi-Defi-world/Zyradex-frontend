@@ -33,7 +33,7 @@ export interface TrustlineResponse {
 export interface MintTokenPayload {
   distributorSecret: string
   assetCode: string
-  totalSupply: string | number
+  totalSupply: number
   name: string
   description: string
   homeDomain?: string
