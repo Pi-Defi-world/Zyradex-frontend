@@ -194,12 +194,6 @@ const ProfilePage: React.FC = () => {
     }
 
     try {
-      // Check IndexedDB availability first
-      const { isIndexedDBAvailable } = await import("@/lib/passkey/storage")
-      if (!isIndexedDBAvailable()) {
-        throw new Error("IndexedDB is not available in this browser. Please use a modern browser or check your browser settings.")
-      }
-
       console.log("Setting up password for public key:", pendingPublicKey)
       
       // Generate salt and derive key from password
@@ -212,15 +206,15 @@ const ProfilePage: React.FC = () => {
       
       // Encrypt secret with password-derived key
       const { encrypted, iv } = await encryptSecret(pendingSecret, key)
-      console.log("Secret encrypted, storing in IndexedDB...")
+      console.log("Secret encrypted, storing on backend...")
       
       // Store encrypted secret with salt
       try {
         await storeEncryptedSecret(pendingPublicKey, encrypted, iv, saltBase64)
-        console.log("Encrypted secret stored successfully for:", pendingPublicKey)
+        console.log("Encrypted secret stored successfully on backend for:", pendingPublicKey)
       } catch (storageError: any) {
         console.error("Storage error details:", storageError)
-        throw new Error(`Failed to store encrypted secret: ${storageError?.message || 'Unknown error'}. Please check if IndexedDB is enabled in your browser.`)
+        throw new Error(`Failed to store encrypted secret: ${storageError?.message || 'Unknown error'}. Please try again.`)
       }
       
       // Verify storage with retry

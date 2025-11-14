@@ -29,7 +29,7 @@ export const getSecretForTransaction = async (
       throw new Error("Account is locked due to too many failed password attempts. Please use the recovery option to reset your account.")
     }
 
-    // Get encrypted secret from IndexedDB
+    // Get encrypted secret from backend
     const encryptedData = await getEncryptedSecret(publicKey)
     if (!encryptedData) {
       throw new Error("No encrypted secret found. Please re-import your account.")
