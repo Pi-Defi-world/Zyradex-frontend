@@ -52,15 +52,14 @@ export function PasswordSetupDialog({
     setIsSubmitting(true)
     try {
       await onPasswordSet(password)
-      // Reset form on success
+      // Reset form on success - but don't close dialog here, let parent handle it
       setPassword('')
       setConfirmPassword('')
       setError(null)
-      onOpenChange(false)
+      // Parent will close the dialog after successful storage
     } catch (err: any) {
       setError(err?.message || 'Failed to set up password. Please try again.')
-    } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false) // Only set to false on error, parent handles success
     }
   }
 

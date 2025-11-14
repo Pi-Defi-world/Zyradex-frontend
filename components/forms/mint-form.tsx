@@ -2,19 +2,30 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { useLogger } from "@/hooks/use-logger"
-import { Loader2 } from "lucide-react"
+import { Loader2, Lock } from "lucide-react"
 import { useMintToken } from "@/hooks/useTokenRegistry"
 import { useAdminAuth } from "@/hooks/useAdminAuth"
+import { useTransactionAuth } from "@/hooks/useTransactionAuth"
+import { PasswordPromptDialog } from "@/components/password-prompt-dialog"
+import { usePi } from "@/components/providers/pi-provider"
+import { useUserProfile } from "@/hooks/useUserProfile"
+
+const getStoredWallet = () => {
+  if (typeof window === "undefined") return null
+  return localStorage.getItem("zyradex-wallet-address")
+}
 
 export function MintForm() {
   const { toast } = useToast()
   const { addLog } = useLogger()
+  const { user } = usePi()
+  const { profile } = useUserProfile()
   const { mintToken, isLoading, error } = useMintToken()
   const {
     isAdmin,
@@ -22,6 +33,30 @@ export function MintForm() {
     error: adminError,
     signIn: signInAdmin,
   } = useAdminAuth()
+  const [walletAddress, setWalletAddress] = useState<string | null>(null)
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false)
+  const [passwordResolve, setPasswordResolve] = useState<((password: string) => void) | null>(null)
+  const [passwordReject, setPasswordReject] = useState<((error: Error) => void) | null>(null)
+
+  useEffect(() => {
+    const stored = getStoredWallet()
+    const address = profile?.public_key || stored || user?.wallet_address || null
+    setWalletAddress(address)
+  }, [profile?.public_key, user?.wallet_address])
+
+  const handlePasswordPrompt = async (): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      setPasswordResolve(() => (password: string) => resolve(password))
+      setPasswordReject(() => (error: Error) => reject(error))
+      setShowPasswordDialog(true)
+    })
+  }
+
+  const { getSecret: getSecretFromAuth, hasStoredSecret } = useTransactionAuth(
+    walletAddress || undefined,
+    handlePasswordPrompt
+  )
+
   const [formData, setFormData] = useState({
     distributorSecret: "",
     assetCode: "",
@@ -31,6 +66,26 @@ export function MintForm() {
     homeDomain: "",
   })
   const [assetCodeError, setAssetCodeError] = useState("")
+
+  const handlePasswordSubmit = async (password: string) => {
+    if (passwordResolve) {
+      passwordResolve(password)
+      setPasswordResolve(null)
+      setPasswordReject(null)
+      setShowPasswordDialog(false)
+    }
+  }
+
+  const handlePasswordDialogClose = (open: boolean) => {
+    if (!open) {
+      setShowPasswordDialog(false)
+      if (passwordReject) {
+        passwordReject(new Error("Password prompt cancelled"))
+        setPasswordResolve(null)
+        setPasswordReject(null)
+      }
+    }
+  }
 
   const validateAssetCode = (value: string): string => {
     if (!value) return "Token code is required"
@@ -76,9 +131,29 @@ export function MintForm() {
     }
 
     try {
+      let secretToUse = formData.distributorSecret
+      
+      // If stored secret exists, always use password authentication
+      if (hasStoredSecret && walletAddress) {
+        try {
+          secretToUse = await getSecretFromAuth(walletAddress)
+        } catch (err) {
+          const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Authentication failed"
+          toast({ title: "Authentication failed", description: message, variant: "destructive" })
+          return
+        }
+      } else if (!secretToUse) {
+        toast({ 
+          title: "Secret required", 
+          description: "Enter the distributor secret key, or import your account and set up authentication.",
+          variant: "destructive" 
+        })
+        return
+      }
+
       addLog("info", `Minting ${formData.totalSupply} ${formData.assetCode}`)
       await mintToken({
-        distributorSecret: formData.distributorSecret,
+        distributorSecret: secretToUse,
         assetCode: formData.assetCode,
         totalSupply: formData.totalSupply,
         name: formData.tokenName || formData.assetCode,
@@ -98,7 +173,8 @@ export function MintForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <>
+      <form onSubmit={handleSubmit} className="space-y-4">
       {!isAdmin && (
         <div className="rounded-lg border border-border/60 bg-muted/30 p-4 text-sm text-muted-foreground">
           Admin privileges are required to mint tokens.
@@ -116,20 +192,30 @@ export function MintForm() {
         </div>
       )}
 
-      <div className="space-y-2">
-        <Label htmlFor="distributorSecret" className="text-base font-medium">
-          Distributor Secret
-        </Label>
-        <Input
-          id="distributorSecret"
-          type="password"
-          placeholder="S..."
-          value={formData.distributorSecret}
-          onChange={(event) => setFormData((prev) => ({ ...prev, distributorSecret: event.target.value }))}
-          required
-          className="border-border"
-        />
-      </div>
+      {!hasStoredSecret && (
+        <div className="space-y-2">
+          <Label htmlFor="distributorSecret" className="text-base font-medium">
+            Distributor Secret
+          </Label>
+          <Input
+            id="distributorSecret"
+            type="password"
+            placeholder="S..."
+            value={formData.distributorSecret}
+            onChange={(event) => setFormData((prev) => ({ ...prev, distributorSecret: event.target.value }))}
+            required
+            className="border-border"
+          />
+        </div>
+      )}
+      {hasStoredSecret && (
+        <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Lock className="h-4 w-4" />
+            <span>You'll be prompted for your PIN/password when you submit</span>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="assetCode" className="text-base font-medium">
@@ -210,5 +296,16 @@ export function MintForm() {
         {isLoading ? "Minting..." : "Mint Token"}
       </Button>
     </form>
+
+    {walletAddress && (
+      <PasswordPromptDialog
+        open={showPasswordDialog}
+        onOpenChange={handlePasswordDialogClose}
+        publicKey={walletAddress}
+        onPasswordSubmit={handlePasswordSubmit}
+        error={null}
+      />
+    )}
+    </>
   )
 }

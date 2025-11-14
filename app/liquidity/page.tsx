@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
 import {
   Card,
   CardContent,
@@ -20,7 +20,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, Plus, Droplets, TrendingUp, Users, Minus, Search } from "lucide-react"
+import { Loader2, Plus, Droplets, TrendingUp, Users, Minus, Search, Lock } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import {
   useLiquidityPools,
@@ -28,7 +28,16 @@ import {
   useAddLiquidity,
   useWithdrawLiquidity,
 } from "@/hooks/useLiquidityData"
+import { useTransactionAuth } from "@/hooks/useTransactionAuth"
+import { PasswordPromptDialog } from "@/components/password-prompt-dialog"
+import { usePi } from "@/components/providers/pi-provider"
+import { useUserProfile } from "@/hooks/useUserProfile"
 import type { ILiquidityPool } from "@/lib/types"
+
+const getStoredWallet = () => {
+  if (typeof window === "undefined") return null
+  return localStorage.getItem("zyradex-wallet-address")
+}
 
 interface LiquidityFormState {
   userSecret: string
@@ -97,8 +106,33 @@ const formatPool = (pool: ILiquidityPool) => {
 
 export default function LiquidityPage() {
   const { toast } = useToast()
+  const { user } = usePi()
+  const { profile } = useUserProfile()
   const [searchQuery, setSearchQuery] = useState("")
   const [refreshKey, setRefreshKey] = useState(Date.now())
+  const [walletAddress, setWalletAddress] = useState<string | null>(null)
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false)
+  const [passwordResolve, setPasswordResolve] = useState<((password: string) => void) | null>(null)
+  const [passwordReject, setPasswordReject] = useState<((error: Error) => void) | null>(null)
+
+  useEffect(() => {
+    const stored = getStoredWallet()
+    const address = profile?.public_key || stored || user?.wallet_address || null
+    setWalletAddress(address)
+  }, [profile?.public_key, user?.wallet_address])
+
+  const handlePasswordPrompt = async (): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      setPasswordResolve(() => (password: string) => resolve(password))
+      setPasswordReject(() => (error: Error) => reject(error))
+      setShowPasswordDialog(true)
+    })
+  }
+
+  const { getSecret: getSecretFromAuth, hasStoredSecret } = useTransactionAuth(
+    walletAddress || undefined,
+    handlePasswordPrompt
+  )
 
   const { pools, isLoading, error } = useLiquidityPools({ limit: 30 }, { refreshKey })
   const { createLiquidityPool, isLoading: creating } = useCreateLiquidityPool()
@@ -109,6 +143,26 @@ export default function LiquidityPage() {
   const [depositForm, setDepositForm] = useState<DepositFormState>(defaultDepositForm)
   const [withdrawForm, setWithdrawForm] = useState<WithdrawFormState>(defaultWithdrawForm)
   const [activePool, setActivePool] = useState<ILiquidityPool | null>(null)
+
+  const handlePasswordSubmit = async (password: string) => {
+    if (passwordResolve) {
+      passwordResolve(password)
+      setPasswordResolve(null)
+      setPasswordReject(null)
+      setShowPasswordDialog(false)
+    }
+  }
+
+  const handlePasswordDialogClose = (open: boolean) => {
+    if (!open) {
+      setShowPasswordDialog(false)
+      if (passwordReject) {
+        passwordReject(new Error("Password prompt cancelled"))
+        setPasswordResolve(null)
+        setPasswordReject(null)
+      }
+    }
+  }
 
   const displayPools = useMemo(() => {
     const formatted = pools.map(formatPool)
@@ -129,8 +183,28 @@ export default function LiquidityPage() {
   const handleCreatePool = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     try {
+      let secretToUse = createForm.userSecret
+      
+      // If stored secret exists, always use password authentication
+      if (hasStoredSecret && walletAddress) {
+        try {
+          secretToUse = await getSecretFromAuth(walletAddress)
+        } catch (err) {
+          const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Authentication failed"
+          toast({ title: "Authentication failed", description: message, variant: "destructive" })
+          return
+        }
+      } else if (!secretToUse) {
+        toast({ 
+          title: "Secret required", 
+          description: "Enter the secret key to create the pool, or import your account and set up authentication.",
+          variant: "destructive" 
+        })
+        return
+      }
+
       await createLiquidityPool({
-        userSecret: createForm.userSecret,
+        userSecret: secretToUse,
         tokenA: { code: createForm.tokenACode, issuer: createForm.tokenAIssuer },
         tokenB: { code: createForm.tokenBCode, issuer: createForm.tokenBIssuer },
         amountA: createForm.amountA,
@@ -148,8 +222,28 @@ export default function LiquidityPage() {
   const handleDeposit = async (event: React.FormEvent<HTMLFormElement>, pool: ILiquidityPool) => {
     event.preventDefault()
     try {
+      let secretToUse = depositForm.userSecret
+      
+      // If stored secret exists, always use password authentication
+      if (hasStoredSecret && walletAddress) {
+        try {
+          secretToUse = await getSecretFromAuth(walletAddress)
+        } catch (err) {
+          const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Authentication failed"
+          toast({ title: "Authentication failed", description: message, variant: "destructive" })
+          return
+        }
+      } else if (!secretToUse) {
+        toast({ 
+          title: "Secret required", 
+          description: "Enter the secret key to add liquidity, or import your account and set up authentication.",
+          variant: "destructive" 
+        })
+        return
+      }
+
       await addLiquidity({
-        userSecret: depositForm.userSecret,
+        userSecret: secretToUse,
         poolId: pool.id,
         amountA: depositForm.amountA,
         amountB: depositForm.amountB,
@@ -166,8 +260,28 @@ export default function LiquidityPage() {
   const handleWithdraw = async (event: React.FormEvent<HTMLFormElement>, pool: ILiquidityPool) => {
     event.preventDefault()
     try {
+      let secretToUse = withdrawForm.userSecret
+      
+      // If stored secret exists, always use password authentication
+      if (hasStoredSecret && walletAddress) {
+        try {
+          secretToUse = await getSecretFromAuth(walletAddress)
+        } catch (err) {
+          const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Authentication failed"
+          toast({ title: "Authentication failed", description: message, variant: "destructive" })
+          return
+        }
+      } else if (!secretToUse) {
+        toast({ 
+          title: "Secret required", 
+          description: "Enter the secret key to withdraw liquidity, or import your account and set up authentication.",
+          variant: "destructive" 
+        })
+        return
+      }
+
       await withdrawLiquidity({
-        userSecret: withdrawForm.userSecret,
+        userSecret: secretToUse,
         poolId: pool.id,
         amount: withdrawForm.shareAmount,
       })
@@ -201,16 +315,27 @@ export default function LiquidityPage() {
                 <DialogDescription>Provide the asset pair, amounts, and secret to initialise the pool.</DialogDescription>
               </DialogHeader>
               <form className="space-y-4" onSubmit={handleCreatePool}>
-                <div className="space-y-2">
-                  <Label htmlFor="create-secret">User Secret</Label>
-                  <Input
-                    id="create-secret"
-                    placeholder="SXXXXXXXXXXXXXXXX"
-                    value={createForm.userSecret}
-                    onChange={(event) => setCreateForm((prev) => ({ ...prev, userSecret: event.target.value }))}
-                    required
-                  />
-                </div>
+                {!hasStoredSecret && (
+                  <div className="space-y-2">
+                    <Label htmlFor="create-secret">User Secret</Label>
+                    <Input
+                      id="create-secret"
+                      type="password"
+                      placeholder="SXXXXXXXXXXXXXXXX"
+                      value={createForm.userSecret}
+                      onChange={(event) => setCreateForm((prev) => ({ ...prev, userSecret: event.target.value }))}
+                      required
+                    />
+                  </div>
+                )}
+                {hasStoredSecret && (
+                  <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Lock className="h-4 w-4" />
+                      <span>You'll be prompted for your PIN/password when you submit</span>
+                    </div>
+                  </div>
+                )}
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="tokenA-code">Token A Code</Label>
@@ -409,15 +534,27 @@ export default function LiquidityPage() {
                           <DialogDescription>Deposit matching amounts to increase the pool depth.</DialogDescription>
                         </DialogHeader>
                         <form className="space-y-4" onSubmit={(event) => handleDeposit(event, pool)}>
-                          <div className="space-y-2">
-                            <Label htmlFor="deposit-secret">User Secret</Label>
-                            <Input
-                              id="deposit-secret"
-                              value={depositForm.userSecret}
-                              onChange={(event) => setDepositForm((prev) => ({ ...prev, userSecret: event.target.value }))}
-                              required
-                            />
-                          </div>
+                          {!hasStoredSecret && (
+                            <div className="space-y-2">
+                              <Label htmlFor="deposit-secret">User Secret</Label>
+                              <Input
+                                id="deposit-secret"
+                                type="password"
+                                placeholder="SXXXXXXXXXXXXXXXX"
+                                value={depositForm.userSecret}
+                                onChange={(event) => setDepositForm((prev) => ({ ...prev, userSecret: event.target.value }))}
+                                required
+                              />
+                            </div>
+                          )}
+                          {hasStoredSecret && (
+                            <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm">
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <Lock className="h-4 w-4" />
+                                <span>You'll be prompted for your PIN/password when you submit</span>
+                              </div>
+                            </div>
+                          )}
                           <div className="space-y-2">
                             <Label>{pool.assetA.symbol} Amount</Label>
                             <Input
@@ -468,15 +605,27 @@ export default function LiquidityPage() {
                           <DialogDescription>Redeem liquidity by providing your pool share percentage.</DialogDescription>
                           </DialogHeader>
                         <form className="space-y-4" onSubmit={(event) => handleWithdraw(event, pool)}>
-                          <div className="space-y-2">
-                            <Label htmlFor="withdraw-secret">User Secret</Label>
-                            <Input
-                              id="withdraw-secret"
-                              value={withdrawForm.userSecret}
-                              onChange={(event) => setWithdrawForm((prev) => ({ ...prev, userSecret: event.target.value }))}
-                              required
-                            />
-                          </div>
+                          {!hasStoredSecret && (
+                            <div className="space-y-2">
+                              <Label htmlFor="withdraw-secret">User Secret</Label>
+                              <Input
+                                id="withdraw-secret"
+                                type="password"
+                                placeholder="SXXXXXXXXXXXXXXXX"
+                                value={withdrawForm.userSecret}
+                                onChange={(event) => setWithdrawForm((prev) => ({ ...prev, userSecret: event.target.value }))}
+                                required
+                              />
+                            </div>
+                          )}
+                          {hasStoredSecret && (
+                            <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm">
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <Lock className="h-4 w-4" />
+                                <span>You'll be prompted for your PIN/password when you submit</span>
+                              </div>
+                            </div>
+                          )}
                             <div className="space-y-2">
                             <Label>Pool Share to Withdraw</Label>
                             <Input
@@ -503,6 +652,16 @@ export default function LiquidityPage() {
           </CardContent>
         </Card>
       </div>
+
+      {walletAddress && (
+        <PasswordPromptDialog
+          open={showPasswordDialog}
+          onOpenChange={handlePasswordDialogClose}
+          publicKey={walletAddress}
+          onPasswordSubmit={handlePasswordSubmit}
+          error={null}
+        />
+      )}
     </div>
   )
 }

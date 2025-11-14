@@ -170,8 +170,8 @@ export function SwapCard() {
     
     let secretToUse = userSecret
     
-    // Try to get secret from stored authentication if available and no manual secret provided
-    if (!secretToUse && hasStoredSecret && walletAddress) {
+    // If stored secret exists, always use password authentication (don't allow manual entry)
+    if (hasStoredSecret && walletAddress) {
       try {
         secretToUse = await getSecretFromAuth(walletAddress)
       } catch (err) {
@@ -179,13 +179,13 @@ export function SwapCard() {
         toast({ title: "Authentication failed", description: message, variant: "destructive" })
         return
       }
-    }
-    
-    if (!secretToUse) {
-      const authMessage = hasStoredSecret 
-        ? "Authentication failed. Please enter your secret key manually."
-        : "Enter the secret key to sign the swap transaction, or import your account and set up authentication."
-      toast({ title: "Secret required", description: authMessage, variant: "destructive" })
+    } else if (!secretToUse) {
+      // Only allow manual entry if no stored secret exists
+      toast({ 
+        title: "Secret required", 
+        description: "Enter the secret key to sign the swap transaction, or import your account and set up authentication.",
+        variant: "destructive" 
+      })
       return
     }
     
@@ -464,42 +464,33 @@ export function SwapCard() {
             </>
           )}
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
+          {/* Only show secret input if no stored secret exists */}
+          {!hasStoredSecret && (
+            <div className="space-y-2">
               <Label htmlFor="swap-secret" className="text-sm font-medium text-muted-foreground">
                 User Secret
               </Label>
-              {hasStoredSecret && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleAuthenticate}
-                  disabled={authLoading}
-                  className="h-8"
-                >
-                  {authLoading ? (
-                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                  ) : (
-                    <Lock className="h-3 w-3 mr-1" />
-                  )}
-                  Use PIN/Password
-                </Button>
-              )}
-            </div>
-            <Input
-              id="swap-secret"
-              type="password"
-              placeholder={hasStoredSecret ? "Enter secret or use authentication above" : "SXXXXXXXXXXXXXXXX"}
-              value={userSecret}
-              onChange={(event) => setUserSecret(event.target.value)}
-            />
-            {hasStoredSecret && (
+              <Input
+                id="swap-secret"
+                type="password"
+                placeholder="SXXXXXXXXXXXXXXXX"
+                value={userSecret}
+                onChange={(event) => setUserSecret(event.target.value)}
+              />
               <p className="text-xs text-muted-foreground">
-                You can use PIN/password authentication or enter your secret key manually.
+                Enter the secret key to sign the swap transaction, or import your account and set up authentication.
               </p>
-            )}
-          </div>
+            </div>
+          )}
+          
+          {hasStoredSecret && (
+            <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Lock className="h-4 w-4" />
+                <span>You'll be prompted for your PIN/password when you click Swap</span>
+              </div>
+            </div>
+          )}
 
           <Button
             className="w-full h-12 btn-gradient-primary font-semibold shadow-lg"

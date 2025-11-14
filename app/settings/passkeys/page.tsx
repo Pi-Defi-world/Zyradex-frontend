@@ -5,7 +5,8 @@ import { usePasskeyManagement, usePasskeyRegistration } from "@/hooks/usePasskey
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
-import { Loader2, Shield, Trash2, Plus } from "lucide-react"
+import { Loader2, Shield, Trash2, Plus, AlertCircle } from "lucide-react"
+import { isWebAuthnSupported } from "@/lib/passkey/webauthn"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,6 +24,7 @@ const PasskeysPage: React.FC = () => {
   const { register: registerPasskey, isLoading: registeringPasskey } = usePasskeyRegistration()
   const { toast } = useToast()
   const [deletingId, setDeletingId] = React.useState<string | null>(null)
+  const webAuthnSupported = isWebAuthnSupported()
 
   useEffect(() => {
     refresh()
@@ -83,6 +85,18 @@ const PasskeysPage: React.FC = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {!webAuthnSupported && (
+              <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-yellow-600 dark:text-yellow-400 text-sm flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-medium">WebAuthn not supported</p>
+                  <p className="text-xs mt-1">
+                    Your browser does not support WebAuthn (Passkeys). You can use PIN/password authentication instead.
+                    Import your account to set up PIN/password authentication.
+                  </p>
+                </div>
+              </div>
+            )}
             {error && (
               <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
                 {error.message}
@@ -91,7 +105,7 @@ const PasskeysPage: React.FC = () => {
 
             <Button
               onClick={handleAddPasskey}
-              disabled={registeringPasskey}
+              disabled={registeringPasskey || !webAuthnSupported}
               className="w-full"
             >
               {registeringPasskey ? (

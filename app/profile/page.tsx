@@ -194,22 +194,37 @@ const ProfilePage: React.FC = () => {
     }
 
     try {
+      console.log("Setting up password for public key:", pendingPublicKey)
+      
       // Generate salt and derive key from password
       const salt = generateSalt()
       const saltBase64 = btoa(String.fromCharCode(...salt))
+      console.log("Generated salt, deriving key from password...")
+      
       const key = await deriveKeyFromPassword(password, salt)
+      console.log("Key derived, encrypting secret...")
       
       // Encrypt secret with password-derived key
       const { encrypted, iv } = await encryptSecret(pendingSecret, key)
+      console.log("Secret encrypted, storing in IndexedDB...")
       
       // Store encrypted secret with salt
       await storeEncryptedSecret(pendingPublicKey, encrypted, iv, saltBase64)
+      console.log("Encrypted secret stored successfully for:", pendingPublicKey)
+      
+      // Verify storage
+      const { hasStoredSecret } = await import("@/lib/passkey/storage")
+      const isStored = await hasStoredSecret(pendingPublicKey)
+      console.log("Verification - secret stored:", isStored)
       
       // Clear pending data
       const savedPublicKey = pendingPublicKey
       const savedSecret = pendingSecret
       setPendingPublicKey(null)
       setPendingSecret(null)
+      
+      // Close password dialog first
+      setShowPasswordDialog(false)
       
       toast({
         title: "Success",
@@ -228,7 +243,7 @@ const ProfilePage: React.FC = () => {
       }
     } catch (err) {
       console.error("Failed to set up password:", err)
-      throw new Error("Failed to set up password. Please try again.")
+      throw new Error(err instanceof Error ? err.message : "Failed to set up password. Please try again.")
     }
   }
 
