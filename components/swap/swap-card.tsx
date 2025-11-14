@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowDown, Settings, Loader2, Lock } from "lucide-react"
 import { usePi } from "@/components/providers/pi-provider"
+import { useUserProfile } from "@/hooks/useUserProfile"
 import { useToast } from "@/hooks/use-toast"
 import { usePoolsForPair, useSwapQuote, useExecuteSwap } from "@/hooks/useSwapData"
 import { useTransactionAuth } from "@/hooks/useTransactionAuth"
@@ -15,7 +16,7 @@ import { PasswordPromptDialog } from "@/components/password-prompt-dialog"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
-  return localStorage.getItem("bingepi-wallet-address")
+  return localStorage.getItem("zyradex-wallet-address")
 }
 
 // Parse token string (e.g., "native" or "CODE:ISSUER" or just "CODE") into { code, issuer }
@@ -41,12 +42,15 @@ const tokenToDescriptor = (token: { code: string; issuer?: string }): string => 
 
 export function SwapCard() {
   const { user } = usePi()
+  const { profile } = useUserProfile()
   const { toast } = useToast()
   const [localWallet, setLocalWallet] = useState<string | null>(null)
 
   useEffect(() => {
-    setLocalWallet(getStoredWallet())
-  }, [])
+    const stored = getStoredWallet()
+    const address = profile?.public_key || stored || user?.wallet_address || null
+    setLocalWallet(address)
+  }, [profile?.public_key, user?.wallet_address])
 
   // Token input state
   const [tokenA, setTokenA] = useState<string>("")
@@ -56,7 +60,7 @@ export function SwapCard() {
   const [selectedPoolId, setSelectedPoolId] = useState<string>("")
   const [slippagePercent, setSlippagePercent] = useState<number>(1)
   
-  const walletAddress = localWallet || user?.wallet_address
+  const walletAddress = localWallet || profile?.public_key || user?.wallet_address
   const [showPasswordDialog, setShowPasswordDialog] = useState(false)
   const [passwordResolve, setPasswordResolve] = useState<((password: string) => void) | null>(null)
   const [passwordReject, setPasswordReject] = useState<((error: Error) => void) | null>(null)

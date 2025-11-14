@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { usePasskeyAuthentication } from './usePasskey'
 import { getSecretForTransaction } from '@/lib/passkey/transaction'
 import { hasStoredSecret, getPasswordAttempts, storePasswordAttempts, resetPasswordAttempts, isAccountLocked } from '@/lib/passkey/storage'
@@ -100,10 +100,18 @@ export const useTransactionAuth = (
     }
   }, [authenticate, checkStoredSecret, onPasswordPrompt])
 
-  // Check stored secret availability when publicKey changes
-  if (publicKey) {
-    checkStoredSecret(publicKey).catch(() => undefined)
-  }
+  // Check stored secret availability when publicKey changes (only once per publicKey)
+  const lastCheckedKey = useRef<string | null>(null)
+  useEffect(() => {
+    if (publicKey && publicKey !== lastCheckedKey.current) {
+      lastCheckedKey.current = publicKey
+      checkStoredSecret(publicKey).catch(() => undefined)
+    } else if (!publicKey) {
+      lastCheckedKey.current = null
+      setHasStoredSecretValue(false)
+      setRequiresPasswordValue(false)
+    }
+  }, [publicKey, checkStoredSecret])
 
   return {
     getSecret,

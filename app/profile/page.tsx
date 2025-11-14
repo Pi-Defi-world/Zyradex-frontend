@@ -216,8 +216,10 @@ const ProfilePage: React.FC = () => {
       console.log("Key derived, encrypting secret...")
       
       // Encrypt secret with password-derived key
+      console.log("Encrypting secret key (starts with 'S'):", pendingSecret.substring(0, 10) + "...")
       const { encrypted, iv } = await encryptSecret(pendingSecret, key)
       console.log("Secret encrypted, storing on backend...")
+      console.log("Encrypted data length:", encrypted.length, "IV length:", iv.length)
       
       // Store encrypted secret with salt
       try {
