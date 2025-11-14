@@ -23,14 +23,30 @@ jobs:
         env:
           DESTINATION_REPO: "https://junman140:${{ secrets.API_TOKEN_GITHUB }}@github.com/junman140/tokenization-fe.git"
         run: |
-          git clone "$DESTINATION_REPO" --branch passkey --single-branch temp_zyra_dex
+          # Try to clone main branch first, if it fails, create the repo structure
+          if git clone "$DESTINATION_REPO" --branch main --single-branch temp_zyra_dex 2>/dev/null; then
+            echo "✅ Cloned main branch successfully"
+          else
+            echo "⚠️ Repository or main branch doesn't exist, creating..."
+            mkdir -p temp_zyra_dex
+            cd temp_zyra_dex
+            git init
+            git checkout -b main
+            git remote add origin "$DESTINATION_REPO"
+            cd ..
+          fi
+          
           rsync -av --delete --exclude '.git' --exclude '.github/workflows' ./ temp_zyra_dex/
           cd temp_zyra_dex
+          
+          # Configure git if not already done
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "GitHub Actions"
 
           if [ -n "$(git status --porcelain)" ]; then
             git add .
             git commit -m "Sync source code for Vercel build 🚀 [skip ci]"
-            git push origin passkey
+            git push origin main || git push -u origin main
             echo "✅ Synced successfully!"
           else
             echo "🟢 No changes detected — skipping commit."

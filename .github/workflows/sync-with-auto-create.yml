@@ -1,0 +1,94 @@
+name: Sync to Vercel Repo (Auto-Create)
+
+on:
+  push:
+    branches:
+      - passkey
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source repo
+        uses: actions/checkout@v4
+
+      - name: Configure Git
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "${{ github.actor }}"
+          git config --global --add safe.directory /github/workspace
+
+      - name: Check if destination repo exists
+        id: check_repo
+        env:
+          GITHUB_TOKEN: ${{ secrets.API_TOKEN_GITHUB }}
+        run: |
+          REPO_NAME="tokenization-fe"
+          OWNER="junman140"
+          
+          # Check if repo exists
+          if curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/$OWNER/$REPO_NAME" | grep -q '"name"'; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "✅ Repository $OWNER/$REPO_NAME exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Repository $OWNER/$REPO_NAME does not exist"
+          fi
+
+      - name: Create repository if it doesn't exist
+        if: steps.check_repo.outputs.exists == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.API_TOKEN_GITHUB }}
+        run: |
+          REPO_NAME="tokenization-fe"
+          OWNER="junman140"
+          
+          echo "Creating repository $OWNER/$REPO_NAME..."
+          curl -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/user/repos" \
+            -d "{\"name\":\"$REPO_NAME\",\"private\":false,\"auto_init\":true,\"default_branch\":\"main\"}"
+          
+          echo "✅ Repository created successfully"
+          # Wait a moment for GitHub to initialize
+          sleep 3
+
+      - name: Push to destination (Vercel) repo
+        env:
+          DESTINATION_REPO: "https://junman140:${{ secrets.API_TOKEN_GITHUB }}@github.com/junman140/tokenization-fe.git"
+        run: |
+          # Clone the repository
+          git clone "$DESTINATION_REPO" --branch main --single-branch temp_zyra_dex || {
+            echo "⚠️ Failed to clone, trying to initialize..."
+            mkdir -p temp_zyra_dex
+            cd temp_zyra_dex
+            git init
+            git checkout -b main
+            git remote add origin "$DESTINATION_REPO"
+            touch README.md
+            git add README.md
+            git commit -m "Initial commit"
+            git push -u origin main || true
+            cd ..
+            git clone "$DESTINATION_REPO" --branch main --single-branch temp_zyra_dex
+          }
+          
+          rsync -av --delete --exclude '.git' --exclude '.github/workflows' ./ temp_zyra_dex/
+          cd temp_zyra_dex
+          
+          # Configure git
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "GitHub Actions"
+
+          if [ -n "$(git status --porcelain)" ]; then
+            git add .
+            git commit -m "Sync source code for Vercel build 🚀 [skip ci]"
+            git push origin main
+            echo "✅ Synced successfully!"
+          else
+            echo "🟢 No changes detected — skipping commit."
+          fi
+
