@@ -23,6 +23,6 @@ jobs:
           destination-repository-name: 'tokenization-fe'
           user-email: 'github-actions[bot]@users.noreply.github.com'
           user-name: 'GitHub Actions'
-          target-branch: 'passkey'
+          target-branch: 'main'
           commit-message: 'Sync source code for Vercel build 🚀'
            
