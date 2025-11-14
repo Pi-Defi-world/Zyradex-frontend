@@ -3,52 +3,93 @@
 import { useState, useCallback } from 'react'
 import { usePasskeyAuthentication } from './usePasskey'
 import { getSecretForTransaction } from '@/lib/passkey/transaction'
-import { hasStoredSecret } from '@/lib/passkey/storage'
+import { hasStoredSecret, getPasswordAttempts, storePasswordAttempts, resetPasswordAttempts, isAccountLocked } from '@/lib/passkey/storage'
+import { isWebAuthnSupported } from '@/lib/passkey/webauthn'
 import type { ApiError } from '@/lib/api'
 import { toApiError } from '@/lib/api'
 
 interface UseTransactionAuthReturn {
-  getSecret: (publicKey: string) => Promise<string>
+  getSecret: (publicKey: string, password?: string) => Promise<string>
   isLoading: boolean
   error: ApiError | null
-  hasPasskey: boolean
+  hasStoredSecret: boolean
+  requiresPassword: boolean // True if WebAuthn not supported and stored secret exists
 }
 
-export const useTransactionAuth = (publicKey?: string): UseTransactionAuthReturn => {
+export const useTransactionAuth = (
+  publicKey?: string,
+  onPasswordPrompt?: () => Promise<string>
+): UseTransactionAuthReturn => {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<ApiError | null>(null)
-  const [hasPasskey, setHasPasskey] = useState(false)
+  const [hasStoredSecretValue, setHasStoredSecretValue] = useState(false)
+  const [requiresPasswordValue, setRequiresPasswordValue] = useState(false)
   const { authenticate } = usePasskeyAuthentication()
 
-  const checkPasskey = useCallback(async (pk: string) => {
+  const checkStoredSecret = useCallback(async (pk: string) => {
     if (!pk) return false
     try {
       const hasSecret = await hasStoredSecret(pk)
-      setHasPasskey(hasSecret)
+      setHasStoredSecretValue(hasSecret)
+      
+      // Password is PRIMARY (99% use Pi Browser)
+      // Always require password if secret exists
+      setRequiresPasswordValue(hasSecret)
+      
       return hasSecret
     } catch {
-      setHasPasskey(false)
+      setHasStoredSecretValue(false)
+      setRequiresPasswordValue(false)
       return false
     }
   }, [])
 
-  const getSecret = useCallback(async (pk: string): Promise<string> => {
+  const getSecret = useCallback(async (pk: string, password?: string): Promise<string> => {
     setIsLoading(true)
     setError(null)
 
     try {
-      // Check if passkey is available
-      const hasPasskeyAvailable = await checkPasskey(pk)
+      // Check if stored secret is available
+      const hasSecretAvailable = await checkStoredSecret(pk)
       
-      if (hasPasskeyAvailable) {
-        // Authenticate with passkey
-        const { sessionToken } = await authenticate()
-        
-        // Get secret from IndexedDB
-        const secret = await getSecretForTransaction(pk, sessionToken)
+      if (!hasSecretAvailable) {
+        throw new Error('No stored secret found. Please import your account and set up authentication, or enter your secret key manually.')
+      }
+
+      // Check if account is locked
+      const locked = await isAccountLocked(pk)
+      if (locked) {
+        throw new Error('Account is locked due to too many failed password attempts. Please use the recovery option to reset your account.')
+      }
+
+      // Password is PRIMARY (99% use Pi Browser)
+      // Always use password authentication first
+      if (!password) {
+        if (onPasswordPrompt) {
+          // Prompt for password using callback
+          password = await onPasswordPrompt()
+        } else {
+          throw new Error('Password is required. Please provide your PIN/password.')
+        }
+      }
+
+      try {
+        const secret = await getSecretForTransaction(pk, { type: 'password', password })
+        // Reset password attempts on successful auth
+        await resetPasswordAttempts(pk)
         return secret
-      } else {
-        throw new Error('No passkey found. Please import your account and set up a passkey, or enter your secret key manually.')
+      } catch (err: any) {
+        // Increment failed attempts
+        const currentAttempts = await getPasswordAttempts(pk)
+        const newAttempts = currentAttempts + 1
+        await storePasswordAttempts(pk, newAttempts)
+
+        if (newAttempts >= 5) {
+          throw new Error('Account locked due to too many failed password attempts. Please use the recovery option.')
+        }
+
+        const remaining = 5 - newAttempts
+        throw new Error(`Incorrect password. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining.`)
       }
     } catch (err) {
       const apiError = toApiError(err)
@@ -57,18 +98,19 @@ export const useTransactionAuth = (publicKey?: string): UseTransactionAuthReturn
     } finally {
       setIsLoading(false)
     }
-  }, [authenticate, checkPasskey])
+  }, [authenticate, checkStoredSecret, onPasswordPrompt])
 
-  // Check passkey availability when publicKey changes
+  // Check stored secret availability when publicKey changes
   if (publicKey) {
-    checkPasskey(publicKey).catch(() => undefined)
+    checkStoredSecret(publicKey).catch(() => undefined)
   }
 
   return {
     getSecret,
     isLoading,
     error,
-    hasPasskey,
+    hasStoredSecret: hasStoredSecretValue,
+    requiresPassword: requiresPasswordValue,
   }
 }
 

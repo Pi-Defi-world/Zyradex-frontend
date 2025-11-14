@@ -35,8 +35,10 @@ import { useImportAccount } from "@/hooks/useAccountData"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { usePasskeyRegistration } from "@/hooks/usePasskey"
 import { storeEncryptedSecret } from "@/lib/passkey/storage"
-import { encryptSecret, generateKey } from "@/lib/passkey/encryption"
+import { encryptSecret, generateKey, deriveKeyFromPassword, generateSalt, validatePasswordStrength } from "@/lib/passkey/encryption"
 import { setEncryptionKey } from "@/lib/passkey/transaction"
+import { isWebAuthnSupported } from "@/lib/passkey/webauthn"
+import { PasswordSetupDialog } from "@/components/password-setup-dialog"
 import {
   Dialog,
   DialogContent,
@@ -68,6 +70,7 @@ const ProfilePage: React.FC = () => {
   const { importAccount, isLoading: importingAccount, error: importError } = useImportAccount()
   const { register: registerPasskey, isLoading: registeringPasskey } = usePasskeyRegistration()
   const [showPasskeyDialog, setShowPasskeyDialog] = useState(false)
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false)
   const [pendingPublicKey, setPendingPublicKey] = useState<string | null>(null)
   const [pendingSecret, setPendingSecret] = useState<string | null>(null)
 
@@ -146,31 +149,16 @@ const ProfilePage: React.FC = () => {
         mnemonic: mnemonicInput.trim() || undefined,
       })
       
-      // Store public key and secret for passkey registration
+      // Store public key and secret for authentication setup
       setPendingPublicKey(response.publicKey)
       setPendingSecret(response.secret)
-      
-      // Encrypt and store secret in IndexedDB
-      try {
-        const key = await generateKey()
-        const { encrypted, iv } = await encryptSecret(response.secret, key)
-        await storeEncryptedSecret(response.publicKey, encrypted, iv)
-        // Store encryption key in memory for later decryption
-        setEncryptionKey(response.publicKey, key)
-      } catch (encryptError) {
-        console.error("Failed to encrypt secret:", encryptError)
-        toast({
-          title: "Warning",
-          description: "Account imported but secret encryption failed. Please set up passkey.",
-          variant: "destructive",
-        })
-      }
       
       handleWalletPersist(response.publicKey)
       refreshProfile().catch(() => undefined)
       
-      // Show passkey registration dialog
-      setShowPasskeyDialog(true)
+      // PIN/password is the PRIMARY option (99% of users use Pi Browser)
+      // Always show password setup dialog first
+      setShowPasswordDialog(true)
       
       setSecretInput("")
       setMnemonicInput("")
@@ -193,6 +181,54 @@ const ProfilePage: React.FC = () => {
     } catch (err) {
       const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Passkey registration failed"
       toast({ title: "Registration failed", description: message, variant: "destructive" })
+    }
+  }
+
+  const handlePasswordSetup = async (password: string) => {
+    if (!pendingPublicKey || !pendingSecret) {
+      throw new Error("Missing account information. Please re-import your account.")
+    }
+
+    if (!validatePasswordStrength(password)) {
+      throw new Error("Password must be at least 6 characters long")
+    }
+
+    try {
+      // Generate salt and derive key from password
+      const salt = generateSalt()
+      const saltBase64 = btoa(String.fromCharCode(...salt))
+      const key = await deriveKeyFromPassword(password, salt)
+      
+      // Encrypt secret with password-derived key
+      const { encrypted, iv } = await encryptSecret(pendingSecret, key)
+      
+      // Store encrypted secret with salt
+      await storeEncryptedSecret(pendingPublicKey, encrypted, iv, saltBase64)
+      
+      // Clear pending data
+      const savedPublicKey = pendingPublicKey
+      const savedSecret = pendingSecret
+      setPendingPublicKey(null)
+      setPendingSecret(null)
+      
+      toast({
+        title: "Success",
+        description: "PIN/password set up successfully. You can now use it to sign transactions.",
+      })
+      
+      // Optionally offer WebAuthn setup if supported (as an additional option)
+      if (isWebAuthnSupported()) {
+        // Store for optional passkey setup
+        setPendingPublicKey(savedPublicKey)
+        setPendingSecret(savedSecret)
+        // Show passkey dialog as optional enhancement
+        setTimeout(() => {
+          setShowPasskeyDialog(true)
+        }, 500)
+      }
+    } catch (err) {
+      console.error("Failed to set up password:", err)
+      throw new Error("Failed to set up password. Please try again.")
     }
   }
 
@@ -453,42 +489,51 @@ const ProfilePage: React.FC = () => {
         )}
       </div>
 
-      <Dialog open={showPasskeyDialog} onOpenChange={setShowPasskeyDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Set Up Passkey</DialogTitle>
-            <DialogDescription>
-              To secure your account and enable passwordless transactions, please register a passkey.
-              This will allow you to sign transactions without entering your secret key each time.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 mt-4">
-            <p className="text-sm text-muted-foreground">
-              Click the button below to create a passkey using your device's biometric authentication
-              (fingerprint, face recognition, or PIN).
-            </p>
-            <Button
-              onClick={handlePasskeyRegistration}
-              disabled={registeringPasskey}
-              className="w-full"
-            >
-              {registeringPasskey && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Register Passkey
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowPasskeyDialog(false)
-                setPendingPublicKey(null)
-                setPendingSecret(null)
-              }}
-              className="w-full"
-            >
-              Skip for Now
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {isWebAuthnSupported() && (
+        <Dialog open={showPasskeyDialog} onOpenChange={setShowPasskeyDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Optional: Set Up Passkey</DialogTitle>
+              <DialogDescription>
+                Your account is already secured with PIN/password. You can optionally add passkey authentication
+                for a more convenient experience on supported browsers.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              <p className="text-sm text-muted-foreground">
+                Passkey allows you to use biometric authentication (fingerprint, face recognition, or PIN)
+                as an alternative to entering your PIN/password. This is optional - your PIN/password will continue to work.
+              </p>
+              <Button
+                onClick={handlePasskeyRegistration}
+                disabled={registeringPasskey}
+                className="w-full"
+              >
+                {registeringPasskey && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Register Passkey (Optional)
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowPasskeyDialog(false)
+                  setPendingPublicKey(null)
+                  setPendingSecret(null)
+                }}
+                className="w-full"
+              >
+                Skip - Use PIN/Password Only
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      <PasswordSetupDialog
+        open={showPasswordDialog}
+        onOpenChange={setShowPasswordDialog}
+        onPasswordSet={handlePasswordSetup}
+        isLoading={false}
+      />
     </div>
   )
 }

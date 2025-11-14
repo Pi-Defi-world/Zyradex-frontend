@@ -6,12 +6,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowDown, Settings, Loader2 } from "lucide-react"
+import { ArrowDown, Settings, Loader2, Lock } from "lucide-react"
 import { usePi } from "@/components/providers/pi-provider"
 import { useToast } from "@/hooks/use-toast"
 import { usePoolsForPair, useSwapQuote, useExecuteSwap } from "@/hooks/useSwapData"
 import { useTransactionAuth } from "@/hooks/useTransactionAuth"
-import { Shield } from "lucide-react"
+import { PasswordPromptDialog } from "@/components/password-prompt-dialog"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -57,7 +57,22 @@ export function SwapCard() {
   const [slippagePercent, setSlippagePercent] = useState<number>(1)
   
   const walletAddress = localWallet || user?.wallet_address
-  const { getSecret: getSecretFromPasskey, isLoading: authLoading, hasPasskey } = useTransactionAuth(walletAddress || undefined)
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false)
+  const [passwordResolve, setPasswordResolve] = useState<((password: string) => void) | null>(null)
+  const [passwordReject, setPasswordReject] = useState<((error: Error) => void) | null>(null)
+  
+  const handlePasswordPrompt = async (): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      setPasswordResolve(() => (password: string) => resolve(password))
+      setPasswordReject(() => (error: Error) => reject(error))
+      setShowPasswordDialog(true)
+    })
+  }
+
+  const { getSecret: getSecretFromAuth, isLoading: authLoading, hasStoredSecret, requiresPassword } = useTransactionAuth(
+    walletAddress || undefined,
+    handlePasswordPrompt
+  )
 
   // Parse tokens
   const fromToken = useMemo(() => {
@@ -155,19 +170,22 @@ export function SwapCard() {
     
     let secretToUse = userSecret
     
-    // Try to get secret from passkey if available and no manual secret provided
-    if (!secretToUse && hasPasskey && walletAddress) {
+    // Try to get secret from stored authentication if available and no manual secret provided
+    if (!secretToUse && hasStoredSecret && walletAddress) {
       try {
-        secretToUse = await getSecretFromPasskey(walletAddress)
+        secretToUse = await getSecretFromAuth(walletAddress)
       } catch (err) {
-        const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Passkey authentication failed"
+        const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Authentication failed"
         toast({ title: "Authentication failed", description: message, variant: "destructive" })
         return
       }
     }
     
     if (!secretToUse) {
-      toast({ title: "Secret required", description: hasPasskey ? "Passkey authentication failed. Please enter your secret key manually." : "Enter the secret key to sign the swap transaction, or set up a passkey.", variant: "destructive" })
+      const authMessage = hasStoredSecret 
+        ? "Authentication failed. Please enter your secret key manually."
+        : "Enter the secret key to sign the swap transaction, or import your account and set up authentication."
+      toast({ title: "Secret required", description: authMessage, variant: "destructive" })
       return
     }
     
@@ -194,18 +212,39 @@ export function SwapCard() {
     }
   }
   
-  const handleAuthenticateWithPasskey = async () => {
+  const handleAuthenticate = async () => {
     if (!walletAddress) {
       toast({ title: "No wallet", description: "Please import your account first.", variant: "destructive" })
       return
     }
     try {
-      const secret = await getSecretFromPasskey(walletAddress)
+      const secret = await getSecretFromAuth(walletAddress)
       setUserSecret(secret)
-      toast({ title: "Authenticated", description: "Secret key retrieved using passkey." })
+      toast({ title: "Authenticated", description: "Secret key retrieved using PIN/password." })
     } catch (err) {
-      const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Passkey authentication failed"
+      const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Authentication failed"
       toast({ title: "Authentication failed", description: message, variant: "destructive" })
+    }
+  }
+
+  const handlePasswordSubmit = async (password: string) => {
+    if (passwordResolve) {
+      passwordResolve(password)
+      setPasswordResolve(null)
+      setPasswordReject(null)
+      setShowPasswordDialog(false)
+    }
+  }
+
+  const handlePasswordDialogClose = (open: boolean) => {
+    if (!open) {
+      setShowPasswordDialog(false)
+      // Reject the promise if dialog is closed without submitting
+      if (passwordReject) {
+        passwordReject(new Error("Password prompt cancelled"))
+        setPasswordResolve(null)
+        setPasswordReject(null)
+      }
     }
   }
 
@@ -430,34 +469,34 @@ export function SwapCard() {
               <Label htmlFor="swap-secret" className="text-sm font-medium text-muted-foreground">
                 User Secret
               </Label>
-              {hasPasskey && (
+              {hasStoredSecret && (
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={handleAuthenticateWithPasskey}
+                  onClick={handleAuthenticate}
                   disabled={authLoading}
                   className="h-8"
                 >
                   {authLoading ? (
                     <Loader2 className="h-3 w-3 animate-spin mr-1" />
                   ) : (
-                    <Shield className="h-3 w-3 mr-1" />
+                    <Lock className="h-3 w-3 mr-1" />
                   )}
-                  Use Passkey
+                  Use PIN/Password
                 </Button>
               )}
             </div>
             <Input
               id="swap-secret"
               type="password"
-              placeholder={hasPasskey ? "Enter secret or use passkey above" : "SXXXXXXXXXXXXXXXX"}
+              placeholder={hasStoredSecret ? "Enter secret or use authentication above" : "SXXXXXXXXXXXXXXXX"}
               value={userSecret}
               onChange={(event) => setUserSecret(event.target.value)}
             />
-            {hasPasskey && (
+            {hasStoredSecret && (
               <p className="text-xs text-muted-foreground">
-                You can use passkey authentication or enter your secret key manually.
+                You can use PIN/password authentication or enter your secret key manually.
               </p>
             )}
           </div>
@@ -483,6 +522,16 @@ export function SwapCard() {
           </Button>
         </CardContent>
       </div>
+
+      {walletAddress && (
+        <PasswordPromptDialog
+          open={showPasswordDialog}
+          onOpenChange={handlePasswordDialogClose}
+          publicKey={walletAddress}
+          onPasswordSubmit={handlePasswordSubmit}
+          error={null}
+        />
+      )}
     </Card>
   )
 }

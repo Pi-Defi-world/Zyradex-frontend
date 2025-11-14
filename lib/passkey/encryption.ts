@@ -114,3 +114,55 @@ export const exportKey = async (key: CryptoKey): Promise<ArrayBuffer> => {
   return crypto.subtle.exportKey('raw', key);
 };
 
+/**
+ * Generate a random salt for password-based key derivation
+ */
+export const generateSalt = (): Uint8Array => {
+  const salt = new Uint8Array(16);
+  crypto.getRandomValues(salt);
+  return salt;
+};
+
+/**
+ * Derive an encryption key from a password using PBKDF2
+ * @param password - The user's PIN/password
+ * @param salt - The salt used for key derivation (should be stored with encrypted data)
+ */
+export const deriveKeyFromPassword = async (
+  password: string,
+  salt: Uint8Array
+): Promise<CryptoKey> => {
+  const encoder = new TextEncoder();
+  const passwordKey = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveKey']
+  );
+
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt,
+      iterations: 100000,
+      hash: 'SHA-256',
+    },
+    passwordKey,
+    {
+      name: ALGORITHM,
+      length: KEY_LENGTH,
+    },
+    true,
+    ['encrypt', 'decrypt']
+  );
+};
+
+/**
+ * Validate password strength
+ * Minimum 6 characters required
+ */
+export const validatePasswordStrength = (password: string): boolean => {
+  return password.length >= 6;
+};
+
