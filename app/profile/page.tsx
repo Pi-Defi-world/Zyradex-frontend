@@ -278,7 +278,7 @@ const ProfilePage: React.FC = () => {
   return (
     <div className="min-h-screen premium-gradient pt-16 pb-20 p-3 sm:p-4">
       <div className="max-w-md mx-auto space-y-6">
-        <div className="flex items-center justify-between">
+        {/* <div className="flex items-center justify-between">
           <h1 className="text-xl sm:text-2xl font-bold text-foreground">Profile</h1>
           {!isAuthenticated && (
             <Button size="sm" onClick={handlePiConnect} disabled={isLoading}>
@@ -286,7 +286,7 @@ const ProfilePage: React.FC = () => {
               Connect Pi
             </Button>
           )}
-        </div>
+        </div> */}
 
         <Card>
           <CardHeader>
