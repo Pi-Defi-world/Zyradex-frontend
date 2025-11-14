@@ -1,10 +1,28 @@
 'use client'
 
 import { useCallback, useEffect, useState } from "react"
+import { jwtDecode } from "jwt-decode"
 import { usePi } from "@/components/providers/pi-provider"
 import { signIn, type AdminUser } from "@/lib/api/auth"
 import type { ApiError } from "@/lib/api"
-import { toApiError } from "@/lib/api"
+import { toApiError, setAuthToken, clearAuthToken } from "@/lib/api"
+
+const USER_TOKEN_KEY = "dex_user_token"
+const USER_PROFILE_KEY = "dex_user_profile"
+
+interface TokenClaims {
+  exp?: number
+}
+
+const isTokenExpired = (token: string) => {
+  try {
+    const claims = jwtDecode<TokenClaims>(token)
+    if (!claims.exp) return false
+    return claims.exp * 1000 < Date.now()
+  } catch {
+    return false
+  }
+}
 
 interface UseUserProfileReturn {
   profile: AdminUser | null
@@ -14,10 +32,46 @@ interface UseUserProfileReturn {
 }
 
 export const useUserProfile = (): UseUserProfileReturn => {
-  const { authenticate, authResult, user: piUser } = usePi()
+  const { authenticate, authResult, user: piUser, isAuthenticated: piAuthenticated } = usePi()
   const [profile, setProfile] = useState<AdminUser | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<ApiError | null>(null)
+
+  // Restore token and profile from localStorage on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const savedToken = localStorage.getItem(USER_TOKEN_KEY)
+    const savedProfile = localStorage.getItem(USER_PROFILE_KEY)
+
+    if (savedToken && savedProfile) {
+      if (isTokenExpired(savedToken)) {
+        localStorage.removeItem(USER_TOKEN_KEY)
+        localStorage.removeItem(USER_PROFILE_KEY)
+        return
+      }
+      try {
+        const parsedProfile: AdminUser = JSON.parse(savedProfile)
+        setProfile(parsedProfile)
+        setAuthToken(savedToken)
+      } catch {
+        localStorage.removeItem(USER_TOKEN_KEY)
+        localStorage.removeItem(USER_PROFILE_KEY)
+      }
+    }
+  }, [])
+
+  // Clear auth if Pi authentication is lost
+  useEffect(() => {
+    if (!piAuthenticated) {
+      setProfile(null)
+      clearAuthToken()
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(USER_TOKEN_KEY)
+        localStorage.removeItem(USER_PROFILE_KEY)
+      }
+    }
+  }, [piAuthenticated])
 
   const loadProfile = useCallback(async () => {
     setIsLoading(true)
@@ -43,8 +97,21 @@ export const useUserProfile = (): UseUserProfileReturn => {
         },
       }
 
-      const { user: backendUser } = await signIn(payload)
+      const { user: backendUser, token } = await signIn(payload)
+
+      if (isTokenExpired(token)) {
+        throw new Error("Received an expired session token")
+      }
+
       setProfile(backendUser)
+      setAuthToken(token)
+
+      // Persist token and profile to localStorage
+      if (typeof window !== "undefined") {
+        localStorage.setItem(USER_TOKEN_KEY, token)
+        localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(backendUser))
+      }
+
       return backendUser
     } catch (err) {
       const apiError = toApiError(err)
