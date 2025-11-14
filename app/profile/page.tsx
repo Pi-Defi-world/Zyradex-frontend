@@ -194,6 +194,12 @@ const ProfilePage: React.FC = () => {
     }
 
     try {
+      // Check IndexedDB availability first
+      const { isIndexedDBAvailable } = await import("@/lib/passkey/storage")
+      if (!isIndexedDBAvailable()) {
+        throw new Error("IndexedDB is not available in this browser. Please use a modern browser or check your browser settings.")
+      }
+
       console.log("Setting up password for public key:", pendingPublicKey)
       
       // Generate salt and derive key from password
@@ -209,13 +215,42 @@ const ProfilePage: React.FC = () => {
       console.log("Secret encrypted, storing in IndexedDB...")
       
       // Store encrypted secret with salt
-      await storeEncryptedSecret(pendingPublicKey, encrypted, iv, saltBase64)
-      console.log("Encrypted secret stored successfully for:", pendingPublicKey)
+      try {
+        await storeEncryptedSecret(pendingPublicKey, encrypted, iv, saltBase64)
+        console.log("Encrypted secret stored successfully for:", pendingPublicKey)
+      } catch (storageError: any) {
+        console.error("Storage error details:", storageError)
+        throw new Error(`Failed to store encrypted secret: ${storageError?.message || 'Unknown error'}. Please check if IndexedDB is enabled in your browser.`)
+      }
       
-      // Verify storage
+      // Verify storage with retry
       const { hasStoredSecret } = await import("@/lib/passkey/storage")
-      const isStored = await hasStoredSecret(pendingPublicKey)
+      let isStored = false
+      let retries = 3
+      while (!isStored && retries > 0) {
+        try {
+          isStored = await hasStoredSecret(pendingPublicKey)
+          if (!isStored) {
+            retries--
+            if (retries > 0) {
+              console.log(`Verification failed, retrying... (${retries} attempts left)`)
+              await new Promise(resolve => setTimeout(resolve, 100))
+            }
+          }
+        } catch (verifyError) {
+          console.error("Verification error:", verifyError)
+          retries--
+          if (retries > 0) {
+            await new Promise(resolve => setTimeout(resolve, 100))
+          }
+        }
+      }
+      
       console.log("Verification - secret stored:", isStored)
+      
+      if (!isStored) {
+        throw new Error("Failed to verify storage. The secret may not have been saved. Please try again.")
+      }
       
       // Clear pending data
       const savedPublicKey = pendingPublicKey
@@ -243,7 +278,13 @@ const ProfilePage: React.FC = () => {
       }
     } catch (err) {
       console.error("Failed to set up password:", err)
-      throw new Error(err instanceof Error ? err.message : "Failed to set up password. Please try again.")
+      const errorMessage = err instanceof Error ? err.message : "Failed to set up password. Please try again."
+      toast({
+        title: "Setup Failed",
+        description: errorMessage,
+        variant: "destructive",
+      })
+      throw new Error(errorMessage)
     }
   }
 

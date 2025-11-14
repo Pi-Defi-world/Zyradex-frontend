@@ -19,8 +19,25 @@ interface PasswordAttempts {
 
 let db: IDBDatabase | null = null;
 
+/**
+ * Check if IndexedDB is available in this browser
+ */
+export const isIndexedDBAvailable = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  try {
+    return 'indexedDB' in window && indexedDB !== null && indexedDB !== undefined;
+  } catch {
+    return false;
+  }
+};
+
 const openDatabase = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {
+    if (!isIndexedDBAvailable()) {
+      reject(new Error('IndexedDB is not available in this browser. Please use a modern browser that supports IndexedDB.'));
+      return;
+    }
+
     if (db) {
       resolve(db);
       return;
@@ -28,8 +45,10 @@ const openDatabase = (): Promise<IDBDatabase> => {
 
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-    request.onerror = () => {
-      reject(new Error('Failed to open IndexedDB'));
+    request.onerror = (event) => {
+      const error = (event.target as IDBOpenDBRequest).error;
+      console.error('IndexedDB open error:', error);
+      reject(new Error(`Failed to open IndexedDB: ${error?.message || 'Unknown error'}`));
     };
 
     request.onsuccess = () => {
@@ -68,6 +87,10 @@ export const storeEncryptedSecret = async (
   salt: string
 ): Promise<void> => {
   try {
+    if (!isIndexedDBAvailable()) {
+      throw new Error('IndexedDB is not available. Please use a browser that supports IndexedDB.');
+    }
+
     const database = await openDatabase();
     const transaction = database.transaction([STORE_NAME], 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
@@ -81,12 +104,47 @@ export const storeEncryptedSecret = async (
     };
 
     await new Promise<void>((resolve, reject) => {
+      let resolved = false;
+      
+      // Listen to transaction errors first (they can abort the whole transaction)
+      transaction.onerror = (event) => {
+        if (resolved) return;
+        resolved = true;
+        const error = (event.target as IDBTransaction).error;
+        console.error('❌ Transaction error while storing:', error);
+        reject(new Error(`Transaction failed: ${error?.message || 'Unknown error'}`));
+      };
+      
+      transaction.onabort = () => {
+        if (resolved) return;
+        resolved = true;
+        console.error('❌ Transaction aborted while storing');
+        reject(new Error('Transaction was aborted. Please try again.'));
+      };
+      
+      transaction.oncomplete = () => {
+        if (resolved) return;
+        resolved = true;
+        console.log('✅ Transaction completed - encrypted secret stored for:', publicKey);
+        resolve();
+      };
+      
       const request = store.put(data);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(new Error('Failed to store encrypted secret'));
+      request.onsuccess = () => {
+        // Don't resolve here - wait for transaction.oncomplete
+        // This ensures the transaction is fully committed
+        console.log('✅ Put request succeeded, waiting for transaction to complete...');
+      };
+      request.onerror = (event) => {
+        if (resolved) return;
+        resolved = true;
+        const error = (event.target as IDBRequest).error;
+        console.error('❌ Failed to store encrypted secret:', error);
+        reject(new Error(`Failed to store encrypted secret: ${error?.message || 'Unknown error'}`));
+      };
     });
   } catch (error) {
-    console.error('Error storing encrypted secret:', error);
+    console.error('❌ Error storing encrypted secret:', error);
     throw error;
   }
 };
