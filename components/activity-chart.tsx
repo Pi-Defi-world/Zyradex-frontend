@@ -1,5 +1,6 @@
 "use client"
 
+
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 
 export interface ActivityPoint {
