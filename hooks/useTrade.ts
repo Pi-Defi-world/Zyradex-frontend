@@ -62,6 +62,15 @@ export const useOrderBook = (base?: string, counter?: string) => {
       return
     }
 
+    // Only fetch if counter is in valid format (native or CODE:ISSUER)
+    const counterStr = counter.trim()
+    if (counterStr !== "native" && !counterStr.includes(":")) {
+      setData(null)
+      setError(null)
+      setIsLoading(false)
+      return
+    }
+
     let cancelled = false
     setIsLoading(true)
     setError(null)
@@ -91,21 +100,23 @@ export const useOrderBook = (base?: string, counter?: string) => {
   // Auto-refresh every 10 seconds
   useEffect(() => {
     if (!base || !counter) return
-
+    const counterStr = counter.trim()
+    if (counterStr !== "native" && !counterStr.includes(":")) return
     const interval = setInterval(() => {
       setRefreshTrigger((prev) => prev + 1)
     }, 10000)
-
     return () => clearInterval(interval)
   }, [base, counter])
 
   const book = useMemo(() => data?.book ?? { bids: [], asks: [] }, [data])
+  const isValidCounter = counter ? (counter.trim() === "native" || counter.trim().includes(":")) : false
 
   return {
     data,
     error,
     isLoading,
     book,
+    isValidCounter,
   }
 }
 
@@ -233,6 +244,15 @@ export const useTrades = (base?: string, counter?: string, limit: number = 20) =
 
   useEffect(() => {
     if (!base || !counter) {
+      setData(null)
+      setError(null)
+      setIsLoading(false)
+      return
+    }
+
+    // Only fetch if counter is in valid format (native or CODE:ISSUER)
+    const counterStr = counter.trim()
+    if (counterStr !== "native" && !counterStr.includes(":")) {
       setData(null)
       setError(null)
       setIsLoading(false)

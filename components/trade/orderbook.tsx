@@ -15,7 +15,7 @@ interface OrderbookProps {
 export function Orderbook({ onBaseChange, onCounterChange }: OrderbookProps) {
   const [base, setBase] = useState("native")
   const [counter, setCounter] = useState("")
-  const { book, isLoading, error } = useOrderBook(base, counter)
+  const { book, isLoading, error, isValidCounter } = useOrderBook(base, counter)
 
   const handleBaseChange = (value: string) => {
     setBase(value)
@@ -53,6 +53,10 @@ export function Orderbook({ onBaseChange, onCounterChange }: OrderbookProps) {
         {!base || !counter ? (
           <div className="text-sm text-muted-foreground py-8 text-center">
             Enter base and counter assets to view order book
+          </div>
+        ) : !isValidCounter ? (
+          <div className="text-sm text-muted-foreground py-8 text-center">
+            Counter asset must be in CODE:ISSUER format (e.g., Archimedes:GBP7HXY4QXLKZBKIUR75Y6I3OHB2CQLAUA2FV2LCNDRPP54TZLNBSENX)
           </div>
         ) : isLoading ? (
           <div className="flex items-center justify-center py-8 text-muted-foreground">
