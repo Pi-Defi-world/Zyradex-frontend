@@ -27,12 +27,38 @@ export interface ApiError {
 
 export const toApiError = (error: unknown): ApiError => {
   if (!error) {
-    return { message: "Unknown error" }
+    return { message: "Unknown error occurred" }
   }
 
   if ((error as AxiosError).isAxiosError) {
-    const axiosError = error as AxiosError<{ message?: string; error?: unknown }>
-    const message = axiosError.response?.data?.message || axiosError.message || "Request failed"
+    const axiosError = error as AxiosError<{ message?: string; error?: string | unknown }>
+    
+    // Try to extract meaningful error message from various possible locations
+    let message = 
+      axiosError.response?.data?.message || 
+      (typeof axiosError.response?.data?.error === 'string' ? axiosError.response.data.error : null) ||
+      axiosError.message || 
+      "Request failed"
+
+    // If message is still generic, try to provide more context
+    if (message === "Request failed" || message === "Network Error") {
+      if (axiosError.code === "ECONNABORTED") {
+        message = "Request timed out. Please try again."
+      } else if (axiosError.code === "ERR_NETWORK") {
+        message = "Network error. Please check your connection."
+      } else if (axiosError.response?.status === 404) {
+        message = "Resource not found"
+      } else if (axiosError.response?.status === 500) {
+        message = "Server error. Please try again later."
+      } else if (axiosError.response?.status === 400) {
+        message = "Invalid request. Please check your input."
+      } else if (axiosError.response?.status === 401) {
+        message = "Authentication required. Please sign in again."
+      } else if (axiosError.response?.status === 403) {
+        message = "Access denied. You don't have permission for this action."
+      }
+    }
+
     return {
       message,
       status: axiosError.response?.status,
@@ -41,13 +67,23 @@ export const toApiError = (error: unknown): ApiError => {
   }
 
   if (error instanceof Error) {
-    return { message: error.message }
+    return { message: error.message || "An error occurred" }
   }
 
   if (typeof error === "string") {
     return { message: error }
   }
 
-  return { message: "Unexpected error" }
+  // Try to stringify the error object to get some information
+  try {
+    const errorStr = JSON.stringify(error)
+    if (errorStr !== "{}") {
+      return { message: `Error: ${errorStr}` }
+    }
+  } catch {
+    // Ignore JSON stringify errors
+  }
+
+  return { message: "An unexpected error occurred. Please try again." }
 }
 
