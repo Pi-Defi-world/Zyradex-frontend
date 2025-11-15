@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowDown, Home, ArrowRightLeft, Loader2, Copy, Wallet, Plus } from "lucide-react"
+import { ArrowDown, TrendingUp, ArrowRightLeft, Loader2, Copy, Wallet, Plus } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { usePi } from "@/components/providers/pi-provider"
 import { useAccountBalances } from "@/hooks/useAccountData"
@@ -78,11 +78,8 @@ export default function HomePage() {
     return tokens
   }, [tokens])
 
-  const handleSend = () => {
-    toast({
-      title: "Coming Soon",
-      description: "Send functionality will be available soon.",
-    })
+  const handleTrade = () => {
+    router.push("/trade")
   }
 
   const handleSwap = () => {
@@ -135,14 +132,13 @@ export default function HomePage() {
               <span className="text-xs">Receive</span>
             </Button>
             <Button
-              onClick={handleSend}
-              className="flex flex-col items-center gap-1 h-auto py-2"
-              variant="outline"
+              onClick={handleTrade}
+              className="flex flex-col items-center gap-1 h-auto py-2 btn-gradient-primary"
+              variant="default"
               size="sm"
-              disabled
             >
-              <Home className="h-4 w-4" />
-              <span className="text-xs">Send</span>
+              <TrendingUp className="h-4 w-4" />
+              <span className="text-xs">Trade</span>
             </Button>
             <Button
               onClick={handleSwap}

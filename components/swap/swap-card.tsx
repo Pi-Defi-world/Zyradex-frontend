@@ -13,6 +13,9 @@ import { useToast } from "@/hooks/use-toast"
 import { usePoolsForPair, useSwapQuote, useExecuteSwap } from "@/hooks/useSwapData"
 import { useTransactionAuth } from "@/hooks/useTransactionAuth"
 import { PasswordPromptDialog } from "@/components/password-prompt-dialog"
+import { useAccountBalances } from "@/hooks/useAccountData"
+import { listLiquidityPools } from "@/lib/api/liquidity"
+import { useRouter } from "next/navigation"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -44,6 +47,7 @@ export function SwapCard() {
   const { user } = usePi()
   const { profile } = useUserProfile()
   const { toast } = useToast()
+  const router = useRouter()
   const [localWallet, setLocalWallet] = useState<string | null>(null)
 
   useEffect(() => {
@@ -52,6 +56,10 @@ export function SwapCard() {
     setLocalWallet(address)
   }, [profile?.public_key, user?.wallet_address])
 
+  // Get user balances for Token A dropdown
+  const publicKey = profile?.public_key || localWallet || user?.wallet_address || undefined
+  const { balances } = useAccountBalances(publicKey)
+
   // Token input state
   const [tokenA, setTokenA] = useState<string>("")
   const [tokenB, setTokenB] = useState<string>("")
@@ -59,6 +67,8 @@ export function SwapCard() {
   const [userSecret, setUserSecret] = useState("")
   const [selectedPoolId, setSelectedPoolId] = useState<string>("")
   const [slippagePercent, setSlippagePercent] = useState<number>(1)
+  const [pairedTokens, setPairedTokens] = useState<string[]>([])
+  const [loadingPairedTokens, setLoadingPairedTokens] = useState(false)
   
   const walletAddress = localWallet || profile?.public_key || user?.wallet_address
   const [showPasswordDialog, setShowPasswordDialog] = useState(false)
@@ -140,8 +150,67 @@ export function SwapCard() {
 
   const { executeSwap, isLoading: executing } = useExecuteSwap()
 
+  // Fetch paired tokens when Token A is selected
+  useEffect(() => {
+    if (!fromToken?.code || fromToken.code === "") {
+      setPairedTokens([])
+      setTokenB("")
+      return
+    }
+
+    const fetchPairedTokens = async () => {
+      setLoadingPairedTokens(true)
+      try {
+        // Fetch all pools and filter those containing Token A
+        const poolsResponse = await listLiquidityPools({ limit: 100 })
+        const pools = poolsResponse.data || []
+
+        // Extract tokens paired with Token A
+        const tokenACode = fromToken.code === "native" ? "native" : fromToken.code.toUpperCase()
+        const paired = new Set<string>()
+
+        pools.forEach((pool) => {
+          if (!pool.reserves || pool.reserves.length < 2) return
+          
+          const assets = pool.reserves.map((r: any) => {
+            const assetStr = r.asset || ""
+            if (assetStr === "native") return "native"
+            return assetStr.split(":")[0].toUpperCase()
+          })
+
+          if (assets.includes(tokenACode)) {
+            // Find the other token in the pair
+            const otherToken = assets.find((a: string) => a !== tokenACode)
+            if (otherToken) {
+              // Try to find full format from reserves
+              const otherReserve = pool.reserves.find((r: any) => {
+                const code = r.asset === "native" ? "native" : r.asset.split(":")[0].toUpperCase()
+                return code === otherToken
+              })
+              if (otherReserve) {
+                paired.add(otherReserve.asset === "native" ? "native" : otherReserve.asset)
+              } else {
+                paired.add(otherToken)
+              }
+            }
+          }
+        })
+
+        setPairedTokens(Array.from(paired))
+      } catch (err) {
+        console.error("Failed to fetch paired tokens:", err)
+        setPairedTokens([])
+      } finally {
+        setLoadingPairedTokens(false)
+      }
+    }
+
+    fetchPairedTokens()
+  }, [fromToken?.code])
+
   const handleTokenAChange = (value: string) => {
     setTokenA(value)
+    setTokenB("")
     setSelectedPoolId("")
     setFromAmount("")
     setSlippagePercent(1) // Reset to default
@@ -272,14 +341,30 @@ export function SwapCard() {
 
         <CardContent className="space-y-6">
           <div className="space-y-3">
-            <Label className="text-sm font-medium text-muted-foreground">Token A</Label>
-            <Input
-              placeholder="e.g., zyra, wpi, native, or CODE:ISSUER"
-              value={tokenA}
-              onChange={(event) => handleTokenAChange(event.target.value)}
-            />
+            <Label className="text-sm font-medium text-muted-foreground">Token A (You're Selling)</Label>
+            <Select value={tokenA} onValueChange={handleTokenAChange}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select a token you own" />
+              </SelectTrigger>
+              <SelectContent>
+                {balances.map((balance) => {
+                  const isNative = balance.assetType === "native"
+                  const displayName = isNative ? "Test Pi" : balance.assetCode
+                  const value = isNative ? "native" : (balance.assetIssuer ? `${balance.assetCode}:${balance.assetIssuer}` : balance.assetCode)
+                  const amount = Number(balance.amount).toLocaleString(undefined, { maximumFractionDigits: 6 })
+                  return (
+                    <SelectItem key={value} value={value}>
+                      <div className="flex items-center justify-between w-full">
+                        <span>{displayName}</span>
+                        <span className="text-xs text-muted-foreground ml-2">{amount}</span>
+                      </div>
+                    </SelectItem>
+                  )
+                })}
+              </SelectContent>
+            </Select>
             <p className="text-xs text-muted-foreground">
-              Enter token code (e.g., "zyra") or full format (e.g., "CODE:ISSUER")
+              Select a token from your balance
             </p>
           </div>
 
@@ -308,15 +393,51 @@ export function SwapCard() {
           </div>
 
           <div className="space-y-3">
-            <Label className="text-sm font-medium text-muted-foreground">Token B</Label>
-            <Input
-              placeholder="e.g., zyra, wpi, native, or CODE:ISSUER"
-              value={tokenB}
-              onChange={(event) => handleTokenBChange(event.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Enter token code (e.g., "wpi") or full format (e.g., "CODE:ISSUER")
-            </p>
+            <Label className="text-sm font-medium text-muted-foreground">Token B (You're Buying)</Label>
+            {!tokenA ? (
+              <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm text-muted-foreground">
+                Select Token A first to see available pairs
+              </div>
+            ) : loadingPairedTokens ? (
+              <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm text-muted-foreground flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Finding available pairs...
+              </div>
+            ) : pairedTokens.length === 0 ? (
+              <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm space-y-2">
+                <p className="text-muted-foreground">No liquidity pools found for this token.</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push("/liquidity")}
+                  className="w-full"
+                >
+                  Go to Liquidity page to create one
+                </Button>
+              </div>
+            ) : (
+              <Select value={tokenB} onValueChange={handleTokenBChange}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a token to swap to" />
+                </SelectTrigger>
+                <SelectContent>
+                  {pairedTokens.map((token) => {
+                    const isNative = token === "native"
+                    const displayName = isNative ? "Test Pi" : (token.includes(":") ? token.split(":")[0] : token)
+                    return (
+                      <SelectItem key={token} value={token}>
+                        {displayName}
+                      </SelectItem>
+                    )
+                  })}
+                </SelectContent>
+              </Select>
+            )}
+            {tokenA && pairedTokens.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Tokens available in liquidity pools with {fromToken?.code === "native" ? "Test Pi" : fromToken?.code}
+              </p>
+            )}
           </div>
 
           {tokenA && tokenB && fromToken?.code && toToken?.code && fromToken.code !== toToken.code && (
