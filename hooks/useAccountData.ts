@@ -69,11 +69,23 @@ export const useAccountBalances = (publicKey?: string) => {
       .then((response) => {
         if (!cancelled) {
           setData(response)
+          setError(null) // Clear any previous errors
         }
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(toApiError(err))
+          const apiError = toApiError(err)
+          // If account not found, treat as empty balances instead of error
+          const errorMessage = apiError.message?.toLowerCase() || ""
+          const statusCode = (apiError as any)?.status || (err as any)?.response?.status
+          
+          if (statusCode === 404 || statusCode === 500 || errorMessage.includes("not found")) {
+            // Account doesn't exist on Pi network yet - return empty balances
+            setData({ publicKey, balances: [] })
+            setError(null)
+          } else {
+            setError(apiError)
+          }
         }
       })
       .finally(() => {

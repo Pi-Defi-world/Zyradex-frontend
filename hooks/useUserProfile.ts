@@ -118,6 +118,32 @@ export const useUserProfile = (): UseUserProfileReturn => {
     } catch (err) {
       const apiError = toApiError(err)
       setError(apiError)
+      
+      // Clear local storage on signin errors (user not found, invalid token, etc.)
+      // This fixes the issue where old cached data persists after user is cleared from DB
+      if (typeof window !== "undefined") {
+        const errorMessage = apiError.message?.toLowerCase() || ""
+        const statusCode = (apiError as any)?.status || (err as any)?.response?.status
+        const isAuthError = 
+          statusCode === 401 || 
+          statusCode === 403 || 
+          statusCode === 500 ||
+          errorMessage.includes("invalid") ||
+          errorMessage.includes("not found") ||
+          errorMessage.includes("unauthorized") ||
+          errorMessage.includes("internal server error")
+        
+        if (isAuthError) {
+          console.log("🧹 Clearing local storage due to authentication error")
+          localStorage.removeItem(USER_TOKEN_KEY)
+          localStorage.removeItem(USER_PROFILE_KEY)
+          localStorage.removeItem("zyradex-wallet-address")
+          localStorage.removeItem("bingepi-wallet-address")
+          setProfile(null)
+          clearAuthToken()
+        }
+      }
+      
       throw apiError
     } finally {
       setIsLoading(false)
