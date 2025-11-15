@@ -3,9 +3,13 @@ import {
   getOrderBook as getOrderBookRequest,
   getOffersByAccount as getOffersByAccountRequest,
   searchAssets as searchAssetsRequest,
+  getTrades as getTradesRequest,
+  getTradeAggregations as getTradeAggregationsRequest,
   type OrderBookResponse,
   type UserOffersResponse,
   type AssetSearchResponse,
+  type TradesResponse,
+  type TradeAggregationsResponse,
 } from "@/lib/api/orderbook"
 import {
   createSellOffer,
@@ -220,5 +224,110 @@ export const useCreateBuyOffer = () => {
 export const useCancelOffer = () => {
   const { mutate, data, error, isLoading } = useMutation<CancelOfferPayload, TradeResponse>(cancelOffer)
   return { cancelOffer: mutate, data, error, isLoading }
+}
+
+export const useTrades = (base?: string, counter?: string, limit: number = 20) => {
+  const [data, setData] = useState<TradesResponse | null>(null)
+  const [error, setError] = useState<ApiError | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+
+  useEffect(() => {
+    if (!base || !counter) {
+      setData(null)
+      setError(null)
+      setIsLoading(false)
+      return
+    }
+
+    let cancelled = false
+    setIsLoading(true)
+    setError(null)
+
+    getTradesRequest(base, counter, limit)
+      .then((response) => {
+        if (!cancelled) {
+          setData(response)
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(toApiError(err))
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [base, counter, limit])
+
+  const trades = useMemo(() => data?.trades ?? [], [data])
+
+  return {
+    data,
+    error,
+    isLoading,
+    trades,
+  }
+}
+
+export const useTradeAggregations = (
+  base?: string,
+  counter?: string,
+  resolution: number = 3600000,
+  startTime?: string,
+  endTime?: string,
+  limit: number = 24
+) => {
+  const [data, setData] = useState<TradeAggregationsResponse | null>(null)
+  const [error, setError] = useState<ApiError | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+
+  useEffect(() => {
+    if (!base || !counter) {
+      setData(null)
+      setError(null)
+      setIsLoading(false)
+      return
+    }
+
+    let cancelled = false
+    setIsLoading(true)
+    setError(null)
+
+    getTradeAggregationsRequest(base, counter, resolution, startTime, endTime, limit)
+      .then((response) => {
+        if (!cancelled) {
+          setData(response)
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(toApiError(err))
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [base, counter, resolution, startTime, endTime, limit])
+
+  const aggregations = useMemo(() => data?.aggregations ?? [], [data])
+
+  return {
+    data,
+    error,
+    isLoading,
+    aggregations,
+  }
 }
 

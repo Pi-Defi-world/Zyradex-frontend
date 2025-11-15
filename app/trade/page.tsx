@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { TradeForm } from "@/components/trade/trade-form"
 import { Orderbook } from "@/components/trade/orderbook"
 import { ActiveOffers } from "@/components/trade/active-offers"
+import { RecentTrades } from "@/components/trade/recent-trades"
 import { usePi } from "@/components/providers/pi-provider"
 import { useUserProfile } from "@/hooks/useUserProfile"
 
@@ -16,6 +17,8 @@ export default function TradePage() {
   const { user, isAuthenticated } = usePi()
   const { profile } = useUserProfile()
   const [localWallet, setLocalWallet] = useState<string | null>(null)
+  const [selectedBase, setSelectedBase] = useState("native")
+  const [selectedCounter, setSelectedCounter] = useState("")
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -49,9 +52,19 @@ export default function TradePage() {
 
           {/* Orderbook - Side Panel */}
           <div className="lg:col-span-1">
-            <Orderbook />
+            <Orderbook 
+              onBaseChange={setSelectedBase}
+              onCounterChange={setSelectedCounter}
+            />
           </div>
         </div>
+
+        {/* Recent Trades - Show when assets are selected */}
+        {selectedBase && selectedCounter && (
+          <div>
+            <RecentTrades base={selectedBase} counter={selectedCounter} />
+          </div>
+        )}
 
         {/* Active Offers */}
         {publicKey && (
@@ -63,4 +76,5 @@ export default function TradePage() {
     </div>
   )
 }
+
 

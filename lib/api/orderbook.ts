@@ -81,3 +81,79 @@ export const searchAssets = async (code: string, limit: number = 10) => {
   }
 }
 
+export interface Trade {
+  id: string
+  paging_token: string
+  ledger_close_time: string
+  offer_id: string
+  base_account: string
+  base_amount: string
+  base_asset_type: string
+  base_asset_code: string | null
+  base_asset_issuer: string | null
+  counter_account: string
+  counter_amount: string
+  counter_asset_type: string
+  counter_asset_code: string | null
+  counter_asset_issuer: string | null
+  base_is_seller: boolean
+  price: {
+    n: number
+    d: number
+    price: number
+  }
+}
+
+export interface TradesResponse {
+  success: boolean
+  trades: Trade[]
+  count: number
+}
+
+export interface TradeAggregation {
+  timestamp: string
+  trade_count: number
+  base_volume: string
+  counter_volume: string
+  avg: string
+  high: string
+  low: string
+  open: string
+  close: string
+}
+
+export interface TradeAggregationsResponse {
+  success: boolean
+  aggregations: TradeAggregation[]
+  count: number
+}
+
+export const getTrades = async (base: string, counter: string, limit: number = 20) => {
+  try {
+    const { data } = await axiosClient.get<TradesResponse>("/market/trades", {
+      params: { base, counter, limit },
+    })
+    return data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}
+
+export const getTradeAggregations = async (
+  base: string,
+  counter: string,
+  resolution: number = 3600000,
+  startTime?: string,
+  endTime?: string,
+  limit: number = 24
+) => {
+  try {
+    const { data } = await axiosClient.get<TradeAggregationsResponse>("/market/trade-aggregations", {
+      params: { base, counter, resolution, startTime, endTime, limit },
+    })
+    return data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}
+

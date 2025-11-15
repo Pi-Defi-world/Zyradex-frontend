@@ -7,10 +7,25 @@ import { Label } from "@/components/ui/label"
 import { Loader2 } from "lucide-react"
 import { useOrderBook } from "@/hooks/useTrade"
 
-export function Orderbook() {
+interface OrderbookProps {
+  onBaseChange?: (base: string) => void
+  onCounterChange?: (counter: string) => void
+}
+
+export function Orderbook({ onBaseChange, onCounterChange }: OrderbookProps) {
   const [base, setBase] = useState("native")
   const [counter, setCounter] = useState("")
   const { book, isLoading, error } = useOrderBook(base, counter)
+
+  const handleBaseChange = (value: string) => {
+    setBase(value)
+    onBaseChange?.(value)
+  }
+
+  const handleCounterChange = (value: string) => {
+    setCounter(value)
+    onCounterChange?.(value)
+  }
 
   return (
     <Card>
@@ -23,7 +38,7 @@ export function Orderbook() {
           <Input
             placeholder="native or CODE:ISSUER"
             value={base}
-            onChange={(e) => setBase(e.target.value)}
+            onChange={(e) => handleBaseChange(e.target.value)}
           />
         </div>
         <div className="space-y-2">
@@ -31,7 +46,7 @@ export function Orderbook() {
           <Input
             placeholder="CODE:ISSUER"
             value={counter}
-            onChange={(e) => setCounter(e.target.value)}
+            onChange={(e) => handleCounterChange(e.target.value)}
           />
         </div>
 
