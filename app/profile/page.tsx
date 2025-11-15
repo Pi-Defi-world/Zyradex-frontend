@@ -204,8 +204,28 @@ const ProfilePage: React.FC = () => {
       throw new Error("Password must be at least 6 characters long")
     }
 
+    // Validate that we're encrypting the SECRET KEY, not the public key
+    if (!pendingSecret.startsWith('S')) {
+      console.error("❌ ERROR: pendingSecret does not start with 'S'!", {
+        pendingSecret: pendingSecret.substring(0, 20) + "...",
+        pendingPublicKey: pendingPublicKey.substring(0, 20) + "...",
+        secretLength: pendingSecret.length,
+        publicKeyLength: pendingPublicKey.length
+      })
+      throw new Error("Invalid secret key format. Secret key must start with 'S'. Please re-import your account.")
+    }
+
+    if (!pendingPublicKey.startsWith('G')) {
+      console.error("❌ ERROR: pendingPublicKey does not start with 'G'!", {
+        pendingPublicKey: pendingPublicKey.substring(0, 20) + "..."
+      })
+      throw new Error("Invalid public key format. Public key must start with 'G'. Please re-import your account.")
+    }
+
     try {
-      console.log("Setting up password for public key:", pendingPublicKey)
+      console.log("✅ Setting up password for public key:", pendingPublicKey)
+      console.log("✅ Encrypting SECRET KEY (starts with 'S'):", pendingSecret.substring(0, 10) + "...")
+      console.log("✅ Public key (starts with 'G'):", pendingPublicKey.substring(0, 10) + "...")
       
       // Generate salt and derive key from password
       const salt = generateSalt()
@@ -216,7 +236,6 @@ const ProfilePage: React.FC = () => {
       console.log("Key derived, encrypting secret...")
       
       // Encrypt secret with password-derived key
-      console.log("Encrypting secret key (starts with 'S'):", pendingSecret.substring(0, 10) + "...")
       const { encrypted, iv } = await encryptSecret(pendingSecret, key)
       console.log("Secret encrypted, storing on backend...")
       console.log("Encrypted data length:", encrypted.length, "IV length:", iv.length)
