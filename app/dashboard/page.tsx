@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button"
 import { usePi } from "@/components/providers/pi-provider"
 import { useAccountBalances, useAccountOperations } from "@/hooks/useAccountData"
 import { useTokenRegistry } from "@/hooks/useTokenRegistry"
-import { useAdminAuth } from "@/hooks/useAdminAuth"
+import { useUserProfile } from "@/hooks/useUserProfile"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -62,14 +62,29 @@ const buildActivitySeries = (operations: ReturnType<typeof useAccountOperations>
 
 export default function DashboardPage() {
   const { user, isAuthenticated } = usePi()
+  const { profile } = useUserProfile()
   const [localWallet, setLocalWallet] = useState<string | null>(null)
-  const { isAdmin, signIn: signInAdmin, isLoading: adminLoading } = useAdminAuth()
 
   useEffect(() => {
-    setLocalWallet(getStoredWallet())
-  }, [])
+    if (isAuthenticated) {
+      const stored = getStoredWallet()
+      setLocalWallet(stored)
+      // Also sync with profile public_key if available
+      if (profile?.public_key && stored !== profile.public_key) {
+        if (typeof window !== "undefined") {
+          localStorage.setItem("zyradex-wallet-address", profile.public_key)
+        }
+        setLocalWallet(profile.public_key)
+      }
+    } else {
+      setLocalWallet(null)
+    }
+  }, [isAuthenticated, profile?.public_key])
 
-  const publicKey = user?.wallet_address || localWallet || undefined
+  // Priority: profile.public_key (from DB) > user.wallet_address (from Pi SDK) > localWallet (from localStorage)
+  const publicKey = isAuthenticated
+    ? (profile?.public_key || user?.wallet_address || localWallet || undefined)
+    : undefined
 
   const {
     balances,
@@ -91,14 +106,14 @@ export default function DashboardPage() {
   )
 
   const mintedSummaries = useMemo<TokenSummary[]>(
-    () => (isAdmin ? mintedTokens.map((token) => formatMintedToken({
+    () => mintedTokens.map((token) => formatMintedToken({
           code: token.assetCode,
           issuer: token.issuer,
           name: token.name,
           totalSupply: token.totalSupply,
           description: token.description,
-        })) : []),
-    [mintedTokens, isAdmin]
+        })),
+    [mintedTokens]
   )
 
   const activitySeries = useMemo(() => buildActivitySeries(operations), [operations])
@@ -124,9 +139,9 @@ export default function DashboardPage() {
     },
     {
       label: "Minted Tokens",
-      value: isAdmin ? `${mintedSummaries.length}` : "Admin only",
+      value: `${mintedSummaries.length}`,
       icon: TrendingUp,
-      hint: isAdmin ? "Registered platform tokens" : "Requires admin session",
+      hint: "Registered platform tokens",
     },
   ]
 
@@ -261,15 +276,7 @@ export default function DashboardPage() {
               <CardDescription>Tokens issued through the DEX toolkit</CardDescription>
             </CardHeader>
             <CardContent>
-              {!isAdmin ? (
-                <div className="space-y-3 text-sm text-muted-foreground">
-                  <p>Sign in as an admin to view and manage minted tokens.</p>
-                  <Button variant="outline" size="sm" onClick={signInAdmin} disabled={adminLoading}>
-                    {adminLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Sign in as admin
-                  </Button>
-                </div>
-              ) : tokensLoading && !mintedSummaries.length ? (
+              {tokensLoading && !mintedSummaries.length ? (
                 <p className="text-sm text-muted-foreground">Loading token registry...</p>
               ) : mintedSummaries.length ? (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

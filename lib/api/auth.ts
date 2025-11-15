@@ -35,3 +35,12 @@ export const signIn = async (payload: SignInPayload) => {
     throw toApiError(error)
   }
 }
+
+export const removePublicKey = async () => {
+  try {
+    const { data } = await axiosClient.delete<{ success: boolean; message: string }>("/users/public-key")
+    return data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}

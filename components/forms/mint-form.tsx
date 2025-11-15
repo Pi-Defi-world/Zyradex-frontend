@@ -10,7 +10,6 @@ import { useToast } from "@/hooks/use-toast"
 import { useLogger } from "@/hooks/use-logger"
 import { Loader2, Lock } from "lucide-react"
 import { useMintToken } from "@/hooks/useTokenRegistry"
-import { useAdminAuth } from "@/hooks/useAdminAuth"
 import { useTransactionAuth } from "@/hooks/useTransactionAuth"
 import { PasswordPromptDialog } from "@/components/password-prompt-dialog"
 import { usePi } from "@/components/providers/pi-provider"
@@ -27,12 +26,6 @@ export function MintForm() {
   const { user } = usePi()
   const { profile } = useUserProfile()
   const { mintToken, isLoading, error } = useMintToken()
-  const {
-    isAdmin,
-    isLoading: adminLoading,
-    error: adminError,
-    signIn: signInAdmin,
-  } = useAdminAuth()
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
   const [showPasswordDialog, setShowPasswordDialog] = useState(false)
   const [passwordResolve, setPasswordResolve] = useState<((password: string) => void) | null>(null)
@@ -103,18 +96,6 @@ export function MintForm() {
     setAssetCodeError(validateAssetCode(value))
   }
 
-  const ensureAdminSession = async () => {
-    if (isAdmin) return true
-    try {
-      await signInAdmin()
-      return true
-    } catch (err) {
-      const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Admin sign-in failed"
-      toast({ title: "Admin sign-in required", description: message, variant: "destructive" })
-      return false
-    }
-  }
-
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
 
@@ -122,11 +103,6 @@ export function MintForm() {
     if (assetCodeValidationError) {
       setAssetCodeError(assetCodeValidationError)
       toast({ title: "Validation Error", description: assetCodeValidationError, variant: "destructive" })
-      return
-    }
-
-    const hasSession = await ensureAdminSession()
-    if (!hasSession) {
       return
     }
 
@@ -182,23 +158,6 @@ export function MintForm() {
   return (
     <>
       <form onSubmit={handleSubmit} className="space-y-4">
-      {!isAdmin && (
-        <div className="rounded-lg border border-border/60 bg-muted/30 p-4 text-sm text-muted-foreground">
-          Admin privileges are required to mint tokens.
-          <Button
-            type="button"
-            variant="outline"
-            className="mt-3"
-            onClick={signInAdmin}
-            disabled={adminLoading}
-          >
-            {adminLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Sign in as admin
-          </Button>
-          {adminError && <p className="mt-2 text-destructive">{adminError.message}</p>}
-        </div>
-      )}
-
       {!hasStoredSecret && (
         <div className="space-y-2">
           <Label htmlFor="distributorSecret" className="text-base font-medium">
@@ -295,11 +254,10 @@ export function MintForm() {
         />
       </div>
 
-      {adminError && isAdmin && <p className="text-sm text-destructive">{adminError.message}</p>}
       {error && <p className="text-sm text-destructive">{error.message}</p>}
 
-      <Button type="submit" className="w-full btn-gradient-primary" disabled={isLoading || adminLoading}>
-        {(isLoading || adminLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+      <Button type="submit" className="w-full btn-gradient-primary" disabled={isLoading}>
+        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         {isLoading ? "Minting..." : "Mint Token"}
       </Button>
     </form>

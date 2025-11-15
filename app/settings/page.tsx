@@ -12,8 +12,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { usePi } from "@/components/providers/pi-provider"
 import { useAccountBalances } from "@/hooks/useAccountData"
-import { useAdminAuth } from "@/hooks/useAdminAuth"
-import { Badge } from "@/components/ui/badge"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -26,14 +24,6 @@ export default function SettingsPage() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
   const [notifications, setNotifications] = useState(true)
   const [username, setUsername] = useState("")
-  const {
-    isAdmin,
-    adminUser,
-    isLoading: adminLoading,
-    error: adminError,
-    signIn: signInAdmin,
-    signOut: signOutAdmin,
-  } = useAdminAuth()
 
   useEffect(() => {
     setWalletAddress(getStoredWallet() || user?.wallet_address || null)
@@ -128,44 +118,6 @@ export default function SettingsPage() {
             ) : (
               <div className="text-sm text-muted-foreground">
                 No wallet connected. Add one from your profile page to enable full functionality.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5" />
-              Admin Access
-            </CardTitle>
-            <CardDescription>Authenticate to perform administrative actions</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {adminError && <p className="text-sm text-destructive">{adminError.message}</p>}
-            {isAdmin && adminUser ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 border border-border/40 rounded-lg bg-muted/40">
-                  <div>
-                    <p className="text-sm font-medium">Signed in as</p>
-                    <p className="text-sm text-muted-foreground">{adminUser.username}</p>
-                  </div>
-                  <Badge variant="secondary">{adminUser.role}</Badge>
-                </div>
-                <Button variant="outline" onClick={signOutAdmin} disabled={adminLoading}>
-                  {adminLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Sign out of admin
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Admin privileges are required to mint tokens, manage fees, and moderate liquidity pools.
-                </p>
-                <Button className="btn-gradient-primary" onClick={signInAdmin} disabled={adminLoading}>
-                  {adminLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Sign in as admin
-                </Button>
               </div>
             )}
           </CardContent>

@@ -9,8 +9,8 @@ import { useToast } from "@/hooks/use-toast"
 import { usePi } from "@/components/providers/pi-provider"
 import { useAccountBalances } from "@/hooks/useAccountData"
 import { useTokenRegistry } from "@/hooks/useTokenRegistry"
-import { useAdminAuth } from "@/hooks/useAdminAuth"
 import { usePiPrice } from "@/hooks/usePiPrice"
+import { useUserProfile } from "@/hooks/useUserProfile"
 import { ReceiveModal } from "@/components/receive-modal"
 import { DisclaimerPopup } from "@/components/disclaimer-popup"
 
@@ -23,20 +23,28 @@ export default function HomePage() {
   const router = useRouter()
   const { toast } = useToast()
   const { user, isAuthenticated } = usePi()
+  const { profile } = useUserProfile()
   const [localWallet, setLocalWallet] = useState<string | null>(null)
   const [receiveModalOpen, setReceiveModalOpen] = useState(false)
   const [disclaimerOpen, setDisclaimerOpen] = useState(false)
-  const { isAdmin } = useAdminAuth()
   const { price: piPrice, isLoading: priceLoading } = usePiPrice()
 
   useEffect(() => {
     // Only restore wallet if user is authenticated
     if (isAuthenticated) {
-      setLocalWallet(getStoredWallet())
+      const stored = getStoredWallet()
+      setLocalWallet(stored)
+      // Also sync with profile public_key if available
+      if (profile?.public_key && stored !== profile.public_key) {
+        if (typeof window !== "undefined") {
+          localStorage.setItem("zyradex-wallet-address", profile.public_key)
+        }
+        setLocalWallet(profile.public_key)
+      }
     } else {
       setLocalWallet(null)
     }
-  }, [isAuthenticated])
+  }, [isAuthenticated, profile?.public_key])
 
   useEffect(() => {
     const disclaimerAccepted = localStorage.getItem("zyradex-disclaimer-accepted")
@@ -45,8 +53,10 @@ export default function HomePage() {
     }
   }, [])
 
-  // Only show wallet address if user is authenticated
-  const publicKey = isAuthenticated ? (user?.wallet_address || localWallet || undefined) : undefined
+  // Priority: profile.public_key (from DB) > user.wallet_address (from Pi SDK) > localWallet (from localStorage)
+  const publicKey = isAuthenticated 
+    ? (profile?.public_key || user?.wallet_address || localWallet || undefined) 
+    : undefined
   const { balances, totalBalance, isLoading: balancesLoading } = useAccountBalances(publicKey)
   const { tokens, isLoading: tokensLoading } = useTokenRegistry()
 
@@ -63,10 +73,10 @@ export default function HomePage() {
     return native ? Number(native.amount) : 0
   }, [balances])
 
-  // Filter minted tokens (admin only)
+  // All users can see minted tokens
   const mintedTokens = useMemo(() => {
-    return isAdmin ? tokens : []
-  }, [tokens, isAdmin])
+    return tokens
+  }, [tokens])
 
   const handleSend = () => {
     toast({
@@ -216,8 +226,8 @@ export default function HomePage() {
           </CardContent>
         </Card>
 
-        {/* Minted Tokens Section (Admin Only) */}
-        {isAdmin && (
+        {/* Minted Tokens Section */}
+        {mintedTokens.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

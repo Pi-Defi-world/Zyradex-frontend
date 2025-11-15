@@ -34,6 +34,7 @@ import { Label } from "@/components/ui/label"
 import { useImportAccount } from "@/hooks/useAccountData"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { usePasskeyRegistration } from "@/hooks/usePasskey"
+import { removePublicKey } from "@/lib/api/auth"
 import { storeEncryptedSecret } from "@/lib/passkey/storage"
 import { encryptSecret, generateKey, deriveKeyFromPassword, generateSalt, validatePasswordStrength } from "@/lib/passkey/encryption"
 import { setEncryptionKey } from "@/lib/passkey/transaction"
@@ -473,6 +474,10 @@ const ProfilePage: React.FC = () => {
                   placeholder="word1 word2 word3 ..."
                   value={mnemonicInput}
                   onChange={(event) => setMnemonicInput(normalizeMnemonic(event.target.value))}
+                  onPaste={(e) => {
+                    // Prevent form submission on paste - user must click button
+                    e.stopPropagation()
+                  }}
                 />
               </div>
               <div className="space-y-2">
@@ -483,6 +488,10 @@ const ProfilePage: React.FC = () => {
                   placeholder="SXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
                   value={secretInput}
                   onChange={(event) => setSecretInput(event.target.value)}
+                  onPaste={(e) => {
+                    // Prevent form submission on paste - user must click button
+                    e.stopPropagation()
+                  }}
                 />
               </div>
               <Button type="submit" className="btn-gradient-primary w-full" disabled={importingAccount}>
@@ -612,7 +621,38 @@ const ProfilePage: React.FC = () => {
 
       <PasswordSetupDialog
         open={showPasswordDialog}
-        onOpenChange={setShowPasswordDialog}
+        onOpenChange={async (open) => {
+          if (!open && pendingPublicKey) {
+            // User cancelled password setup - remove public key from database
+            try {
+              await removePublicKey()
+              // Clear local storage
+              if (typeof window !== "undefined") {
+                localStorage.removeItem("zyradex-wallet-address")
+              }
+              // Clear state
+              setPendingPublicKey(null)
+              setPendingSecret(null)
+              setStoredWalletAddress(null)
+              // Refresh profile to get updated user data
+              refreshProfile().catch(() => undefined)
+              toast({
+                title: "Import cancelled",
+                description: "Account import was cancelled. You can import again when ready.",
+              })
+            } catch (err) {
+              console.error("Failed to remove public key:", err)
+              // Still clear local state even if API call fails
+              setPendingPublicKey(null)
+              setPendingSecret(null)
+              setStoredWalletAddress(null)
+              if (typeof window !== "undefined") {
+                localStorage.removeItem("zyradex-wallet-address")
+              }
+            }
+          }
+          setShowPasswordDialog(open)
+        }}
         onPasswordSet={handlePasswordSetup}
         isLoading={false}
       />
