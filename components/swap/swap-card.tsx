@@ -16,6 +16,8 @@ import { PasswordPromptDialog } from "@/components/password-prompt-dialog"
 import { useAccountBalances } from "@/hooks/useAccountData"
 import { listLiquidityPools } from "@/lib/api/liquidity"
 import { useRouter } from "next/navigation"
+import { useSearchAssets } from "@/hooks/useTrade"
+import { Search } from "lucide-react"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -69,6 +71,8 @@ export function SwapCard() {
   const [slippagePercent, setSlippagePercent] = useState<number>(1)
   const [pairedTokens, setPairedTokens] = useState<string[]>([])
   const [loadingPairedTokens, setLoadingPairedTokens] = useState(false)
+  const [tokenBSearch, setTokenBSearch] = useState<string>("")
+  const [tokenBInputMode, setTokenBInputMode] = useState<"dropdown" | "search">("dropdown")
   
   const walletAddress = localWallet || profile?.public_key || user?.wallet_address
   const [showPasswordDialog, setShowPasswordDialog] = useState(false)
@@ -218,10 +222,29 @@ export function SwapCard() {
 
   const handleTokenBChange = (value: string) => {
     setTokenB(value)
+    setTokenBSearch("")
     setSelectedPoolId("")
     setFromAmount("")
     setSlippagePercent(1) // Reset to default
   }
+
+  // Search for assets when user types Token B
+  const tokenBSearchCode = useMemo(() => {
+    if (!tokenBSearch || tokenBSearch.trim() === "") return undefined
+    const trimmed = tokenBSearch.trim()
+    // If it's "native", return it
+    if (trimmed.toLowerCase() === "native") return "native"
+    // If it contains ":", extract just the code part for search
+    if (trimmed.includes(":")) {
+      return trimmed.split(":")[0].trim()
+    }
+    return trimmed
+  }, [tokenBSearch])
+
+  const { assets: searchedAssets, isLoading: searchingAssets } = useSearchAssets(
+    tokenBSearchCode && tokenBInputMode === "search" ? tokenBSearchCode : undefined,
+    10
+  )
 
   const handleSwapTokens = () => {
     const temp = tokenA
@@ -398,7 +421,30 @@ export function SwapCard() {
           </div>
 
           <div className="space-y-3">
-            <Label className="text-sm font-medium text-muted-foreground">Token B (You're Buying)</Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium text-muted-foreground">Token B (You're Buying)</Label>
+              {tokenA && pairedTokens.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => {
+                    setTokenBInputMode(tokenBInputMode === "dropdown" ? "search" : "dropdown")
+                    setTokenBSearch("")
+                    setTokenB("")
+                  }}
+                >
+                  {tokenBInputMode === "dropdown" ? (
+                    <>
+                      <Search className="h-3 w-3 mr-1" />
+                      Search
+                    </>
+                  ) : (
+                    "Use Dropdown"
+                  )}
+                </Button>
+              )}
+            </div>
             {!tokenA ? (
               <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm text-muted-foreground">
                 Select Token A first to see available pairs
@@ -409,16 +455,195 @@ export function SwapCard() {
                 Finding available pairs...
               </div>
             ) : pairedTokens.length === 0 ? (
-              <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm space-y-2">
-                <p className="text-muted-foreground">No liquidity pools found for this token.</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => router.push("/liquidity")}
-                  className="w-full"
-                >
-                  Go to Liquidity page to create one
-                </Button>
+              <div className="space-y-3">
+                <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm space-y-2">
+                  <p className="text-muted-foreground">No liquidity pools found for this token.</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push("/liquidity")}
+                    className="w-full"
+                  >
+                    Create a Pool
+                  </Button>
+                </div>
+                {/* Allow search even when no pools exist */}
+                <div className="space-y-2">
+                  <Input
+                    placeholder="Type token code (e.g., ARCHIMEDES) or CODE:ISSUER"
+                    value={tokenBSearch}
+                    onChange={(e) => {
+                      setTokenBSearch(e.target.value)
+                      setTokenBInputMode("search")
+                    }}
+                  />
+                  {tokenBSearch && searchingAssets && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Searching...
+                    </div>
+                  )}
+                  {tokenBSearch && !searchingAssets && searchedAssets.length > 0 && (
+                  <div className="rounded-lg border border-border/40 bg-muted/20 p-2 space-y-1 max-h-40 overflow-y-auto">
+                    {searchedAssets.map((asset) => {
+                      const assetValue = asset.asset_type === "native" 
+                        ? "native" 
+                        : `${asset.asset_code}:${asset.asset_issuer}`
+                      const displayName = asset.asset_type === "native" ? "Test Pi" : asset.asset_code
+                      return (
+                        <button
+                          key={assetValue}
+                          onClick={() => {
+                            handleTokenBChange(assetValue)
+                            setTokenBSearch("")
+                          }}
+                          className="w-full text-left p-2 rounded hover:bg-muted transition-colors text-sm"
+                        >
+                          <div className="font-medium">{displayName}</div>
+                          {asset.asset_type !== "native" && (
+                            <div className="text-xs text-muted-foreground truncate">
+                              {asset.asset_issuer.slice(0, 8)}...{asset.asset_issuer.slice(-6)}
+                            </div>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+                {/* Allow manual entry for "native" */}
+                {tokenBSearch && tokenBSearch.toLowerCase() === "native" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      handleTokenBChange("native")
+                      setTokenBSearch("")
+                    }}
+                    className="w-full"
+                  >
+                    Use "Test Pi" (native)
+                  </Button>
+                )}
+                {tokenBSearch && !searchingAssets && searchedAssets.length === 0 && tokenBSearchCode && (
+                  <div className="space-y-2">
+                    <div className="text-xs text-muted-foreground p-2">
+                      No assets found for "{tokenBSearchCode}". You can still enter the full format (CODE:ISSUER) or select from available pairs below.
+                    </div>
+                    {/* Allow manual entry if user types full format */}
+                    {tokenBSearch.includes(":") && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          handleTokenBChange(tokenBSearch)
+                          setTokenBSearch("")
+                        }}
+                        className="w-full"
+                      >
+                        Use "{tokenBSearch}"
+                      </Button>
+                    )}
+                  </div>
+                )}
+                </div>
+              </div>
+            ) : tokenBInputMode === "search" ? (
+              <div className="space-y-2">
+                <Input
+                  placeholder="Type token code (e.g., ARCHIMEDES) or CODE:ISSUER"
+                  value={tokenBSearch}
+                  onChange={(e) => setTokenBSearch(e.target.value)}
+                />
+                {tokenBSearch && searchingAssets && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Searching...
+                  </div>
+                )}
+                {tokenBSearch && !searchingAssets && searchedAssets.length > 0 && (
+                  <div className="rounded-lg border border-border/40 bg-muted/20 p-2 space-y-1 max-h-40 overflow-y-auto">
+                    {searchedAssets.map((asset) => {
+                      const assetValue = asset.asset_type === "native" 
+                        ? "native" 
+                        : `${asset.asset_code}:${asset.asset_issuer}`
+                      const displayName = asset.asset_type === "native" ? "Test Pi" : asset.asset_code
+                      return (
+                        <button
+                          key={assetValue}
+                          onClick={() => {
+                            handleTokenBChange(assetValue)
+                            setTokenBSearch("")
+                          }}
+                          className="w-full text-left p-2 rounded hover:bg-muted transition-colors text-sm"
+                        >
+                          <div className="font-medium">{displayName}</div>
+                          {asset.asset_type !== "native" && (
+                            <div className="text-xs text-muted-foreground truncate">
+                              {asset.asset_issuer.slice(0, 8)}...{asset.asset_issuer.slice(-6)}
+                            </div>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+                {/* Allow manual entry for "native" */}
+                {tokenBSearch && tokenBSearch.toLowerCase() === "native" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      handleTokenBChange("native")
+                      setTokenBSearch("")
+                    }}
+                    className="w-full"
+                  >
+                    Use "Test Pi" (native)
+                  </Button>
+                )}
+                  {tokenBSearch && !searchingAssets && searchedAssets.length === 0 && tokenBSearchCode && (
+                    <div className="space-y-2">
+                      <div className="text-xs text-muted-foreground p-2">
+                        No assets found for "{tokenBSearchCode}". You can still enter the full format (CODE:ISSUER) or select from available pairs below.
+                      </div>
+                      {/* Allow manual entry if user types full format */}
+                      {tokenBSearch.includes(":") && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            handleTokenBChange(tokenBSearch)
+                            setTokenBSearch("")
+                          }}
+                          className="w-full"
+                        >
+                          Use "{tokenBSearch}"
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                {/* Show paired tokens as fallback suggestions */}
+                {pairedTokens.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Or select from available pairs:</p>
+                    <Select value={tokenB} onValueChange={handleTokenBChange}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select from available pairs" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {pairedTokens.map((token) => {
+                          const isNative = token === "native"
+                          const displayName = isNative ? "Test Pi" : (token.includes(":") ? token.split(":")[0] : token)
+                          return (
+                            <SelectItem key={token} value={token}>
+                              {displayName}
+                            </SelectItem>
+                          )
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
             ) : (
               <Select value={tokenB} onValueChange={handleTokenBChange}>
@@ -438,10 +663,10 @@ export function SwapCard() {
                 </SelectContent>
               </Select>
             )}
-            {tokenA && pairedTokens.length > 0 && (
-            <p className="text-xs text-muted-foreground">
+            {tokenA && pairedTokens.length > 0 && tokenBInputMode === "dropdown" && (
+              <p className="text-xs text-muted-foreground">
                 Tokens available in liquidity pools with {fromToken?.code === "native" ? "Test Pi" : fromToken?.code}
-            </p>
+              </p>
             )}
           </div>
 
