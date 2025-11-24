@@ -100,3 +100,55 @@ export const getAccountOperations = async (params: AccountOperationsParams) => {
     throw toApiError(error)
   }
 }
+
+export interface AccountTransactionsParams {
+  publicKey: string
+  limit?: number
+  cursor?: string
+  order?: "asc" | "desc"
+  refresh?: boolean
+}
+
+export interface AccountTransaction {
+  id: string
+  hash: string
+  ledger: number
+  createdAt: string
+  sourceAccount: string
+  fee: string
+  feeAccount?: string
+  operationCount: number
+  successful: boolean
+  paging_token?: string
+  memo?: string
+  memoType?: string
+  operations?: Array<{
+    id: string
+    type: string
+    sourceAccount: string
+    createdAt: string
+  }>
+}
+
+export interface PaginatedTransactions {
+  data: AccountTransaction[]
+  pagination: {
+    limit: number
+    nextCursor: string | null
+    hasMore: boolean
+    order: "asc" | "desc"
+  }
+  cached?: boolean
+}
+
+export const getAccountTransactions = async (params: AccountTransactionsParams) => {
+  try {
+    const { publicKey, refresh, ...query } = params
+    const { data } = await axiosClient.get<PaginatedTransactions>(`/account/transactions/${publicKey}`, {
+      params: refresh ? { ...query, refresh: 'true' } : query,
+    })
+    return data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}

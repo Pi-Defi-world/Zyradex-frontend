@@ -20,6 +20,7 @@ import {
   Droplets,
   User,
   Shield,
+  History,
 } from "lucide-react"
 import { usePi } from "@/components/providers/pi-provider"
 import { Button } from "@/components/ui/button"
@@ -349,6 +350,13 @@ const ProfilePage: React.FC = () => {
       description: "Exchange assets",
       icon: Users,
       href: "/swap",
+      showChevron: true,
+    },
+    {
+      title: "Transaction History",
+      description: "View your transaction history",
+      icon: History,
+      href: "/history",
       showChevron: true,
     },
     {

@@ -3,12 +3,16 @@ import {
   importAccount as importAccountRequest,
   getAccountBalances,
   getAccountOperations,
+  getAccountTransactions,
   type ImportAccountPayload,
   type ImportAccountResponse,
   type AccountBalancesResponse,
   type AccountOperationsParams,
   type PaginatedOperations,
   type AccountOperation,
+  type AccountTransactionsParams,
+  type PaginatedTransactions,
+  type AccountTransaction,
 } from "@/lib/api/account"
 import type { ApiError } from "@/lib/api"
 import { toApiError } from "@/lib/api"
@@ -178,5 +182,81 @@ export const useAccountOperations = (publicKey?: string, options: UseAccountOper
     isLoading,
     operations,
     pagination,
+  }
+}
+
+export interface UseAccountTransactionsOptions {
+  limit?: number
+  order?: "asc" | "desc"
+  cursor?: string
+  skip?: boolean
+  refresh?: boolean
+}
+
+export const useAccountTransactions = (publicKey?: string, options: UseAccountTransactionsOptions = {}) => {
+  const [data, setData] = useState<PaginatedTransactions | null>(null)
+  const [error, setError] = useState<ApiError | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
+
+  const { limit = 20, order = "desc", cursor, skip, refresh } = options
+
+  const refreshTransactions = useCallback(() => {
+    setRefreshTrigger(prev => prev + 1)
+  }, [])
+
+  useEffect(() => {
+    if (!publicKey || skip) {
+      if (!publicKey) {
+        setData(null)
+        setError(null)
+      }
+      return
+    }
+
+    let cancelled = false
+    setIsLoading(true)
+    setError(null)
+
+    const params: AccountTransactionsParams = {
+      publicKey,
+      limit,
+      order,
+      cursor,
+      refresh: refresh || refreshTrigger > 0,
+    }
+
+    getAccountTransactions(params)
+      .then((response) => {
+        if (!cancelled) {
+          setData(response)
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(toApiError(err))
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [publicKey, limit, order, cursor, skip, refresh, refreshTrigger])
+
+  const transactions = (data?.data ?? []) as AccountTransaction[]
+  const pagination = data?.pagination
+
+  return {
+    data,
+    error,
+    isLoading,
+    transactions,
+    pagination,
+    refresh: refreshTransactions,
   }
 }

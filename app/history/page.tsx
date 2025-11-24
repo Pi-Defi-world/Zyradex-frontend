@@ -1,0 +1,251 @@
+"use client"
+
+import React, { useState, useMemo } from "react"
+import { useRouter } from "next/navigation"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ArrowLeft, Loader2, RefreshCw, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { useUserProfile } from "@/hooks/useUserProfile"
+import { useAccountTransactions } from "@/hooks/useAccountData"
+import { formatDistanceToNow } from "date-fns"
+
+const getStoredWallet = () => {
+  if (typeof window === "undefined") return null
+  return localStorage.getItem("zyradex-wallet-address")
+}
+
+export default function HistoryPage() {
+  const router = useRouter()
+  const { toast } = useToast()
+  const { profile } = useUserProfile()
+  const [localWallet, setLocalWallet] = useState<string | null>(null)
+  const [cursor, setCursor] = useState<string | undefined>(undefined)
+  const [order, setOrder] = useState<"asc" | "desc">("desc")
+
+  // Priority: profile.public_key (from DB) > localWallet (from localStorage)
+  const publicKey = profile?.public_key || localWallet || undefined
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = getStoredWallet()
+      setLocalWallet(stored)
+      // Sync with profile public_key if available
+      if (profile?.public_key && stored !== profile.public_key) {
+        localStorage.setItem("zyradex-wallet-address", profile.public_key)
+        setLocalWallet(profile.public_key)
+      }
+    }
+  }, [profile?.public_key])
+
+  const { transactions, pagination, isLoading, error, refresh } = useAccountTransactions(publicKey, {
+    limit: 20,
+    order,
+    cursor,
+  })
+
+  const handleRefresh = () => {
+    setCursor(undefined)
+    refresh()
+    toast({
+      title: "Refreshing",
+      description: "Fetching latest transactions...",
+    })
+  }
+
+  const handleNextPage = () => {
+    if (pagination?.nextCursor) {
+      setCursor(pagination.nextCursor)
+    }
+  }
+
+  const handlePrevPage = () => {
+    // For previous page, we'd need to track history or reset
+    setCursor(undefined)
+  }
+
+  const handleToggleOrder = () => {
+    setOrder(order === "desc" ? "asc" : "desc")
+    setCursor(undefined)
+  }
+
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString)
+      return formatDistanceToNow(date, { addSuffix: true })
+    } catch {
+      return dateString
+    }
+  }
+
+  const getTransactionType = (tx: any) => {
+    if (tx.operationCount === 0) return "Unknown"
+    if (tx.operationCount === 1) return "Single Operation"
+    return `${tx.operationCount} Operations`
+  }
+
+  const getTransactionStatus = (tx: any) => {
+    return tx.successful ? "Success" : "Failed"
+  }
+
+  const truncateHash = (hash: string) => {
+    if (!hash) return ""
+    return `${hash.slice(0, 8)}...${hash.slice(-8)}`
+  }
+
+  const viewOnExplorer = (hash: string) => {
+    const explorerUrl = `https://testnet.minepi.com/explorer/transaction/${hash}`
+    window.open(explorerUrl, "_blank")
+  }
+
+  if (!publicKey) {
+    return (
+      <div className="min-h-screen premium-gradient pt-16 pb-20 p-3 sm:p-4">
+        <div className="max-w-4xl mx-auto">
+          <Card>
+            <CardHeader>
+              <CardTitle>Transaction History</CardTitle>
+              <CardDescription>View your transaction history on the Pi Network</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground text-center py-8">
+                No wallet address found. Please import your account in the Profile page.
+              </p>
+              <Button onClick={() => router.push("/profile")} className="w-full">
+                Go to Profile
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen premium-gradient pt-16 pb-20 p-3 sm:p-4">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => router.back()}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">Transaction History</h1>
+              <p className="text-sm text-muted-foreground">
+                View all transactions for {truncateHash(publicKey)}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleToggleOrder} disabled={isLoading}>
+              {order === "desc" ? "Oldest First" : "Newest First"}
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isLoading}>
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            </Button>
+          </div>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Transactions</CardTitle>
+            <CardDescription>
+              {pagination ? `${transactions.length} transaction${transactions.length !== 1 ? "s" : ""} loaded` : "Loading..."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {error && (
+              <div className="mb-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                <p className="text-sm text-destructive">{error.message || "Failed to load transactions"}</p>
+              </div>
+            )}
+
+            {isLoading && transactions.length === 0 ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : transactions.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground">No transactions found</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Transactions will appear here once you start using your wallet
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {transactions.map((tx) => (
+                  <div
+                    key={tx.id}
+                    className="p-4 rounded-lg border border-border/30 bg-card hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-sm font-semibold text-foreground">
+                            {getTransactionType(tx)}
+                          </span>
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded-full ${
+                              tx.successful
+                                ? "bg-green-500/20 text-green-700 dark:text-green-400"
+                                : "bg-red-500/20 text-red-700 dark:text-red-400"
+                            }`}
+                          >
+                            {getTransactionStatus(tx)}
+                          </span>
+                        </div>
+                        <div className="space-y-1 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs">{truncateHash(tx.hash)}</span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5"
+                              onClick={() => viewOnExplorer(tx.hash)}
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          <div>Ledger: {tx.ledger}</div>
+                          <div>Fee: {tx.fee ? (Number(tx.fee) / 10000000).toFixed(7) : "0"} Test Pi</div>
+                          <div>{formatDate(tx.createdAt)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {pagination && transactions.length > 0 && (
+              <div className="flex items-center justify-between mt-6 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePrevPage}
+                  disabled={!cursor || isLoading}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Previous
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Page {cursor ? "2+" : "1"}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleNextPage}
+                  disabled={!pagination.hasMore || isLoading}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
+
