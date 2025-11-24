@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { Navbar } from "@/components/navbar"
 import { Suspense } from "react"
 import { PiProvider } from "@/components/providers/pi-provider"
+import { DisclaimerProvider } from "@/components/disclaimer-provider"
 import Script from 'next/script'
 import "./globals.css"
 
@@ -45,6 +46,7 @@ export default function RootLayout({
               <Navbar />
               {children}
               <Toaster />
+              <DisclaimerProvider />
             </Suspense>
           </ThemeProvider>
         </PiProvider>

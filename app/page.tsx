@@ -12,7 +12,6 @@ import { useTokenRegistry } from "@/hooks/useTokenRegistry"
 import { usePiPrice } from "@/hooks/usePiPrice"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { ReceiveModal } from "@/components/receive-modal"
-import { DisclaimerPopup } from "@/components/disclaimer-popup"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -26,7 +25,6 @@ export default function HomePage() {
   const { profile } = useUserProfile()
   const [localWallet, setLocalWallet] = useState<string | null>(null)
   const [receiveModalOpen, setReceiveModalOpen] = useState(false)
-  const [disclaimerOpen, setDisclaimerOpen] = useState(false)
   const { price: piPrice, isLoading: priceLoading } = usePiPrice()
 
   useEffect(() => {
@@ -46,12 +44,6 @@ export default function HomePage() {
     }
   }, [isAuthenticated, profile?.public_key])
 
-  useEffect(() => {
-    const disclaimerAccepted = localStorage.getItem("zyradex-disclaimer-accepted")
-    if (!disclaimerAccepted) {
-      setDisclaimerOpen(true)
-    }
-  }, [])
 
   // Priority: profile.public_key (from DB) > user.wallet_address (from Pi SDK) > localWallet (from localStorage)
   const publicKey = isAuthenticated 
@@ -86,10 +78,6 @@ export default function HomePage() {
     router.push("/swap")
   }
 
-  const handleDisclaimerClose = () => {
-    localStorage.setItem("zyradex-disclaimer-accepted", "true")
-    setDisclaimerOpen(false)
-  }
 
   return (
     <div className="min-h-screen premium-gradient pt-16 pb-20">
@@ -293,7 +281,6 @@ export default function HomePage() {
       </div>
 
       <ReceiveModal open={receiveModalOpen} onOpenChange={setReceiveModalOpen} />
-      <DisclaimerPopup open={disclaimerOpen} onOpenChange={handleDisclaimerClose} />
     </div>
   )
 }

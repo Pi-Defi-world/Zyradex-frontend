@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Checkbox } from "@/components/ui/checkbox"
-import { AlertTriangle } from "lucide-react"
+import { AlertCircle } from "lucide-react"
 
 interface DisclaimerPopupProps {
   open: boolean
@@ -21,12 +21,16 @@ export function DisclaimerPopup({ open, onOpenChange }: DisclaimerPopupProps) {
 
   const handleSaveAndContinue = () => {
     if (isAgreed) {
+      // Mark as accepted for this session
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("zyradex-disclaimer-accepted", "true")
+      }
       onOpenChange(false)
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent 
         className="max-w-2xl w-[90vw] max-h-[85vh] !p-0 !grid-rows-[auto_1fr_auto] !gap-0"
         showCloseButton={false}
@@ -34,7 +38,7 @@ export function DisclaimerPopup({ open, onOpenChange }: DisclaimerPopupProps) {
         {/* Header */}
         <div className="p-6 pb-4 border-b">
           <DialogTitle className="flex items-center gap-2 text-xl font-bold">
-            <AlertTriangle className="h-6 w-6 text-yellow-500" />
+            <AlertCircle className="h-6 w-6 text-yellow-500" />
             Important Disclaimer
           </DialogTitle>
         </div>
