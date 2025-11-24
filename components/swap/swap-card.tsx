@@ -140,7 +140,7 @@ export function SwapCard() {
   const fromDescriptor = fromToken ? tokenToDescriptor(fromToken) : ""
   const toDescriptor = toToken ? tokenToDescriptor(toToken) : ""
 
-  const { quote, isLoading: quoting, error: quoteError } = useSwapQuote(
+  const { quote, isLoading: quoting, error: quoteError, timeUntilRefresh } = useSwapQuote(
     quoteEnabled
       ? {
           poolId: selectedPoolId,
@@ -151,6 +151,27 @@ export function SwapCard() {
         }
       : undefined
   )
+
+  // Local state for countdown display (updates every second)
+  const [displayCountdown, setDisplayCountdown] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (timeUntilRefresh === null) {
+      setDisplayCountdown(null)
+      return
+    }
+
+    setDisplayCountdown(timeUntilRefresh)
+
+    const interval = setInterval(() => {
+      setDisplayCountdown((prev) => {
+        if (prev === null || prev <= 0) return null
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [timeUntilRefresh])
 
   const { executeSwap, isLoading: executing } = useExecuteSwap()
 
@@ -775,6 +796,21 @@ export function SwapCard() {
                     </div>
                   ) : quote ? (
                     <>
+                      {displayCountdown !== null && displayCountdown > 0 && (
+                        <div className="mb-3 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-yellow-600 dark:text-yellow-400">
+                              Quote expires in:
+                            </span>
+                            <span className="font-mono font-semibold text-yellow-600 dark:text-yellow-400">
+                              {displayCountdown}s
+                            </span>
+                          </div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            Quote will automatically refresh
+                          </div>
+                        </div>
+                      )}
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Estimated Output</span>
                         <span className="font-medium">

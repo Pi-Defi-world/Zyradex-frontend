@@ -48,45 +48,66 @@ export const useSwapQuote = (params?: SwapQuoteParams) => {
   const [data, setData] = useState<SwapQuoteResponse | null>(null)
   const [error, setError] = useState<ApiError | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [quoteTimestamp, setQuoteTimestamp] = useState<number | null>(null)
+
+  const fetchQuote = useCallback(async () => {
+    if (!params?.poolId) {
+      setData(null)
+      setError(null)
+      setQuoteTimestamp(null)
+      return
+    }
+
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const response = await quoteSwapRequest(params)
+      setData(response)
+      setQuoteTimestamp(Date.now())
+    } catch (err) {
+      setError(toApiError(err))
+    } finally {
+      setIsLoading(false)
+    }
+  }, [params?.poolId, params?.amount, params?.from, params?.to, params?.slippagePercent])
 
   useEffect(() => {
     if (!params?.poolId) {
       setData(null)
       setError(null)
+      setQuoteTimestamp(null)
       return
     }
 
-    let cancelled = false
-    setIsLoading(true)
-    setError(null)
+    // Initial fetch
+    fetchQuote()
 
-    quoteSwapRequest(params)
-      .then((response) => {
-        if (!cancelled) {
-          setData(response)
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(toApiError(err))
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsLoading(false)
-        }
-      })
+    // Set up auto-refresh every 20 seconds
+    const interval = setInterval(() => {
+      fetchQuote()
+    }, 20000) // 20 seconds
 
     return () => {
-      cancelled = true
+      clearInterval(interval)
     }
-  }, [params?.poolId, params?.amount, params?.from, params?.to, params?.slippagePercent])
+  }, [fetchQuote, params?.poolId, params?.amount, params?.from, params?.to, params?.slippagePercent])
+
+  // Calculate time until next refresh (20 seconds from last quote)
+  const timeUntilRefresh = useMemo(() => {
+    if (!quoteTimestamp) return null
+    const elapsed = Date.now() - quoteTimestamp
+    const remaining = Math.max(0, 20000 - elapsed)
+    return Math.ceil(remaining / 1000) // Return seconds
+  }, [quoteTimestamp])
 
   return {
     data,
     error,
     isLoading,
     quote: data,
+    timeUntilRefresh,
+    refreshQuote: fetchQuote,
   }
 }
 
