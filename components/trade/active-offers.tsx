@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useUserOffers, useCancelOffer } from "@/hooks/useTrade"
 import { useTransactionAuth } from "@/hooks/useTransactionAuth"
 import { PasswordPromptDialog } from "@/components/password-prompt-dialog"
+import { useAccountBalances } from "@/hooks/useAccountData"
 
 interface ActiveOffersProps {
   account: string
@@ -17,6 +18,7 @@ export function ActiveOffers({ account }: ActiveOffersProps) {
   const { toast } = useToast()
   const { offers, isLoading, error } = useUserOffers(account)
   const { cancelOffer, isLoading: cancelling } = useCancelOffer()
+  const { refresh: refreshBalances } = useAccountBalances(account)
 
   // Authentication
   const [showPasswordDialog, setShowPasswordDialog] = useState(false)
@@ -81,6 +83,11 @@ export function ActiveOffers({ account }: ActiveOffersProps) {
       })
 
       toast({ title: "Offer cancelled", description: "Your offer has been cancelled successfully." })
+      
+ 
+      setTimeout(() => {
+        refreshBalances()
+      }, 2000) // Wait 2 seconds for transaction to be processed
     } catch (err) {
       const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Failed to cancel offer"
       toast({ title: "Error", description: message, variant: "destructive" })

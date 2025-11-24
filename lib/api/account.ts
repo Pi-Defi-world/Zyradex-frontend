@@ -78,9 +78,11 @@ export const importAccount = async (payload: ImportAccountPayload) => {
   }
 }
 
-export const getAccountBalances = async (publicKey: string) => {
+export const getAccountBalances = async (publicKey: string, refresh?: boolean) => {
   try {
-    const { data } = await axiosClient.get<AccountBalancesResponse>(`/account/balance/${publicKey}`)
+    const { data } = await axiosClient.get<AccountBalancesResponse>(`/account/balance/${publicKey}`, {
+      params: refresh ? { refresh: 'true' } : undefined
+    })
     return data
   } catch (error) {
     throw toApiError(error)

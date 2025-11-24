@@ -14,6 +14,7 @@ import { useTransactionAuth } from "@/hooks/useTransactionAuth"
 import { PasswordPromptDialog } from "@/components/password-prompt-dialog"
 import { usePi } from "@/components/providers/pi-provider"
 import { useUserProfile } from "@/hooks/useUserProfile"
+import { useAccountBalances } from "@/hooks/useAccountData"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -27,6 +28,10 @@ export function MintForm() {
   const { profile } = useUserProfile()
   const { mintToken, isLoading, error } = useMintToken()
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
+  
+  // Get public key for balance refresh
+  const publicKey = profile?.public_key || walletAddress || user?.wallet_address || undefined
+  const { refresh: refreshBalances } = useAccountBalances(publicKey)
   const [showPasswordDialog, setShowPasswordDialog] = useState(false)
   const [passwordResolve, setPasswordResolve] = useState<((password: string) => void) | null>(null)
   const [passwordReject, setPasswordReject] = useState<((error: Error) => void) | null>(null)
@@ -148,6 +153,14 @@ export function MintForm() {
       toast({ title: "Token minted", description: `${formData.totalSupply} ${formData.assetCode} issued.` })
       setFormData({ distributorSecret: "", assetCode: "", totalSupply: "", tokenName: "", description: "", homeDomain: "" })
       setAssetCodeError("")
+      
+      // Refresh balances after successful minting to show new token
+      // Backend already clears cache, but we refresh to get the latest data
+      if (publicKey) {
+        setTimeout(() => {
+          refreshBalances()
+        }, 2000) // Wait 2 seconds for transaction to be processed
+      }
     } catch (err) {
       const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Minting failed"
       addLog("error", message)

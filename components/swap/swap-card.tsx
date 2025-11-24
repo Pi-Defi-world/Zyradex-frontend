@@ -58,7 +58,7 @@ export function SwapCard() {
 
   // Get user balances for Token A dropdown
   const publicKey = profile?.public_key || localWallet || user?.wallet_address || undefined
-  const { balances } = useAccountBalances(publicKey)
+  const { balances, refresh: refreshBalances } = useAccountBalances(publicKey)
 
   // Token input state
   const [tokenA, setTokenA] = useState<string>("")
@@ -99,7 +99,7 @@ export function SwapCard() {
     return parseToken(tokenB)
   }, [tokenB])
 
-  // Fetch pools for the entered pair - only when both tokens have codes
+  
   const poolsEnabled = Boolean(
     fromToken && 
     toToken && 
@@ -279,6 +279,11 @@ export function SwapCard() {
       })
       setFromAmount("")
       setUserSecret("")
+      // Refresh balances after successful swap to show updated amounts
+      // Backend already clears cache, but we refresh to get the latest data
+      setTimeout(() => {
+        refreshBalances()
+      }, 2000) // Wait 2 seconds for transaction to be processed
     } catch (err) {
       const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Swap failed"
       toast({ title: "Swap failed", description: message, variant: "destructive" })
@@ -434,9 +439,9 @@ export function SwapCard() {
               </Select>
             )}
             {tokenA && pairedTokens.length > 0 && (
-              <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
                 Tokens available in liquidity pools with {fromToken?.code === "native" ? "Test Pi" : fromToken?.code}
-              </p>
+            </p>
             )}
           </div>
 

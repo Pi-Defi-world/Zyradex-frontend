@@ -53,6 +53,11 @@ export const useAccountBalances = (publicKey?: string) => {
   const [data, setData] = useState<AccountBalancesResponse | null>(null)
   const [error, setError] = useState<ApiError | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
+
+  const refresh = useCallback(() => {
+    setRefreshTrigger(prev => prev + 1)
+  }, [])
 
   useEffect(() => {
     if (!publicKey) {
@@ -65,22 +70,22 @@ export const useAccountBalances = (publicKey?: string) => {
     setIsLoading(true)
     setError(null)
 
-    getAccountBalances(publicKey)
+ 
+    const shouldRefresh = refreshTrigger > 0
+    getAccountBalances(publicKey, shouldRefresh)
       .then((response) => {
         if (!cancelled) {
           setData(response)
-          setError(null) // Clear any previous errors
+          setError(null)
         }
       })
       .catch((err) => {
         if (!cancelled) {
           const apiError = toApiError(err)
-          // If account not found, treat as empty balances instead of error
           const errorMessage = apiError.message?.toLowerCase() || ""
           const statusCode = (apiError as any)?.status || (err as any)?.response?.status
           
           if (statusCode === 404 || statusCode === 500 || errorMessage.includes("not found")) {
-            // Account doesn't exist on Pi network yet - return empty balances
             setData({ publicKey, balances: [] })
             setError(null)
           } else {
@@ -97,7 +102,7 @@ export const useAccountBalances = (publicKey?: string) => {
     return () => {
       cancelled = true
     }
-  }, [publicKey])
+  }, [publicKey, refreshTrigger])
 
   const balances = data?.balances ?? []
   const totalBalance = useMemo(
@@ -111,6 +116,7 @@ export const useAccountBalances = (publicKey?: string) => {
     isLoading,
     balances,
     totalBalance,
+    refresh,
   }
 }
 

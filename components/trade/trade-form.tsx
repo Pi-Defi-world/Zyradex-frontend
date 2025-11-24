@@ -41,7 +41,7 @@ const tokenToDescriptor = (token: { code: string; issuer?: string }): string => 
 
 export function TradeForm({ publicKey }: TradeFormProps) {
   const { toast } = useToast()
-  const { balances } = useAccountBalances(publicKey)
+  const { balances, refresh: refreshBalances } = useAccountBalances(publicKey)
   const [tradeType, setTradeType] = useState<"sell" | "buy">("sell")
   
   // Token selection
@@ -169,6 +169,12 @@ export function TradeForm({ publicKey }: TradeFormProps) {
       setAmount("")
       setBuyAmount("")
       setPrice("")
+      
+      // Refresh balances after successful offer creation
+      // Backend already clears cache, but we refresh to get the latest data
+      setTimeout(() => {
+        refreshBalances()
+      }, 2000) // Wait 2 seconds for transaction to be processed
     } catch (err) {
       const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Failed to create offer"
       toast({ title: "Error", description: message, variant: "destructive" })
