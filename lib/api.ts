@@ -23,6 +23,9 @@ export interface ApiError {
   message: string
   status?: number
   details?: unknown
+  suggestion?: string
+  operationError?: string
+  reason?: string
 }
 
 export const toApiError = (error: unknown): ApiError => {
@@ -31,7 +34,14 @@ export const toApiError = (error: unknown): ApiError => {
   }
 
   if ((error as AxiosError).isAxiosError) {
-    const axiosError = error as AxiosError<{ message?: string; error?: string | unknown }>
+    const axiosError = error as AxiosError<{ 
+      message?: string
+      error?: string | unknown
+      suggestion?: string
+      operationError?: string
+      reason?: string
+      details?: unknown
+    }>
     
     // Try to extract meaningful error message from various possible locations
     let message = 
@@ -51,7 +61,8 @@ export const toApiError = (error: unknown): ApiError => {
       } else if (axiosError.response?.status === 500) {
         message = "Server error. Please try again later."
       } else if (axiosError.response?.status === 400) {
-        message = "Invalid request. Please check your input."
+        // For 400 errors, use the backend message if available, otherwise generic
+        message = axiosError.response?.data?.message || "Invalid request. Please check your input."
       } else if (axiosError.response?.status === 401) {
         message = "Authentication required. Please sign in again."
       } else if (axiosError.response?.status === 403) {
@@ -62,7 +73,10 @@ export const toApiError = (error: unknown): ApiError => {
     return {
       message,
       status: axiosError.response?.status,
-      details: axiosError.response?.data?.error,
+      details: axiosError.response?.data?.details || axiosError.response?.data?.error,
+      suggestion: axiosError.response?.data?.suggestion,
+      operationError: axiosError.response?.data?.operationError,
+      reason: axiosError.response?.data?.reason,
     }
   }
 

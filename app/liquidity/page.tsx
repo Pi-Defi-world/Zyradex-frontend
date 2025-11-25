@@ -277,8 +277,19 @@ export default function LiquidityPage() {
           variant: "destructive",
         })
       } else {
+        // Extract error message and suggestion
         const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Failed to create pool"
-        toast({ title: "Could not create pool", description: message, variant: "destructive" })
+        const suggestion = err && typeof err === "object" && "suggestion" in err ? (err as any).suggestion : undefined
+        
+        // Combine message and suggestion for better user experience
+        const description = suggestion ? `${message}\n\n${suggestion}` : message
+        
+        toast({ 
+          title: "Could not create pool", 
+          description: description,
+          variant: "destructive",
+          duration: suggestion ? 8000 : 5000, // Show longer if there's a suggestion
+        })
       }
     }
   }
@@ -315,9 +326,17 @@ export default function LiquidityPage() {
       toast({ title: "Liquidity added", description: `${pool.id} updated successfully.` })
       resetForms()
       setRefreshKey(Date.now())
-    } catch (err) {
+    } catch (err: any) {
       const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Failed to add liquidity"
-      toast({ title: "Could not add liquidity", description: message, variant: "destructive" })
+      const suggestion = err && typeof err === "object" && "suggestion" in err ? (err as any).suggestion : undefined
+      const description = suggestion ? `${message}\n\n${suggestion}` : message
+      
+      toast({ 
+        title: "Could not add liquidity", 
+        description: description,
+        variant: "destructive",
+        duration: suggestion ? 8000 : 5000,
+      })
     }
   }
 
@@ -352,9 +371,17 @@ export default function LiquidityPage() {
       toast({ title: "Liquidity withdrawn", description: `${pool.id} updated successfully.` })
       resetForms()
       setRefreshKey(Date.now())
-    } catch (err) {
+    } catch (err: any) {
       const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Failed to withdraw"
-      toast({ title: "Could not withdraw liquidity", description: message, variant: "destructive" })
+      const suggestion = err && typeof err === "object" && "suggestion" in err ? (err as any).suggestion : undefined
+      const description = suggestion ? `${message}\n\n${suggestion}` : message
+      
+      toast({ 
+        title: "Could not withdraw liquidity", 
+        description: description,
+        variant: "destructive",
+        duration: suggestion ? 8000 : 5000,
+      })
     }
   }
 
