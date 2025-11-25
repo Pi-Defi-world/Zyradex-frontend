@@ -20,6 +20,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Loader2, Plus, Droplets, TrendingUp, Users, Minus, Search, Lock } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import {
@@ -32,6 +39,7 @@ import { useTransactionAuth } from "@/hooks/useTransactionAuth"
 import { PasswordPromptDialog } from "@/components/password-prompt-dialog"
 import { usePi } from "@/components/providers/pi-provider"
 import { useUserProfile } from "@/hooks/useUserProfile"
+import { getUserTokens, getPlatformPools, type PoolExistsError } from "@/lib/api/liquidity"
 import type { ILiquidityPool } from "@/lib/types"
 
 const getStoredWallet = () => {
@@ -121,6 +129,46 @@ export default function LiquidityPage() {
     setWalletAddress(address)
   }, [profile?.public_key, user?.wallet_address])
 
+  // Fetch user tokens when wallet address is available
+  useEffect(() => {
+    if (walletAddress) {
+      setLoadingUserTokens(true)
+      getUserTokens(walletAddress)
+        .then((data) => {
+          setUserTokens(
+            data.tokens.map((t) => ({
+              code: t.code,
+              issuer: t.issuer || "",
+              amount: t.amount,
+            }))
+          )
+        })
+        .catch((err) => {
+          console.error("Failed to fetch user tokens:", err)
+        })
+        .finally(() => {
+          setLoadingUserTokens(false)
+        })
+    } else {
+      setUserTokens([])
+    }
+  }, [walletAddress])
+
+  // Fetch platform pools
+  useEffect(() => {
+    setLoadingPlatformPools(true)
+    getPlatformPools()
+      .then((data) => {
+        setPlatformPools(data.pools)
+      })
+      .catch((err) => {
+        console.error("Failed to fetch platform pools:", err)
+      })
+      .finally(() => {
+        setLoadingPlatformPools(false)
+      })
+  }, [])
+
   const handlePasswordPrompt = async (): Promise<string> => {
     return new Promise((resolve, reject) => {
       setPasswordResolve(() => (password: string) => resolve(password))
@@ -143,6 +191,11 @@ export default function LiquidityPage() {
   const [depositForm, setDepositForm] = useState<DepositFormState>(defaultDepositForm)
   const [withdrawForm, setWithdrawForm] = useState<WithdrawFormState>(defaultWithdrawForm)
   const [activePool, setActivePool] = useState<ILiquidityPool | null>(null)
+  const [userTokens, setUserTokens] = useState<Array<{ code: string; issuer: string | null; amount: number }>>([])
+  const [loadingUserTokens, setLoadingUserTokens] = useState(false)
+  const [platformPools, setPlatformPools] = useState<any[]>([])
+  const [loadingPlatformPools, setLoadingPlatformPools] = useState(false)
+  const [poolExistsError, setPoolExistsError] = useState<PoolExistsError | null>(null)
 
   const handlePasswordSubmit = async (password: string) => {
     if (passwordResolve) {
@@ -212,10 +265,21 @@ export default function LiquidityPage() {
       })
       toast({ title: "Liquidity pool created", description: "Liquidity was deposited successfully." })
       resetForms()
+      setPoolExistsError(null)
       setRefreshKey(Date.now())
-    } catch (err) {
-      const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Failed to create pool"
-      toast({ title: "Could not create pool", description: message, variant: "destructive" })
+    } catch (err: any) {
+      // Handle pool exists error
+      if (err.poolExists && err.poolId) {
+        setPoolExistsError(err)
+        toast({
+          title: "Pool already exists",
+          description: err.suggestion || "Use the deposit option to add liquidity to the existing pool",
+          variant: "destructive",
+        })
+      } else {
+        const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Failed to create pool"
+        toast({ title: "Could not create pool", description: message, variant: "destructive" })
+      }
     }
   }
 
@@ -336,48 +400,147 @@ export default function LiquidityPage() {
                     </div>
                   </div>
                 )}
+                {poolExistsError && (
+                  <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-4">
+                    <div className="flex items-start gap-2">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
+                          Pool already exists
+                        </p>
+                        <p className="text-xs text-yellow-600 dark:text-yellow-500 mt-1">
+                          {poolExistsError.suggestion}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Pool ID: {poolExistsError.poolId}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (poolExistsError.existingPool) {
+                            setActivePool(poolExistsError.existingPool)
+                            setPoolExistsError(null)
+                          }
+                        }}
+                      >
+                        Add Liquidity
+                      </Button>
+                    </div>
+                  </div>
+                )}
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="tokenA-code">Token A Code</Label>
-                    <Input
-                      id="tokenA-code"
-                      placeholder="e.g. PI"
-                      value={createForm.tokenACode}
-                      onChange={(event) => setCreateForm((prev) => ({ ...prev, tokenACode: event.target.value }))}
-                      required
-                    />
+                    <Label htmlFor="tokenA-select">Token A</Label>
+                    {userTokens.length > 0 ? (
+                      <Select
+                        value={createForm.tokenACode && createForm.tokenAIssuer ? `${createForm.tokenACode}:${createForm.tokenAIssuer}` : ""}
+                        onValueChange={(value) => {
+                          if (value === "native") {
+                            setCreateForm((prev) => ({ ...prev, tokenACode: "native", tokenAIssuer: "" }))
+                          } else {
+                            const [code, issuer] = value.split(":")
+                            setCreateForm((prev) => ({ ...prev, tokenACode: code, tokenAIssuer: issuer || "" }))
+                          }
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select token A" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="native">Native (Test Pi)</SelectItem>
+                          {userTokens
+                            .filter((t) => t.code !== "native" || t.issuer === "")
+                            .map((token) => (
+                              <SelectItem
+                                key={`${token.code}:${token.issuer}`}
+                                value={`${token.code}:${token.issuer}`}
+                              >
+                                {token.code} {token.issuer ? `(${token.issuer.slice(0, 8)}...)` : ""} - {token.amount.toFixed(4)}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="space-y-2">
+                        <Input
+                          id="tokenA-code"
+                          placeholder="e.g. PI or native"
+                          value={createForm.tokenACode}
+                          onChange={(event) => setCreateForm((prev) => ({ ...prev, tokenACode: event.target.value }))}
+                          required
+                        />
+                        {createForm.tokenACode !== "native" && (
+                          <Input
+                            id="tokenA-issuer"
+                            placeholder="Issuer public key (leave empty for native)"
+                            value={createForm.tokenAIssuer}
+                            onChange={(event) => setCreateForm((prev) => ({ ...prev, tokenAIssuer: event.target.value }))}
+                          />
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="tokenA-issuer">Token A Issuer</Label>
-                    <Input
-                      id="tokenA-issuer"
-                      placeholder="Issuer public key"
-                      value={createForm.tokenAIssuer}
-                      onChange={(event) => setCreateForm((prev) => ({ ...prev, tokenAIssuer: event.target.value }))}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="tokenB-code">Token B Code</Label>
-                    <Input
-                      id="tokenB-code"
-                      placeholder="e.g. PIUSD"
-                      value={createForm.tokenBCode}
-                      onChange={(event) => setCreateForm((prev) => ({ ...prev, tokenBCode: event.target.value }))}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="tokenB-issuer">Token B Issuer</Label>
-                    <Input
-                      id="tokenB-issuer"
-                      placeholder="Issuer public key"
-                      value={createForm.tokenBIssuer}
-                      onChange={(event) => setCreateForm((prev) => ({ ...prev, tokenBIssuer: event.target.value }))}
-                      required
-                    />
+                    <Label htmlFor="tokenB-select">Token B</Label>
+                    {userTokens.length > 0 ? (
+                      <Select
+                        value={createForm.tokenBCode && createForm.tokenBIssuer ? `${createForm.tokenBCode}:${createForm.tokenBIssuer}` : ""}
+                        onValueChange={(value) => {
+                          if (value === "native") {
+                            setCreateForm((prev) => ({ ...prev, tokenBCode: "native", tokenBIssuer: "" }))
+                          } else {
+                            const [code, issuer] = value.split(":")
+                            setCreateForm((prev) => ({ ...prev, tokenBCode: code, tokenBIssuer: issuer || "" }))
+                          }
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select token B" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="native">Native (Test Pi)</SelectItem>
+                          {userTokens
+                            .filter((t) => t.code !== "native" || t.issuer === "")
+                            .map((token) => (
+                              <SelectItem
+                                key={`${token.code}:${token.issuer}`}
+                                value={`${token.code}:${token.issuer}`}
+                              >
+                                {token.code} {token.issuer ? `(${token.issuer.slice(0, 8)}...)` : ""} - {token.amount.toFixed(4)}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="space-y-2">
+                        <Input
+                          id="tokenB-code"
+                          placeholder="e.g. PIUSD"
+                          value={createForm.tokenBCode}
+                          onChange={(event) => setCreateForm((prev) => ({ ...prev, tokenBCode: event.target.value }))}
+                          required
+                        />
+                        {createForm.tokenBCode !== "native" && (
+                          <Input
+                            id="tokenB-issuer"
+                            placeholder="Issuer public key"
+                            value={createForm.tokenBIssuer}
+                            onChange={(event) => setCreateForm((prev) => ({ ...prev, tokenBIssuer: event.target.value }))}
+                            required
+                          />
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
+                {loadingUserTokens && (
+                  <p className="text-xs text-muted-foreground">Loading your tokens...</p>
+                )}
+                {!loadingUserTokens && userTokens.length === 0 && walletAddress && (
+                  <p className="text-xs text-muted-foreground">No tokens found. You need to own tokens to create a pool.</p>
+                )}
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="amountA">Amount A</Label>
@@ -426,6 +589,48 @@ export default function LiquidityPage() {
             />
           </div>
         </div>
+
+        {platformPools.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Platform Pools</CardTitle>
+              <CardDescription>Pools created on this platform</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingPlatformPools ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {platformPools.map((platformPool) => (
+                    <div
+                      key={platformPool.poolId}
+                      className="flex items-center justify-between p-3 rounded-lg border bg-card"
+                    >
+                      <div className="flex-1">
+                        <div className="font-medium">
+                          {platformPool.baseToken}/{platformPool.quoteToken}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Pool ID: {platformPool.poolId.slice(0, 16)}...
+                        </div>
+                        {platformPool.pool && (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Total Shares: {parseFloat(platformPool.pool.total_shares || "0").toFixed(2)}
+                          </div>
+                        )}
+                      </div>
+                      <Badge variant={platformPool.verified ? "default" : "secondary"}>
+                        {platformPool.verified ? "Verified" : "Unverified"}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid gap-4 md:grid-cols-3">
           <Card>

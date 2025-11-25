@@ -70,11 +70,49 @@ export interface WithdrawLiquidityPayload {
   amount: string | number
 }
 
+export interface UserToken {
+  code: string
+  issuer: string | null
+  amount: number
+  assetType: string
+}
+
+export interface GetUserTokensResponse {
+  publicKey: string
+  tokens: UserToken[]
+  cached: boolean
+}
+
+export interface PlatformPool {
+  poolId: string
+  baseToken: string
+  quoteToken: string
+  verified: boolean
+  source: string
+  createdAt: string
+  pool: ILiquidityPool | null
+  error?: string
+}
+
+export interface GetPlatformPoolsResponse {
+  pools: PlatformPool[]
+  count: number
+}
+
+export interface PoolExistsError {
+  message: string
+  poolExists: boolean
+  poolId: string
+  existingPool?: ILiquidityPool
+  suggestion: string
+}
+
 export const createLiquidityPool = async (payload: CreateLiquidityPoolPayload) => {
   try {
     const { data } = await axiosClient.post<LiquidityTransactionResponse>("/liquidity-pools", payload)
     
     // Register the pair in the DEX registry after pool creation
+    // Note: This is now handled on the backend, but keeping for backward compatibility
     if (data.poolId) {
       try {
         await registerPair({
@@ -90,7 +128,12 @@ export const createLiquidityPool = async (payload: CreateLiquidityPoolPayload) =
     }
     
     return data
-  } catch (error) {
+  } catch (error: any) {
+    // Check if this is a pool exists error (409 status)
+    if (error.response?.status === 409 && error.response?.data?.poolExists) {
+      const poolError: PoolExistsError = error.response.data
+      throw poolError
+    }
     throw toApiError(error)
   }
 }
@@ -145,6 +188,26 @@ export const getUserLiquidityPools = async (userPublicKey: string) => {
     const { data } = await axiosClient.get<UserLiquidityPoolSummary[]>("/liquidity-pools/user-pools", {
       params: { userPublicKey },
     })
+    return data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}
+
+export const getUserTokens = async (publicKey: string) => {
+  try {
+    const { data } = await axiosClient.get<GetUserTokensResponse>("/liquidity-pools/user-tokens", {
+      params: { publicKey },
+    })
+    return data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}
+
+export const getPlatformPools = async () => {
+  try {
+    const { data } = await axiosClient.get<GetPlatformPoolsResponse>("/liquidity-pools/platform-pools")
     return data
   } catch (error) {
     throw toApiError(error)
