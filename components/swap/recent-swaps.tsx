@@ -56,29 +56,34 @@ export function RecentSwaps({ operations = [], isLoading }: RecentSwapsProps) {
           const isPathPayment = swap.type?.toLowerCase().includes("path_payment")
           const displayAction = swap.action || swap.type || "swap"
           const displayAmount = swap.amount || "0"
-          const displayAsset = swap.asset || (isPathPayment ? "tokens" : "")
+          
+          // Extract asset code only (remove issuer address)
+          let displayAsset = swap.asset || (isPathPayment ? "tokens" : "")
+          if (displayAsset && displayAsset.includes(":")) {
+            // Extract just the code part before the colon
+            displayAsset = displayAsset.split(":")[0]
+          }
+          // Handle "Test Pi" for native assets
+          if (displayAsset === "Pi" || displayAsset === "native") {
+            displayAsset = "Test Pi"
+          }
           
           return (
             <div
               key={swap.id}
-              className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 transition-colors"
+              className="flex items-center justify-between gap-3 p-3 border rounded-lg hover:bg-accent/50 transition-colors overflow-hidden"
             >
-              <div className="flex-1">
-                <p className="font-medium text-sm capitalize">
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm capitalize truncate">
                   {displayAction === "swap" ? "Swap" : displayAction}
                 </p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground truncate">
                   {new Date(swap.createdAt).toLocaleString()}
                 </p>
-                {isPathPayment && swap.from && swap.to && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {swap.from.slice(0, 4)}... → {swap.to.slice(0, 4)}...
-                  </p>
-                )}
               </div>
-              <div className="text-right">
+              <div className="text-right flex-shrink-0 min-w-0">
                 {displayAmount && displayAsset && (
-                  <p className="text-sm font-semibold">
+                  <p className="text-sm font-semibold truncate max-w-[120px]">
                     {parseFloat(displayAmount).toLocaleString(undefined, { 
                       maximumFractionDigits: 6 
                     })} {displayAsset}
