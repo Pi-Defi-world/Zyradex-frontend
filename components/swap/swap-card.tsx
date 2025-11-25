@@ -315,22 +315,63 @@ export function SwapCard() {
         sendAmount: fromAmount,
         slippagePercent,
       })
+      
+      if (result?.success && result?.data?.txHash) {
+        toast({ 
+          title: "Swap executed successfully", 
+            description: `Transaction submitted to the network`,
+            variant: "default"
+        })
+        setFromAmount("")
+        setUserSecret("")
+        // Refresh balances after successful swap to show updated amounts
+        // Backend already clears cache, but we refresh to get the latest data
+        setTimeout(() => {
+          refreshBalances()
+        }, 2000) // Wait 2 seconds for transaction to be processed
+      } else {
+        toast({ 
+          title: "Swap submitted", 
+          description: "Transaction submitted to the network",
+          variant: "default"
+        })
+      }
+    } catch (err: any) {
+      let errorMessage = "Swap failed"
+      let errorTitle = "Swap failed"
+      
+      if (err) {
+        // Check for API error response
+        if (err.response?.data?.error) {
+          errorMessage = err.response.data.error
+        } else if (err.response?.data?.message) {
+          errorMessage = err.response.data.message
+        } else if (typeof err === "object" && "message" in err) {
+          errorMessage = (err as any).message
+        } else if (typeof err === "string") {
+          errorMessage = err
+        }
+        
+        // Check for specific error types
+        if (errorMessage.toLowerCase().includes("insufficient balance") || 
+            errorMessage.toLowerCase().includes("underfunded")) {
+          errorTitle = "Insufficient Balance"
+        } else if (errorMessage.toLowerCase().includes("trustline")) {
+          errorTitle = "Trustline Required"
+        } else if (errorMessage.toLowerCase().includes("pool") && errorMessage.toLowerCase().includes("not found")) {
+          errorTitle = "Pool Not Found"
+        } else if (errorMessage.toLowerCase().includes("slippage")) {
+          errorTitle = "Slippage Exceeded"
+        }
+      }
+      
+      console.error("Swap error:", err)
       toast({ 
-        title: "Swap executed successfully", 
-        description: result.data?.txHash 
-          ? `Transaction hash: ${result.data.txHash}` 
-          : "Transaction submitted to the network" 
+        title: errorTitle, 
+        description: errorMessage, 
+        variant: "destructive",
+        duration: 5000 // Show for 5 seconds so user can read it
       })
-      setFromAmount("")
-      setUserSecret("")
-      // Refresh balances after successful swap to show updated amounts
-      // Backend already clears cache, but we refresh to get the latest data
-      setTimeout(() => {
-        refreshBalances()
-      }, 2000) // Wait 2 seconds for transaction to be processed
-    } catch (err) {
-      const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Swap failed"
-      toast({ title: "Swap failed", description: message, variant: "destructive" })
     }
   }
 
@@ -390,7 +431,7 @@ export function SwapCard() {
 
         <CardContent className="space-y-6">
           <div className="space-y-3">
-            <Label className="text-sm font-medium text-muted-foreground">Token A (You're Selling)</Label>
+            <Label className="text-sm font-medium text-muted-foreground">Token You're Selling</Label>
             <Select value={tokenA} onValueChange={handleTokenAChange}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select a token you own" />
@@ -443,7 +484,7 @@ export function SwapCard() {
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium text-muted-foreground">Token B (You're Buying)</Label>
+              <Label className="text-sm font-medium text-muted-foreground">Token You're Buying</Label>
               {tokenA && pairedTokens.length > 0 && (
                 <Button
                   variant="ghost"

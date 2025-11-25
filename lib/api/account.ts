@@ -55,6 +55,8 @@ export interface AccountOperation {
   medThreshold?: string | null
   highThreshold?: string | null
   destination?: string
+  destinationAsset?: string
+  destinationAmount?: string
   details?: unknown
   pagingToken?: string
 }
