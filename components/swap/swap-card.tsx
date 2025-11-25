@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowDown, Settings, Loader2, Lock } from "lucide-react"
+import { ArrowDown, Settings, Loader2 } from "lucide-react"
 import { usePi } from "@/components/providers/pi-provider"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { useToast } from "@/hooks/use-toast"
@@ -735,24 +735,30 @@ export function SwapCard() {
           {tokenA && tokenB && fromToken?.code && toToken?.code && fromToken.code !== toToken.code && (
             <>
               <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">From</span>
-                  <span className="font-medium">{tokenA}</span>
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-muted-foreground flex-shrink-0">From</span>
+                  <span className="font-medium truncate min-w-0 text-right">
+                    {tokenA.includes(":") ? tokenA.split(":")[0] : tokenA}
+                  </span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">To</span>
-                  <span className="font-medium">{tokenB}</span>
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-muted-foreground flex-shrink-0">To</span>
+                  <span className="font-medium truncate min-w-0 text-right">
+                    {tokenB.includes(":") ? tokenB.split(":")[0] : tokenB}
+                  </span>
                 </div>
-                <div className="flex justify-between items-center text-xs text-muted-foreground pt-1 border-t border-border/20">
-                  <span>Searching for:</span>
-                  <span className="font-mono">{fromToken.code} / {toToken.code}</span>
+                <div className="flex justify-between items-center gap-2 text-xs text-muted-foreground pt-1 border-t border-border/20">
+                  <span className="flex-shrink-0">Searching for:</span>
+                  <span className="font-mono truncate min-w-0 text-right">
+                    {fromToken.code} / {toToken.code}
+                  </span>
                 </div>
               </div>
 
               {poolsError && (
-                <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive overflow-hidden">
                   <div className="font-medium mb-1">Error fetching pools:</div>
-                  <div>{poolsError.message}</div>
+                  <div className="break-words truncate">{poolsError.message}</div>
                   {poolsError.status && (
                     <div className="text-xs mt-1">Status: {poolsError.status}</div>
                   )}
@@ -784,17 +790,19 @@ export function SwapCard() {
 
               {selectedPool && (
                 <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Pool ID</span>
-                    <span className="font-mono text-xs">{selectedPool.id.slice(0, 16)}...</span>
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="text-muted-foreground flex-shrink-0">Pool ID</span>
+                    <span className="font-mono text-xs truncate min-w-0 text-right">
+                      {selectedPool.id.slice(0, 8)}...{selectedPool.id.slice(-6)}
+                    </span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Pool Fee</span>
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="text-muted-foreground flex-shrink-0">Pool Fee</span>
                     <span className="font-medium">{(selectedPool.fee_bp / 100).toFixed(2)}%</span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Total Shares</span>
-                    <span className="font-medium">{selectedPool.total_shares}</span>
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="text-muted-foreground flex-shrink-0">Total Shares</span>
+                    <span className="font-medium truncate min-w-0 text-right">{selectedPool.total_shares}</span>
                   </div>
                 </div>
               )}
@@ -832,15 +840,16 @@ export function SwapCard() {
                       <span className="text-muted-foreground">Fetching quote...</span>
                     </div>
                   ) : quoteError ? (
-                    <div className="text-sm text-destructive">
-                      Failed to fetch quote: {quoteError.message || "Unknown error"}
+                    <div className="text-sm text-destructive break-words overflow-hidden">
+                      <div className="font-medium mb-1">Failed to fetch quote:</div>
+                      <div className="truncate">{quoteError.message || "Unknown error"}</div>
                     </div>
                   ) : quote ? (
                     <>
                       {displayCountdown !== null && displayCountdown > 0 && (
                         <div className="mb-3 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-yellow-600 dark:text-yellow-400">
+                          <div className="flex items-center justify-between gap-2 text-xs">
+                            <span className="text-yellow-600 dark:text-yellow-400 shrink-0">
                               Quote expires in:
                             </span>
                             <span className="font-mono font-semibold text-yellow-600 dark:text-yellow-400">
@@ -852,22 +861,22 @@ export function SwapCard() {
                           </div>
                         </div>
                       )}
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Estimated Output</span>
-                        <span className="font-medium">
-                          {quote.expectedOutput} {toToken?.code ?? ""}
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="text-muted-foreground shrink-0">Estimated Output</span>
+                        <span className="font-medium truncate min-w-0 text-right">
+                          {quote.expectedOutput} {((toToken?.code ?? "").includes(":") ? (toToken?.code ?? "").split(":")[0] : (toToken?.code ?? ""))}
                         </span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Min Received</span>
-                        <span className="font-medium text-green-500">{quote.minOut}</span>
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="text-muted-foreground shrink-0">Min Received</span>
+                        <span className="font-medium text-green-500 truncate min-w-0 text-right">{quote.minOut}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Pool Fee</span>
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="text-muted-foreground shrink-0">Pool Fee</span>
                         <span className="font-medium">{quote.fee}%</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Slippage</span>
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="text-muted-foreground shrink-0">Slippage</span>
                         <span className="font-medium">{quote.slippagePercent}%</span>
                       </div>
                     </>
@@ -903,8 +912,7 @@ export function SwapCard() {
           {hasStoredSecret && (
             <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm">
               <div className="flex items-center gap-2 text-muted-foreground">
-                <Lock className="h-4 w-4" />
-                <span>You'll be prompted for your PIN/password when you click Swap</span>
+                <span>🔒 You will be prompted for your PIN/password when you click Swap</span>
               </div>
             </div>
           )}
