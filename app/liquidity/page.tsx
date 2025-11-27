@@ -27,7 +27,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Loader2, Plus, Droplets, TrendingUp, Users, Minus, Search, Lock } from "lucide-react"
+import { Loader2, Plus, Droplets, TrendingUp, Users, Minus, Search, Lock, User } from "lucide-react"
+import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import {
   useLiquidityPools,
@@ -249,8 +250,8 @@ export default function LiquidityPage() {
         }
       } else if (!secretToUse) {
         toast({ 
-          title: "Secret required", 
-          description: "Enter the secret key to create the pool, or import your account and set up authentication.",
+          title: "Account required", 
+          description: "Please import your account in your profile to set up authentication. This allows you to use PIN/password for transactions.",
           variant: "destructive" 
         })
         return
@@ -310,8 +311,8 @@ export default function LiquidityPage() {
         }
       } else if (!secretToUse) {
         toast({ 
-          title: "Secret required", 
-          description: "Enter the secret key to add liquidity, or import your account and set up authentication.",
+          title: "Account required", 
+          description: "Please import your account in your profile to set up authentication. This allows you to use PIN/password for transactions.",
           variant: "destructive" 
         })
         return
@@ -356,8 +357,8 @@ export default function LiquidityPage() {
         }
       } else if (!secretToUse) {
         toast({ 
-          title: "Secret required", 
-          description: "Enter the secret key to withdraw liquidity, or import your account and set up authentication.",
+          title: "Account required", 
+          description: "Please import your account in your profile to set up authentication. This allows you to use PIN/password for transactions.",
           variant: "destructive" 
         })
         return
@@ -407,16 +408,24 @@ export default function LiquidityPage() {
               </DialogHeader>
               <form className="space-y-4" onSubmit={handleCreatePool}>
                 {!hasStoredSecret && (
-                  <div className="space-y-2">
-                    <Label htmlFor="create-secret">User Secret</Label>
-                    <Input
-                      id="create-secret"
-                      type="password"
-                      placeholder="SXXXXXXXXXXXXXXXX"
-                      value={createForm.userSecret}
-                      onChange={(event) => setCreateForm((prev) => ({ ...prev, userSecret: event.target.value }))}
-                      required
-                    />
+                  <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-4 space-y-3">
+                    <div className="flex items-start gap-2">
+                      <Lock className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                      <div className="flex-1 space-y-2">
+                        <p className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
+                          Account Required
+                        </p>
+                        <p className="text-xs text-yellow-600 dark:text-yellow-500">
+                          You need to import your account and set up authentication to create pools. This allows you to use PIN/password instead of entering your secret key manually.
+                        </p>
+                      </div>
+                    </div>
+                    <Link href="/profile" className="block">
+                      <Button type="button" variant="outline" className="w-full" size="sm">
+                        <User className="mr-2 h-4 w-4" />
+                        Go to Profile to Import Account
+                      </Button>
+                    </Link>
                   </div>
                 )}
                 {hasStoredSecret && (
@@ -767,16 +776,24 @@ export default function LiquidityPage() {
                         </DialogHeader>
                         <form className="space-y-4" onSubmit={(event) => handleDeposit(event, pool)}>
                           {!hasStoredSecret && (
-                            <div className="space-y-2">
-                              <Label htmlFor="deposit-secret">User Secret</Label>
-                              <Input
-                                id="deposit-secret"
-                                type="password"
-                                placeholder="SXXXXXXXXXXXXXXXX"
-                                value={depositForm.userSecret}
-                                onChange={(event) => setDepositForm((prev) => ({ ...prev, userSecret: event.target.value }))}
-                                required
-                              />
+                            <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-4 space-y-3">
+                              <div className="flex items-start gap-2">
+                                <Lock className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                                <div className="flex-1 space-y-2">
+                                  <p className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
+                                    Account Required
+                                  </p>
+                                  <p className="text-xs text-yellow-600 dark:text-yellow-500">
+                                    You need to import your account and set up authentication to add liquidity. This allows you to use PIN/password instead of entering your secret key manually.
+                                  </p>
+                                </div>
+                              </div>
+                              <Link href="/profile" className="block">
+                                <Button type="button" variant="outline" className="w-full" size="sm">
+                                  <User className="mr-2 h-4 w-4" />
+                                  Go to Profile to Import Account
+                                </Button>
+                              </Link>
                             </div>
                           )}
                           {hasStoredSecret && (
@@ -838,16 +855,24 @@ export default function LiquidityPage() {
                           </DialogHeader>
                         <form className="space-y-4" onSubmit={(event) => handleWithdraw(event, pool)}>
                           {!hasStoredSecret && (
-                            <div className="space-y-2">
-                              <Label htmlFor="withdraw-secret">User Secret</Label>
-                              <Input
-                                id="withdraw-secret"
-                                type="password"
-                                placeholder="SXXXXXXXXXXXXXXXX"
-                                value={withdrawForm.userSecret}
-                                onChange={(event) => setWithdrawForm((prev) => ({ ...prev, userSecret: event.target.value }))}
-                                required
-                              />
+                            <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-4 space-y-3">
+                              <div className="flex items-start gap-2">
+                                <Lock className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                                <div className="flex-1 space-y-2">
+                                  <p className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
+                                    Account Required
+                                  </p>
+                                  <p className="text-xs text-yellow-600 dark:text-yellow-500">
+                                    You need to import your account and set up authentication to withdraw liquidity. This allows you to use PIN/password instead of entering your secret key manually.
+                                  </p>
+                                </div>
+                              </div>
+                              <Link href="/profile" className="block">
+                                <Button type="button" variant="outline" className="w-full" size="sm">
+                                  <User className="mr-2 h-4 w-4" />
+                                  Go to Profile to Import Account
+                                </Button>
+                              </Link>
                             </div>
                           )}
                           {hasStoredSecret && (

@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowDown, Settings, Loader2 } from "lucide-react"
+import { ArrowDown, Settings, Loader2, Lock, User } from "lucide-react"
+import Link from "next/link"
 import { usePi } from "@/components/providers/pi-provider"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { useToast } from "@/hooks/use-toast"
@@ -66,7 +67,6 @@ export function SwapCard() {
   const [tokenA, setTokenA] = useState<string>("")
   const [tokenB, setTokenB] = useState<string>("")
   const [fromAmount, setFromAmount] = useState("")
-  const [userSecret, setUserSecret] = useState("")
   const [selectedPoolId, setSelectedPoolId] = useState<string>("")
   const [slippagePercent, setSlippagePercent] = useState<number>(1)
   const [pairedTokens, setPairedTokens] = useState<string[]>([])
@@ -285,9 +285,9 @@ export function SwapCard() {
       return
     }
     
-    let secretToUse = userSecret
+    let secretToUse: string | undefined = undefined
     
-    // If stored secret exists, always use password authentication (don't allow manual entry)
+    // If stored secret exists, always use password authentication
     if (hasStoredSecret && walletAddress) {
       try {
         secretToUse = await getSecretFromAuth(walletAddress)
@@ -297,10 +297,9 @@ export function SwapCard() {
         return
       }
     } else if (!secretToUse) {
-      // Only allow manual entry if no stored secret exists
       toast({ 
-        title: "Secret required", 
-        description: "Enter the secret key to sign the swap transaction, or import your account and set up authentication.",
+        title: "Account required", 
+        description: "Please import your account in your profile to set up authentication. This allows you to use PIN/password for transactions.",
         variant: "destructive" 
       })
       return
@@ -323,7 +322,6 @@ export function SwapCard() {
             variant: "default"
         })
         setFromAmount("")
-        setUserSecret("")
         // Refresh balances after successful swap to show updated amounts
         // Backend already clears cache, but we refresh to get the latest data
         setTimeout(() => {
@@ -890,29 +888,34 @@ export function SwapCard() {
             </>
           )}
 
-          {/* Only show secret input if no stored secret exists */}
+          {/* Only show account import prompt if no stored secret exists */}
           {!hasStoredSecret && (
-            <div className="space-y-2">
-              <Label htmlFor="swap-secret" className="text-sm font-medium text-muted-foreground">
-                User Secret
-              </Label>
-              <Input
-                id="swap-secret"
-                type="password"
-                placeholder="SXXXXXXXXXXXXXXXX"
-                value={userSecret}
-                onChange={(event) => setUserSecret(event.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Enter the secret key to sign the swap transaction, or import your account and set up authentication.
-              </p>
+            <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-4 space-y-3">
+              <div className="flex items-start gap-2">
+                <Lock className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                <div className="flex-1 space-y-2">
+                  <p className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
+                    Account Required
+                  </p>
+                  <p className="text-xs text-yellow-600 dark:text-yellow-500">
+                    You need to import your account and set up authentication to perform swaps. This allows you to use PIN/password instead of entering your secret key manually.
+                  </p>
+                </div>
+              </div>
+              <Link href="/profile" className="block">
+                <Button type="button" variant="outline" className="w-full" size="sm">
+                  <User className="mr-2 h-4 w-4" />
+                  Go to Profile to Import Account
+                </Button>
+              </Link>
             </div>
           )}
           
           {hasStoredSecret && (
             <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm">
               <div className="flex items-center gap-2 text-muted-foreground">
-                <span>🔒 You will be prompted for your PIN/password when you click Swap</span>
+                <Lock className="h-4 w-4" />
+                <span>You will be prompted for your PIN/password when you click Swap</span>
               </div>
             </div>
           )}

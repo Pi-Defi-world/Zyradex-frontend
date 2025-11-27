@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { useLogger } from "@/hooks/use-logger"
-import { Loader2, Lock } from "lucide-react"
+import { Loader2, Lock, User } from "lucide-react"
+import Link from "next/link"
 import { useTrustline } from "@/hooks/useTokenRegistry"
 import { useTransactionAuth } from "@/hooks/useTransactionAuth"
 import { PasswordPromptDialog } from "@/components/password-prompt-dialog"
@@ -94,8 +95,8 @@ export function TrustlineForm() {
         }
       } else if (!secretToUse) {
         toast({ 
-          title: "Secret required", 
-          description: "Enter the secret key to establish trustline, or import your account and set up authentication.",
+          title: "Account required", 
+          description: "Please import your account in your profile to set up authentication. This allows you to use PIN/password for transactions.",
           variant: "destructive" 
         })
         return
@@ -110,7 +111,7 @@ export function TrustlineForm() {
       })
       addLog("success", "Trustline established successfully")
       toast({ title: "Trustline established", description: `${formData.assetCode} is now trusted.` })
-      setFormData({ userSecret: "", assetCode: "", issuer: "", limit: "100000000" })
+      setFormData({ assetCode: "", issuer: "", limit: "100000000" })
     } catch (err) {
       const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Failed to establish trustline"
       addLog("error", message)
@@ -122,16 +123,24 @@ export function TrustlineForm() {
     <>
       <form onSubmit={handleSubmit} className="space-y-4">
         {!hasStoredSecret && (
-          <div className="space-y-2">
-            <Label htmlFor="userSecret">User Secret</Label>
-            <Input
-              id="userSecret"
-              type="password"
-              placeholder="S..."
-              value={formData.userSecret}
-              onChange={(event) => setFormData({ ...formData, userSecret: event.target.value })}
-              required
-            />
+          <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-4 space-y-3">
+            <div className="flex items-start gap-2">
+              <Lock className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+              <div className="flex-1 space-y-2">
+                <p className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
+                  Account Required
+                </p>
+                <p className="text-xs text-yellow-600 dark:text-yellow-500">
+                  You need to import your account and set up authentication to establish trustlines. This allows you to use PIN/password instead of entering your secret key manually.
+                </p>
+              </div>
+            </div>
+            <Link href="/profile" className="block">
+              <Button type="button" variant="outline" className="w-full" size="sm">
+                <User className="mr-2 h-4 w-4" />
+                Go to Profile to Import Account
+              </Button>
+            </Link>
           </div>
         )}
         {hasStoredSecret && (

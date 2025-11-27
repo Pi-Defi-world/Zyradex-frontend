@@ -3,7 +3,8 @@
 import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Loader2, X } from "lucide-react"
+import { Loader2, X, Lock, User } from "lucide-react"
+import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { useUserOffers, useCancelOffer } from "@/hooks/useTrade"
 import { useTransactionAuth } from "@/hooks/useTransactionAuth"
@@ -63,8 +64,8 @@ export function ActiveOffers({ account }: ActiveOffersProps) {
   const handleCancel = async (offer: any) => {
     if (!hasStoredSecret) {
       toast({ 
-        title: "Authentication required", 
-        description: "Please import your account and set up authentication.", 
+        title: "Account required", 
+        description: "Please import your account in your profile to set up authentication. This allows you to use PIN/password for transactions.", 
         variant: "destructive" 
       })
       return
@@ -128,8 +129,30 @@ export function ActiveOffers({ account }: ActiveOffersProps) {
               No active offers
             </div>
           ) : (
-            <div className="space-y-3">
-              {offers.map((offer) => (
+            <>
+              {!hasStoredSecret && (
+                <div className="mb-4 rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-4 space-y-3">
+                  <div className="flex items-start gap-2">
+                    <Lock className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                    <div className="flex-1 space-y-2">
+                      <p className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
+                        Account Required
+                      </p>
+                      <p className="text-xs text-yellow-600 dark:text-yellow-500">
+                        You need to import your account and set up authentication to cancel offers. This allows you to use PIN/password instead of entering your secret key manually.
+                      </p>
+                    </div>
+                  </div>
+                  <Link href="/profile" className="block">
+                    <Button type="button" variant="outline" className="w-full" size="sm">
+                      <User className="mr-2 h-4 w-4" />
+                      Go to Profile to Import Account
+                    </Button>
+                  </Link>
+                </div>
+              )}
+              <div className="space-y-3">
+                {offers.map((offer) => (
                 <div
                   key={offer.id}
                   className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
@@ -163,7 +186,8 @@ export function ActiveOffers({ account }: ActiveOffersProps) {
                   </Button>
                 </div>
               ))}
-            </div>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
