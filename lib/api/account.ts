@@ -1,13 +1,14 @@
 import { axiosClient, toApiError } from "../api"
 
-export interface ImportAccountPayload {
-  mnemonic?: string
-  secret?: string
-}
-
-export interface ImportAccountResponse {
+export interface CreateWalletResponse {
   publicKey: string
   secret: string
+  seedResult: {
+    success: boolean
+    transactionHash: string
+    accountCreated: boolean
+    amount: string
+  }
 }
 
 export interface AccountBalanceEntry {
@@ -71,9 +72,9 @@ export interface PaginatedOperations {
   }
 }
 
-export const importAccount = async (payload: ImportAccountPayload) => {
+export const createWallet = async () => {
   try {
-    const { data } = await axiosClient.post<ImportAccountResponse>("/account/import", payload)
+    const { data } = await axiosClient.post<CreateWalletResponse>("/account/create-wallet")
     return data
   } catch (error) {
     throw toApiError(error)

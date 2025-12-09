@@ -44,14 +44,15 @@ export function PiProvider({ children }: { children: ReactNode }) {
     if (savedToken && savedUser) {
       try {
         const userData: PiUser = JSON.parse(savedUser)
-        setUser(userData)
-        setAccessToken(savedToken)
-        setAuthResult({ accessToken: savedToken, user: userData })
-        setIsAuthenticated(true)
+        console.log("Found saved authentication, but requiring re-authentication for security")
+        localStorage.removeItem("pi_access_token")
+        localStorage.removeItem("pi_user")
+        localStorage.removeItem("zyradex-wallet-address")
       } catch (error) {
         console.error("Error restoring saved authentication:", error)
         localStorage.removeItem("pi_access_token")
         localStorage.removeItem("pi_user")
+        localStorage.removeItem("zyradex-wallet-address")
       }
     }
   }, [])
@@ -75,6 +76,10 @@ export function PiProvider({ children }: { children: ReactNode }) {
 
       const auth = await window.Pi.authenticate(["username", "payments", "wallet_address"], onIncompletePaymentFound)
 
+      if (!auth?.accessToken) {
+        throw new Error("No access token received from Pi SDK")
+      }
+
       const userData: PiUser = auth.user
       const result: PiAuthResult = {
         accessToken: auth.accessToken,
@@ -94,6 +99,15 @@ export function PiProvider({ children }: { children: ReactNode }) {
       return result
     } catch (error) {
       console.error("Pi Network authentication failed:", error)
+      // Clear any stale auth data on error
+      setUser(null)
+      setAccessToken(null)
+      setAuthResult(null)
+      setIsAuthenticated(false)
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("pi_access_token")
+        localStorage.removeItem("pi_user")
+      }
       throw error
     } finally {
       setIsLoading(false)

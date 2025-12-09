@@ -99,7 +99,40 @@ export const useUserProfile = (): UseUserProfileReturn => {
         },
       }
 
-      const { user: backendUser, token } = await signIn(payload)
+      let backendUser, token
+      try {
+        const result = await signIn(payload)
+        backendUser = result.user
+        token = result.token
+      } catch (signInError: any) {
+        // If signin fails with "Invalid access token", clear auth and retry with fresh token
+        const errorMessage = signInError?.message?.toLowerCase() || ""
+        if (errorMessage.includes("invalid") || errorMessage.includes("access token") || errorMessage.includes("expired")) {
+          console.log("🔄 Access token invalid, getting fresh token...")
+          // Clear the old auth result and get a fresh token
+          const freshSession = await authenticate()
+          if (!freshSession?.accessToken) {
+            throw new Error("Failed to get fresh access token")
+          }
+          
+          // Retry signin with fresh token
+          const retryPayload = {
+            authResult: {
+              accessToken: freshSession.accessToken,
+              user: {
+                username: freshSession.user?.username || piUser?.username || "",
+                uid: freshSession.user?.uid || piUser?.uid || "",
+              },
+            },
+          }
+          const retryResult = await signIn(retryPayload)
+          backendUser = retryResult.user
+          token = retryResult.token
+        } else {
+          // Re-throw other errors
+          throw signInError
+        }
+      }
 
       if (isTokenExpired(token)) {
         throw new Error("Received an expired session token")
@@ -131,7 +164,8 @@ export const useUserProfile = (): UseUserProfileReturn => {
           errorMessage.includes("invalid") ||
           errorMessage.includes("not found") ||
           errorMessage.includes("unauthorized") ||
-          errorMessage.includes("internal server error")
+          errorMessage.includes("internal server error") ||
+          errorMessage.includes("access token")
         
         if (isAuthError) {
           console.log("🧹 Clearing local storage due to authentication error")
@@ -139,6 +173,11 @@ export const useUserProfile = (): UseUserProfileReturn => {
           localStorage.removeItem(USER_PROFILE_KEY)
           localStorage.removeItem("zyradex-wallet-address")
           localStorage.removeItem("bingepi-wallet-address")
+          // Also clear Pi authentication tokens if access token is invalid
+          if (errorMessage.includes("access token") || errorMessage.includes("invalid")) {
+            localStorage.removeItem("pi_access_token")
+            localStorage.removeItem("pi_user")
+          }
           setProfile(null)
           clearAuthToken()
         }

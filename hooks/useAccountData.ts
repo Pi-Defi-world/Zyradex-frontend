@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {
-  importAccount as importAccountRequest,
+  createWallet as createWalletRequest,
   getAccountBalances,
   getAccountOperations,
   getAccountTransactions,
-  type ImportAccountPayload,
-  type ImportAccountResponse,
+  type CreateWalletResponse,
   type AccountBalancesResponse,
   type AccountOperationsParams,
   type PaginatedOperations,
@@ -24,16 +23,16 @@ export interface UseAccountOperationsOptions {
   skip?: boolean
 }
 
-export const useImportAccount = () => {
-  const [data, setData] = useState<ImportAccountResponse | null>(null)
+export const useCreateWallet = () => {
+  const [data, setData] = useState<CreateWalletResponse | null>(null)
   const [error, setError] = useState<ApiError | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
-  const importAccount = useCallback(async (payload: ImportAccountPayload) => {
+  const createWallet = useCallback(async () => {
     setIsLoading(true)
     setError(null)
     try {
-      const response = await importAccountRequest(payload)
+      const response = await createWalletRequest()
       setData(response)
       return response
     } catch (err) {
@@ -49,7 +48,7 @@ export const useImportAccount = () => {
     data,
     error,
     isLoading,
-    importAccount,
+    createWallet,
   }
 }
 

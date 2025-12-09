@@ -3,13 +3,12 @@
 import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Loader2, X, Lock, User } from "lucide-react"
-import Link from "next/link"
+import { Loader2, X } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useUserOffers, useCancelOffer } from "@/hooks/useTrade"
-import { useTransactionAuth } from "@/hooks/useTransactionAuth"
-import { PasswordPromptDialog } from "@/components/password-prompt-dialog"
 import { useAccountBalances } from "@/hooks/useAccountData"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 interface ActiveOffersProps {
   account: string
@@ -20,52 +19,14 @@ export function ActiveOffers({ account }: ActiveOffersProps) {
   const { offers, isLoading, error } = useUserOffers(account)
   const { cancelOffer, isLoading: cancelling } = useCancelOffer()
   const { refresh: refreshBalances } = useAccountBalances(account)
-
-  // Authentication
-  const [showPasswordDialog, setShowPasswordDialog] = useState(false)
-  const [passwordResolve, setPasswordResolve] = useState<((password: string) => void) | null>(null)
-  const [passwordReject, setPasswordReject] = useState<((error: Error) => void) | null>(null)
+  const [userSecret, setUserSecret] = useState<string>("")
   const [cancellingOfferId, setCancellingOfferId] = useState<string | null>(null)
 
-  const handlePasswordPrompt = async (): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      setPasswordResolve(() => (password: string) => resolve(password))
-      setPasswordReject(() => (error: Error) => reject(error))
-      setShowPasswordDialog(true)
-    })
-  }
-
-  const { getSecret: getSecretFromAuth, hasStoredSecret } = useTransactionAuth(
-    account || undefined,
-    handlePasswordPrompt
-  )
-
-  const handlePasswordSubmit = async (password: string) => {
-    if (passwordResolve) {
-      passwordResolve(password)
-      setPasswordResolve(null)
-      setPasswordReject(null)
-      setShowPasswordDialog(false)
-    }
-  }
-
-  const handlePasswordDialogClose = (open: boolean) => {
-    if (!open) {
-      setShowPasswordDialog(false)
-      if (passwordReject) {
-        passwordReject(new Error("Password prompt cancelled"))
-        setPasswordResolve(null)
-        setPasswordReject(null)
-      }
-      setCancellingOfferId(null)
-    }
-  }
-
   const handleCancel = async (offer: any) => {
-    if (!hasStoredSecret) {
+    if (!userSecret.trim()) {
       toast({ 
-        title: "Account required", 
-        description: "Please import your account in your profile to set up authentication. This allows you to use PIN/password for transactions.", 
+        title: "Secret seed required", 
+        description: "Please enter your secret seed to cancel the offer.", 
         variant: "destructive" 
       })
       return
@@ -74,18 +35,16 @@ export function ActiveOffers({ account }: ActiveOffersProps) {
     setCancellingOfferId(offer.id)
 
     try {
-      const secret = await getSecretFromAuth(account)
-      
       await cancelOffer({
-        userSecret: secret,
+        userSecret: userSecret.trim(),
         selling: offer.selling,
         buying: offer.buying,
         offerId: offer.id,
       })
 
       toast({ title: "Offer cancelled", description: "Your offer has been cancelled successfully." })
+      setUserSecret("") // Clear secret after successful transaction
       
- 
       setTimeout(() => {
         refreshBalances()
       }, 2000) // Wait 2 seconds for transaction to be processed
@@ -130,27 +89,18 @@ export function ActiveOffers({ account }: ActiveOffersProps) {
             </div>
           ) : (
             <>
-              {!hasStoredSecret && (
-                <div className="mb-4 rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-4 space-y-3">
-                  <div className="flex items-start gap-2">
-                    <Lock className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
-                    <div className="flex-1 space-y-2">
-                      <p className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
-                        Account Required
-                      </p>
-                      <p className="text-xs text-yellow-600 dark:text-yellow-500">
-                        You need to import your account and set up authentication to cancel offers. This allows you to use PIN/password instead of entering your secret key manually.
-                      </p>
-                    </div>
-                  </div>
-                  <Link href="/profile" className="block">
-                    <Button type="button" variant="outline" className="w-full" size="sm">
-                      <User className="mr-2 h-4 w-4" />
-                      Go to Profile to Import Account
-                    </Button>
-                  </Link>
-                </div>
-              )}
+              <div className="mb-4 space-y-2">
+                <Label>Secret Seed (Required to Cancel Offers)</Label>
+                <Input
+                  type="password"
+                  placeholder="Enter your secret seed (starts with S...)"
+                  value={userSecret}
+                  onChange={(event) => setUserSecret(event.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Enter your secret seed to cancel offers. We don't store your secret seed.
+                </p>
+              </div>
               <div className="space-y-3">
                 {offers.map((offer) => (
                 <div
@@ -175,7 +125,7 @@ export function ActiveOffers({ account }: ActiveOffersProps) {
                     variant="destructive"
                     size="sm"
                     onClick={() => handleCancel(offer)}
-                    disabled={cancelling || cancellingOfferId === offer.id}
+                    disabled={cancelling || cancellingOfferId === offer.id || !userSecret.trim()}
                   >
                     {cancellingOfferId === offer.id ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -191,16 +141,6 @@ export function ActiveOffers({ account }: ActiveOffersProps) {
           )}
         </CardContent>
       </Card>
-
-      {account && (
-        <PasswordPromptDialog
-          open={showPasswordDialog}
-          onOpenChange={handlePasswordDialogClose}
-          publicKey={account}
-          onPasswordSubmit={handlePasswordSubmit}
-          error={null}
-        />
-      )}
     </>
   )
 }

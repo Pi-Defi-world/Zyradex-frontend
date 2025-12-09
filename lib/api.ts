@@ -9,11 +9,38 @@ export const axiosClient = axios.create({
   },
 })
 
+// Request interceptor to always include auth token from localStorage
+axiosClient.interceptors.request.use(
+  (config) => {
+    // Always check localStorage for token and set it on each request
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("dex_user_token")
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`
+      } else {
+        // Remove auth header if no token
+        delete config.headers.Authorization
+      }
+    }
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
+  }
+)
+
 export const setAuthToken = (token?: string | null) => {
   if (token) {
     axiosClient.defaults.headers.Authorization = `Bearer ${token}`
+    // Also store in localStorage for interceptor to pick up
+    if (typeof window !== "undefined") {
+      localStorage.setItem("dex_user_token", token)
+    }
   } else {
     delete axiosClient.defaults.headers.Authorization
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("dex_user_token")
+    }
   }
 }
 

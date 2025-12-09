@@ -32,15 +32,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useImportAccount } from "@/hooks/useAccountData"
+import { useCreateWallet } from "@/hooks/useAccountData"
 import { useUserProfile } from "@/hooks/useUserProfile"
-import { usePasskeyRegistration } from "@/hooks/usePasskey"
-import { removePublicKey } from "@/lib/api/auth"
-import { storeEncryptedSecret } from "@/lib/passkey/storage"
-import { encryptSecret, generateKey, deriveKeyFromPassword, generateSalt, validatePasswordStrength } from "@/lib/passkey/encryption"
-import { setEncryptionKey } from "@/lib/passkey/transaction"
-import { isWebAuthnSupported } from "@/lib/passkey/webauthn"
-import { PasswordSetupDialog } from "@/components/password-setup-dialog"
 import {
   Dialog,
   DialogContent,
@@ -54,12 +47,6 @@ const getStoredWallet = () => {
   return localStorage.getItem("zyradex-wallet-address")
 }
 
-const normalizeMnemonic = (value: string) =>
-  value
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean)
-    .join(" ")
 
 const ProfilePage: React.FC = () => {
   const { user, isAuthenticated, authenticate, signOut } = usePi()
@@ -67,43 +54,50 @@ const ProfilePage: React.FC = () => {
   const { toast } = useToast()
   const [storedWalletAddress, setStoredWalletAddress] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [secretInput, setSecretInput] = useState("")
-  const [mnemonicInput, setMnemonicInput] = useState("")
-  const { importAccount, isLoading: importingAccount, error: importError } = useImportAccount()
-  const { register: registerPasskey, isLoading: registeringPasskey } = usePasskeyRegistration()
-  const [showPasskeyDialog, setShowPasskeyDialog] = useState(false)
-  const [showPasswordDialog, setShowPasswordDialog] = useState(false)
-  const [pendingPublicKey, setPendingPublicKey] = useState<string | null>(null)
-  const [pendingSecret, setPendingSecret] = useState<string | null>(null)
-
-  useEffect(() => {
-    // Only restore wallet if user is authenticated
-    if (isAuthenticated) {
-      setStoredWalletAddress(getStoredWallet())
-    } else {
-      setStoredWalletAddress(null)
-    }
-  }, [isAuthenticated])
+  const { createWallet, isLoading: creatingWallet, error: createWalletError } = useCreateWallet()
+  const [newWalletSecret, setNewWalletSecret] = useState<string | null>(null)
+  const [showSecretDialog, setShowSecretDialog] = useState(false)
 
   useEffect(() => {
     // Only set wallet address if user is authenticated
     if (!isAuthenticated) {
       setStoredWalletAddress(null)
+      if (typeof window !== "undefined") {
+        // Clear localStorage when not authenticated
+        localStorage.removeItem("zyradex-wallet-address")
+      }
       return
     }
 
-    if (profile?.public_key) {
+    // Priority 1: Use wallet from user profile (database) - this is the source of truth
+    if (profile?.public_key && profile.public_key.trim() !== '') {
       setStoredWalletAddress(profile.public_key)
       if (typeof window !== "undefined") {
+        // Only store in localStorage if it matches the database
         localStorage.setItem("zyradex-wallet-address", profile.public_key)
       }
       return
     }
 
-    if (!storedWalletAddress && user?.wallet_address) {
+    // Priority 2: Check localStorage, but only if it matches what's in the database
+    // If user has no wallet in database, clear localStorage to avoid using stale data
+    const storedWallet = getStoredWallet()
+    if (storedWallet && profile?.public_key && storedWallet === profile.public_key) {
+      // Only use localStorage if it matches the database
+      setStoredWalletAddress(storedWallet)
+    } else {
+      // Clear localStorage if it doesn't match or user has no wallet
+      setStoredWalletAddress(null)
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("zyradex-wallet-address")
+      }
+    }
+
+    // Priority 3: Fallback to user.wallet_address (from Pi SDK) if no database wallet
+    if (!storedWalletAddress && !profile?.public_key && user?.wallet_address) {
       setStoredWalletAddress(user.wallet_address)
     }
-  }, [profile?.public_key, user?.wallet_address, storedWalletAddress, isAuthenticated])
+  }, [profile?.public_key, user?.wallet_address, isAuthenticated, profile])
 
   const { balances, totalBalance, isLoading: balancesLoading } = useAccountBalances(storedWalletAddress ?? user?.wallet_address ?? undefined)
 
@@ -150,169 +144,44 @@ const ProfilePage: React.FC = () => {
     }
   }
 
-  const handleAccountImport = async (event: React.FormEvent) => {
-    event.preventDefault()
-    if (!secretInput.trim() && !mnemonicInput.trim()) {
-      toast({ title: "Missing credentials", description: "Provide either a secret key or mnemonic.", variant: "destructive" })
+  const handleCreateWallet = async () => {
+    if (!isAuthenticated) {
+      toast({ 
+        title: "Authentication Required", 
+        description: "Please authenticate first to create a wallet.", 
+        variant: "destructive" 
+      })
       return
     }
+
     try {
-      const response = await importAccount({
-        secret: secretInput.trim() || undefined,
-        mnemonic: mnemonicInput.trim() || undefined,
-      })
+      const response = await createWallet()
       
-      // Store public key and secret for authentication setup
-      setPendingPublicKey(response.publicKey)
-      setPendingSecret(response.secret)
-      
+      // Store the secret seed to show to user
+      setNewWalletSecret(response.secret)
       handleWalletPersist(response.publicKey)
       refreshProfile().catch(() => undefined)
       
-      // PIN/password is the PRIMARY option (99% of users use Pi Browser)
-      // Always show password setup dialog first
-      setShowPasswordDialog(true)
+      // Show dialog with wallet details
+      setShowSecretDialog(true)
       
-      setSecretInput("")
-      setMnemonicInput("")
+      toast({
+        title: "Wallet Created!",
+        description: "Your new wallet has been created and seeded with test Pi. Please save your secret seed securely.",
+      })
     } catch (err) {
-      const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Import failed"
-      toast({ title: "Import failed", description: message, variant: "destructive" })
+      const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Wallet creation failed"
+      toast({ title: "Creation failed", description: message, variant: "destructive" })
     }
   }
 
-  const handlePasskeyRegistration = async () => {
-    try {
-      await registerPasskey()
-      setShowPasskeyDialog(false)
-      setPendingPublicKey(null)
-      setPendingSecret(null)
+  const handleCopySecret = () => {
+    if (newWalletSecret) {
+      navigator.clipboard.writeText(newWalletSecret)
       toast({
-        title: "Success",
-        description: "Passkey registered successfully. You can now use it for transactions.",
+        title: "Copied!",
+        description: "Secret seed copied to clipboard. Keep it safe!",
       })
-    } catch (err) {
-      const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Passkey registration failed"
-      toast({ title: "Registration failed", description: message, variant: "destructive" })
-    }
-  }
-
-  const handlePasswordSetup = async (password: string) => {
-    if (!pendingPublicKey || !pendingSecret) {
-      throw new Error("Missing account information. Please re-import your account.")
-    }
-
-    if (!validatePasswordStrength(password)) {
-      throw new Error("Password must be at least 6 characters long")
-    }
-
-    // Validate that we're encrypting the SECRET KEY, not the public key
-    if (!pendingSecret.startsWith('S')) {
-      console.error("❌ ERROR: pendingSecret does not start with 'S'!", {
-        pendingSecret: pendingSecret.substring(0, 20) + "...",
-        pendingPublicKey: pendingPublicKey.substring(0, 20) + "...",
-        secretLength: pendingSecret.length,
-        publicKeyLength: pendingPublicKey.length
-      })
-      throw new Error("Invalid secret key format. Secret key must start with 'S'. Please re-import your account.")
-    }
-
-    if (!pendingPublicKey.startsWith('G')) {
-      console.error("❌ ERROR: pendingPublicKey does not start with 'G'!", {
-        pendingPublicKey: pendingPublicKey.substring(0, 20) + "..."
-      })
-      throw new Error("Invalid public key format. Public key must start with 'G'. Please re-import your account.")
-    }
-
-    try {
-      console.log("✅ Setting up password for public key:", pendingPublicKey)
-      console.log("✅ Encrypting SECRET KEY (starts with 'S'):", pendingSecret.substring(0, 10) + "...")
-      console.log("✅ Public key (starts with 'G'):", pendingPublicKey.substring(0, 10) + "...")
-      
-      // Generate salt and derive key from password
-      const salt = generateSalt()
-      const saltBase64 = btoa(String.fromCharCode(...salt))
-      console.log("Generated salt, deriving key from password...")
-      
-      const key = await deriveKeyFromPassword(password, salt)
-      console.log("Key derived, encrypting secret...")
-      
-      // Encrypt secret with password-derived key
-      const { encrypted, iv } = await encryptSecret(pendingSecret, key)
-      console.log("Secret encrypted, storing on backend...")
-      console.log("Encrypted data length:", encrypted.length, "IV length:", iv.length)
-      
-      // Store encrypted secret with salt
-      try {
-        await storeEncryptedSecret(pendingPublicKey, encrypted, iv, saltBase64)
-        console.log("Encrypted secret stored successfully on backend for:", pendingPublicKey)
-      } catch (storageError: any) {
-        console.error("Storage error details:", storageError)
-        throw new Error(`Failed to store encrypted secret: ${storageError?.message || 'Unknown error'}. Please try again.`)
-      }
-      
-      // Verify storage with retry
-      const { hasStoredSecret } = await import("@/lib/passkey/storage")
-      let isStored = false
-      let retries = 3
-      while (!isStored && retries > 0) {
-        try {
-          isStored = await hasStoredSecret(pendingPublicKey)
-          if (!isStored) {
-            retries--
-            if (retries > 0) {
-              console.log(`Verification failed, retrying... (${retries} attempts left)`)
-              await new Promise(resolve => setTimeout(resolve, 100))
-            }
-          }
-        } catch (verifyError) {
-          console.error("Verification error:", verifyError)
-          retries--
-          if (retries > 0) {
-            await new Promise(resolve => setTimeout(resolve, 100))
-          }
-        }
-      }
-      
-      console.log("Verification - secret stored:", isStored)
-      
-      if (!isStored) {
-        throw new Error("Failed to verify storage. The secret may not have been saved. Please try again.")
-      }
-      
-      // Clear pending data
-      const savedPublicKey = pendingPublicKey
-      const savedSecret = pendingSecret
-      setPendingPublicKey(null)
-      setPendingSecret(null)
-      
-      // Close password dialog first
-      setShowPasswordDialog(false)
-      
-      toast({
-        title: "Success",
-        description: "PIN/password set up successfully. You can now use it to sign transactions.",
-      })
-      
-      // Optionally offer WebAuthn setup if supported (as an additional option)
-      if (isWebAuthnSupported()) {
-        // Store for optional passkey setup
-        setPendingPublicKey(savedPublicKey)
-        setPendingSecret(savedSecret)
-        // Show passkey dialog as optional enhancement
-        setTimeout(() => {
-          setShowPasskeyDialog(true)
-        }, 500)
-      }
-    } catch (err) {
-      console.error("Failed to set up password:", err)
-      const errorMessage = err instanceof Error ? err.message : "Failed to set up password. Please try again."
-      toast({
-        title: "Setup Failed",
-        description: errorMessage,
-        variant: "destructive",
-      })
-      throw new Error(errorMessage)
     }
   }
 
@@ -464,51 +333,40 @@ const ProfilePage: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5" />
-              Account Import
-            </CardTitle>
-            <CardDescription>Import your account using a secret key or mnemonic</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {importError && <p className="text-sm text-destructive">{importError.message}</p>}
-            <form className="space-y-3" onSubmit={handleAccountImport}>
-            <div className="space-y-2">
-                <Label htmlFor="mnemonic">Mnemonic</Label>
-                <Input
-                  id="mnemonic"
-                  placeholder="word1 word2 word3 ..."
-                  value={mnemonicInput}
-                  onChange={(event) => setMnemonicInput(normalizeMnemonic(event.target.value))}
-                  onPaste={(e) => {
-                    // Prevent form submission on paste - user must click button
-                    e.stopPropagation()
-                  }}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="secret-key">Secret Key (optional)</Label>
-                <Input
-                  id="secret-key"
-                  type="password"
-                  placeholder="SXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-                  value={secretInput}
-                  onChange={(event) => setSecretInput(event.target.value)}
-                  onPaste={(e) => {
-                    // Prevent form submission on paste - user must click button
-                    e.stopPropagation()
-                  }}
-                />
-              </div>
-              <Button type="submit" className="btn-gradient-primary w-full" disabled={importingAccount}>
-                {importingAccount && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Import Account
+        {!storedWalletAddress && isAuthenticated && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                Create New Wallet
+              </CardTitle>
+              <CardDescription>Generate a new wallet and receive test Pi</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {createWalletError && (
+                <Alert variant="destructive">
+                  <AlertDescription className="text-sm break-words">
+                    {createWalletError.message}
+                  </AlertDescription>
+                </Alert>
+              )}
+              <Alert>
+                <AlertDescription className="text-sm break-words">
+                  A new wallet will be created and seeded with test Pi. You will receive your secret seed - 
+                  save it securely as you'll need it for all transactions. We don't store your secret seed.
+                </AlertDescription>
+              </Alert>
+              <Button 
+                onClick={handleCreateWallet} 
+                className="btn-gradient-primary w-full" 
+                disabled={creatingWallet}
+              >
+                {creatingWallet && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Create New Wallet
               </Button>
-            </form>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
@@ -588,82 +446,51 @@ const ProfilePage: React.FC = () => {
         )}
       </div>
 
-      {isWebAuthnSupported() && (
-        <Dialog open={showPasskeyDialog} onOpenChange={setShowPasskeyDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Optional: Set Up Passkey</DialogTitle>
-              <DialogDescription>
-                Your account is already secured with PIN/password. You can optionally add passkey authentication
-                for a more convenient experience on supported browsers.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 mt-4">
-              <p className="text-sm text-muted-foreground">
-                Passkey allows you to use biometric authentication (fingerprint, face recognition, or PIN)
-                as an alternative to entering your PIN/password. This is optional - your PIN/password will continue to work.
-              </p>
-              <Button
-                onClick={handlePasskeyRegistration}
-                disabled={registeringPasskey}
-                className="w-full"
-              >
-                {registeringPasskey && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Register Passkey (Optional)
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowPasskeyDialog(false)
-                  setPendingPublicKey(null)
-                  setPendingSecret(null)
-                }}
-                className="w-full"
-              >
-                Skip - Use PIN/Password Only
-              </Button>
+      <Dialog open={showSecretDialog} onOpenChange={setShowSecretDialog}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Save Your Secret Seed</DialogTitle>
+            <DialogDescription>
+              Your wallet has been created! Please save your secret seed securely. You'll need it for all transactions.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <Alert variant="destructive">
+              <AlertDescription className="text-sm break-words">
+                <strong>IMPORTANT:</strong> Save this secret seed in a secure location. We don't store it, 
+                and you cannot recover it if lost. You'll need to provide it for every transaction.
+              </AlertDescription>
+            </Alert>
+            <div className="space-y-2">
+              <Label>Wallet Address (Public Key)</Label>
+              <div className="flex items-center gap-2 p-3 bg-muted rounded-md border border-border">
+                <span className="flex-1 break-all font-mono text-xs sm:text-sm min-w-0">{storedWalletAddress}</span>
+                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleCopyWalletAddress}>
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      <PasswordSetupDialog
-        open={showPasswordDialog}
-        onOpenChange={async (open) => {
-          if (!open && pendingPublicKey) {
-            // User cancelled password setup - remove public key from database
-            try {
-              await removePublicKey()
-              // Clear local storage
-              if (typeof window !== "undefined") {
-                localStorage.removeItem("zyradex-wallet-address")
-              }
-              // Clear state
-              setPendingPublicKey(null)
-              setPendingSecret(null)
-              setStoredWalletAddress(null)
-              // Refresh profile to get updated user data
-              refreshProfile().catch(() => undefined)
-              toast({
-                title: "Import cancelled",
-                description: "Account import was cancelled. You can import again when ready.",
-              })
-            } catch (err) {
-              console.error("Failed to remove public key:", err)
-              // Still clear local state even if API call fails
-              setPendingPublicKey(null)
-              setPendingSecret(null)
-              setStoredWalletAddress(null)
-              if (typeof window !== "undefined") {
-                localStorage.removeItem("zyradex-wallet-address")
-              }
-            }
-          }
-          setShowPasswordDialog(open)
-        }}
-        onPasswordSet={handlePasswordSetup}
-        isLoading={false}
-      />
+            <div className="space-y-2">
+              <Label>Secret Seed (Private Key)</Label>
+              <div className="flex items-start gap-2 p-3 bg-muted rounded-md border border-border min-h-[60px]">
+                <span className="flex-1 break-all font-mono text-xs sm:text-sm min-w-0 leading-relaxed">{newWalletSecret}</span>
+                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 mt-0.5" onClick={handleCopySecret}>
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <Button
+              onClick={() => {
+                setShowSecretDialog(false)
+                setNewWalletSecret(null)
+              }}
+              className="w-full"
+            >
+              I've Saved My Secret Seed
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

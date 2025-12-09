@@ -12,8 +12,6 @@ import { usePi } from "@/components/providers/pi-provider"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { useToast } from "@/hooks/use-toast"
 import { usePoolsForPair, useSwapQuote, useExecuteSwap } from "@/hooks/useSwapData"
-import { useTransactionAuth } from "@/hooks/useTransactionAuth"
-import { PasswordPromptDialog } from "@/components/password-prompt-dialog"
 import { useAccountBalances } from "@/hooks/useAccountData"
 import { listLiquidityPools } from "@/lib/api/liquidity"
 import { useRouter } from "next/navigation"
@@ -75,22 +73,7 @@ export function SwapCard() {
   const [tokenBInputMode, setTokenBInputMode] = useState<"dropdown" | "search">("dropdown")
   
   const walletAddress = localWallet || profile?.public_key || user?.wallet_address
-  const [showPasswordDialog, setShowPasswordDialog] = useState(false)
-  const [passwordResolve, setPasswordResolve] = useState<((password: string) => void) | null>(null)
-  const [passwordReject, setPasswordReject] = useState<((error: Error) => void) | null>(null)
-  
-  const handlePasswordPrompt = async (): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      setPasswordResolve(() => (password: string) => resolve(password))
-      setPasswordReject(() => (error: Error) => reject(error))
-      setShowPasswordDialog(true)
-    })
-  }
-
-  const { getSecret: getSecretFromAuth, isLoading: authLoading, hasStoredSecret, requiresPassword } = useTransactionAuth(
-    walletAddress || undefined,
-    handlePasswordPrompt
-  )
+  const [userSecret, setUserSecret] = useState<string>("")
 
   // Parse tokens
   const fromToken = useMemo(() => {
@@ -284,22 +267,10 @@ export function SwapCard() {
       toast({ title: "Invalid pair", description: "Please enter both tokens to create a trading pair.", variant: "destructive" })
       return
     }
-    
-    let secretToUse: string | undefined = undefined
-    
-    // If stored secret exists, always use password authentication
-    if (hasStoredSecret && walletAddress) {
-      try {
-        secretToUse = await getSecretFromAuth(walletAddress)
-      } catch (err) {
-        const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Authentication failed"
-        toast({ title: "Authentication failed", description: message, variant: "destructive" })
-        return
-      }
-    } else if (!secretToUse) {
+    if (!userSecret.trim()) {
       toast({ 
-        title: "Account required", 
-        description: "Please import your account in your profile to set up authentication. This allows you to use PIN/password for transactions.",
+        title: "Secret seed required", 
+        description: "Please enter your secret seed to sign the transaction.",
         variant: "destructive" 
       })
       return
@@ -307,7 +278,7 @@ export function SwapCard() {
     
     try {
       const result = await executeSwap({
-        userSecret: secretToUse,
+        userSecret: userSecret.trim(),
         poolId: selectedPoolId,
         from: fromToken,
         to: toToken,
@@ -322,6 +293,7 @@ export function SwapCard() {
             variant: "default"
         })
         setFromAmount("")
+        setUserSecret("") // Clear secret after successful transaction
         // Refresh balances after successful swap to show updated amounts
         // Backend already clears cache, but we refresh to get the latest data
         setTimeout(() => {
@@ -373,26 +345,6 @@ export function SwapCard() {
     }
   }
 
-  const handlePasswordSubmit = async (password: string) => {
-    if (passwordResolve) {
-      passwordResolve(password)
-      setPasswordResolve(null)
-      setPasswordReject(null)
-      setShowPasswordDialog(false)
-    }
-  }
-
-  const handlePasswordDialogClose = (open: boolean) => {
-    if (!open) {
-      setShowPasswordDialog(false)
-      // Reject the promise if dialog is closed without submitting
-      if (passwordReject) {
-        passwordReject(new Error("Password prompt cancelled"))
-        setPasswordResolve(null)
-        setPasswordReject(null)
-      }
-    }
-  }
 
   const poolSummary = () => {
     if (!tokenA || !tokenB) return "Enter both tokens to check for pools."
@@ -888,37 +840,18 @@ export function SwapCard() {
             </>
           )}
 
-          {/* Only show account import prompt if no stored secret exists */}
-          {!hasStoredSecret && (
-            <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-4 space-y-3">
-              <div className="flex items-start gap-2">
-                <Lock className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
-                <div className="flex-1 space-y-2">
-                  <p className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
-                    Account Required
-                  </p>
-                  <p className="text-xs text-yellow-600 dark:text-yellow-500">
-                    You need to import your account and set up authentication to perform swaps. This allows you to use PIN/password instead of entering your secret key manually.
-                  </p>
-                </div>
-              </div>
-              <Link href="/profile" className="block">
-                <Button type="button" variant="outline" className="w-full" size="sm">
-                  <User className="mr-2 h-4 w-4" />
-                  Go to Profile to Import Account
-                </Button>
-              </Link>
-            </div>
-          )}
-          
-          {hasStoredSecret && (
-            <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Lock className="h-4 w-4" />
-                <span>You will be prompted for your PIN/password when you click Swap</span>
-              </div>
-            </div>
-          )}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-muted-foreground">Secret Seed (Required for Transaction)</Label>
+            <Input
+              type="password"
+              placeholder="Enter your secret seed (starts with S...)"
+              value={userSecret}
+              onChange={(event) => setUserSecret(event.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Enter your secret seed to sign this transaction. We don't store your secret seed.
+            </p>
+          </div>
 
           <Button
             className="w-full h-12 btn-gradient-primary font-semibold shadow-lg"
@@ -942,15 +875,6 @@ export function SwapCard() {
         </CardContent>
       </div>
 
-      {walletAddress && (
-        <PasswordPromptDialog
-          open={showPasswordDialog}
-          onOpenChange={handlePasswordDialogClose}
-          publicKey={walletAddress}
-          onPasswordSubmit={handlePasswordSubmit}
-          error={null}
-        />
-      )}
     </Card>
   )
 }

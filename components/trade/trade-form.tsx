@@ -11,8 +11,6 @@ import { Loader2, Lock, Search, User } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { useAccountBalances } from "@/hooks/useAccountData"
-import { useTransactionAuth } from "@/hooks/useTransactionAuth"
-import { PasswordPromptDialog } from "@/components/password-prompt-dialog"
 import { useCreateSellOffer, useCreateBuyOffer, useSearchAssets } from "@/hooks/useTrade"
 
 interface TradeFormProps {
@@ -54,24 +52,7 @@ export function TradeForm({ publicKey }: TradeFormProps) {
   const [amount, setAmount] = useState("")
   const [price, setPrice] = useState("")
   const [buyAmount, setBuyAmount] = useState("") // For buy offers
-  
-  // Authentication
-  const [showPasswordDialog, setShowPasswordDialog] = useState(false)
-  const [passwordResolve, setPasswordResolve] = useState<((password: string) => void) | null>(null)
-  const [passwordReject, setPasswordReject] = useState<((error: Error) => void) | null>(null)
-
-  const handlePasswordPrompt = async (): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      setPasswordResolve(() => (password: string) => resolve(password))
-      setPasswordReject(() => (error: Error) => reject(error))
-      setShowPasswordDialog(true)
-    })
-  }
-
-  const { getSecret: getSecretFromAuth, hasStoredSecret } = useTransactionAuth(
-    publicKey || undefined,
-    handlePasswordPrompt
-  )
+  const [userSecret, setUserSecret] = useState<string>("")
 
   // Search assets for buying token
   const { assets: searchResults, isLoading: searchingAssets } = useSearchAssets(
@@ -85,26 +66,6 @@ export function TradeForm({ publicKey }: TradeFormProps) {
 
   const { createSellOffer, isLoading: creatingSell, error: sellError } = useCreateSellOffer()
   const { createBuyOffer, isLoading: creatingBuy, error: buyError } = useCreateBuyOffer()
-
-  const handlePasswordSubmit = async (password: string) => {
-    if (passwordResolve) {
-      passwordResolve(password)
-      setPasswordResolve(null)
-      setPasswordReject(null)
-      setShowPasswordDialog(false)
-    }
-  }
-
-  const handlePasswordDialogClose = (open: boolean) => {
-    if (!open) {
-      setShowPasswordDialog(false)
-      if (passwordReject) {
-        passwordReject(new Error("Password prompt cancelled"))
-        setPasswordResolve(null)
-        setPasswordReject(null)
-      }
-    }
-  }
 
   const handleSubmit = async () => {
     if (!publicKey) {
@@ -129,26 +90,23 @@ export function TradeForm({ publicKey }: TradeFormProps) {
       }
     }
 
-    let secretToUse: string
+    if (!userSecret.trim()) {
+      toast({ 
+        title: "Secret seed required", 
+        description: "Please enter your secret seed to sign the transaction.",
+        variant: "destructive" 
+      })
+      return
+    }
 
     try {
-      if (hasStoredSecret && publicKey) {
-        secretToUse = await getSecretFromAuth(publicKey)
-      } else {
-        toast({ 
-          title: "Account required", 
-          description: "Please import your account in your profile to set up authentication. This allows you to use PIN/password for transactions.", 
-          variant: "destructive" 
-        })
-        return
-      }
 
       const sellingDescriptor = tokenToDescriptor(sellingTokenParsed)
       const buyingDescriptor = tokenToDescriptor(buyingTokenParsed)
 
       if (tradeType === "sell") {
         await createSellOffer({
-          userSecret: secretToUse,
+          userSecret: userSecret.trim(),
           selling: sellingDescriptor,
           buying: buyingDescriptor,
           amount: amount,
@@ -157,7 +115,7 @@ export function TradeForm({ publicKey }: TradeFormProps) {
         toast({ title: "Sell offer created", description: `Selling ${amount} ${sellingTokenParsed.code} at ${price} per unit.` })
       } else {
         await createBuyOffer({
-          userSecret: secretToUse,
+          userSecret: userSecret.trim(),
           selling: sellingDescriptor,
           buying: buyingDescriptor,
           buyAmount: buyAmount,
@@ -170,6 +128,7 @@ export function TradeForm({ publicKey }: TradeFormProps) {
       setAmount("")
       setBuyAmount("")
       setPrice("")
+      setUserSecret("") // Clear secret after successful transaction
       
       // Refresh balances after successful offer creation
       // Backend already clears cache, but we refresh to get the latest data
@@ -405,36 +364,18 @@ export function TradeForm({ publicKey }: TradeFormProps) {
             </TabsContent>
           </Tabs>
 
-          {!hasStoredSecret && (
-            <div className="mt-4 rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-4 space-y-3">
-              <div className="flex items-start gap-2">
-                <Lock className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
-                <div className="flex-1 space-y-2">
-                  <p className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
-                    Account Required
-                  </p>
-                  <p className="text-xs text-yellow-600 dark:text-yellow-500">
-                    You need to import your account and set up authentication to create trade offers. This allows you to use PIN/password instead of entering your secret key manually.
-                  </p>
-                </div>
-              </div>
-              <Link href="/profile" className="block">
-                <Button type="button" variant="outline" className="w-full" size="sm">
-                  <User className="mr-2 h-4 w-4" />
-                  Go to Profile to Import Account
-                </Button>
-              </Link>
-            </div>
-          )}
-
-          {hasStoredSecret && (
-            <div className="mt-4 rounded-lg border border-border/40 bg-muted/20 p-3 text-sm">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Lock className="h-4 w-4" />
-                <span>You'll be prompted for your PIN/password when you submit</span>
-              </div>
-            </div>
-          )}
+          <div className="mt-4 space-y-2">
+            <Label>Secret Seed (Required for Transaction)</Label>
+            <Input
+              type="password"
+              placeholder="Enter your secret seed (starts with S...)"
+              value={userSecret}
+              onChange={(event) => setUserSecret(event.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Enter your secret seed to sign this transaction. We don't store your secret seed.
+            </p>
+          </div>
 
           {(sellError || buyError) && (
             <div className="mt-4 p-3 bg-destructive/10 text-destructive text-sm rounded">
@@ -445,23 +386,13 @@ export function TradeForm({ publicKey }: TradeFormProps) {
           <Button
             className="w-full mt-4 btn-gradient-primary"
             onClick={handleSubmit}
-            disabled={creatingSell || creatingBuy || !hasStoredSecret}
+            disabled={creatingSell || creatingBuy || !userSecret.trim()}
           >
             {(creatingSell || creatingBuy) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {creatingSell || creatingBuy ? "Creating..." : tradeType === "sell" ? "Create Sell Offer" : "Create Buy Offer"}
           </Button>
         </CardContent>
       </Card>
-
-      {publicKey && (
-        <PasswordPromptDialog
-          open={showPasswordDialog}
-          onOpenChange={handlePasswordDialogClose}
-          publicKey={publicKey}
-          onPasswordSubmit={handlePasswordSubmit}
-          error={null}
-        />
-      )}
     </>
   )
 }
