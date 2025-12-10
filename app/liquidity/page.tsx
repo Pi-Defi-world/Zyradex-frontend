@@ -41,7 +41,7 @@ import {
 } from "@/hooks/useLiquidityData"
 import { usePi } from "@/components/providers/pi-provider"
 import { useUserProfile } from "@/hooks/useUserProfile"
-import { getUserTokens, getPlatformPools, type PoolExistsError } from "@/lib/api/liquidity"
+import { getUserTokens, getPlatformPools, quoteAddLiquidity, type PoolExistsError } from "@/lib/api/liquidity"
 import type { ILiquidityPool } from "@/lib/types"
 
 const getStoredWallet = () => {
@@ -182,6 +182,7 @@ export default function LiquidityPage() {
   const [loadingPlatformPools, setLoadingPlatformPools] = useState(false)
   const [poolExistsError, setPoolExistsError] = useState<PoolExistsError | null>(null)
   const [hasStoredSecret, setHasStoredSecret] = useState(false)
+  const [loadingQuote, setLoadingQuote] = useState(false)
 
 
   const displayPools = useMemo(() => {
@@ -644,22 +645,56 @@ export default function LiquidityPage() {
                                       min="0"
                                       step="any"
                                       value={depositForm.amountA}
-                                      onChange={(event) => setDepositForm((prev) => ({ ...prev, amountA: event.target.value }))}
+                                      onChange={async (event) => {
+                                        const amountA = event.target.value
+                                        setDepositForm((prev) => ({ ...prev, amountA }))
+                                        
+                                        // Fetch quote when amountA is entered
+                                        if (amountA && parseFloat(amountA) > 0) {
+                                          setLoadingQuote(true)
+                                          try {
+                                            const quote = await quoteAddLiquidity({
+                                              poolId: poolForInteraction.id,
+                                              amountA,
+                                            })
+                                            setDepositForm((prev) => ({ ...prev, amountB: quote.amountB }))
+                                          } catch (err) {
+                                            console.error("Failed to fetch quote:", err)
+                                            setDepositForm((prev) => ({ ...prev, amountB: "" }))
+                                          } finally {
+                                            setLoadingQuote(false)
+                                          }
+                                        } else {
+                                          setDepositForm((prev) => ({ ...prev, amountB: "" }))
+                                        }
+                                      }}
                                       required
                                     />
                                   </div>
                                   <div className="space-y-2">
-                                    <Label>{formattedPool.assetB.symbol} Amount</Label>
+                                    <Label>{formattedPool.assetB.symbol} Amount (Calculated)</Label>
                                     <Input
                                       type="number"
                                       min="0"
                                       step="any"
                                       value={depositForm.amountB}
-                                      onChange={(event) => setDepositForm((prev) => ({ ...prev, amountB: event.target.value }))}
-                                      required
+                                      readOnly
+                                      className="bg-muted"
+                                      placeholder={loadingQuote ? "Calculating..." : "Enter amount above"}
                                     />
+                                    {loadingQuote && (
+                                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                        Calculating required amount...
+                                      </p>
+                                    )}
+                                    {!loadingQuote && depositForm.amountB && (
+                                      <p className="text-xs text-muted-foreground">
+                                        This amount is calculated based on the pool's current ratio
+                                      </p>
+                                    )}
                                   </div>
-                                  <Button type="submit" className="w-full btn-gradient-primary" disabled={adding}>
+                                  <Button type="submit" className="w-full btn-gradient-primary" disabled={adding || !depositForm.amountA || !depositForm.amountB}>
                                     {adding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                                     Add Liquidity
                                   </Button>
@@ -808,22 +843,56 @@ export default function LiquidityPage() {
                               min="0"
                               step="any"
                               value={depositForm.amountA}
-                              onChange={(event) => setDepositForm((prev) => ({ ...prev, amountA: event.target.value }))}
+                              onChange={async (event) => {
+                                const amountA = event.target.value
+                                setDepositForm((prev) => ({ ...prev, amountA }))
+                                
+                                // Fetch quote when amountA is entered
+                                if (amountA && parseFloat(amountA) > 0) {
+                                  setLoadingQuote(true)
+                                  try {
+                                    const quote = await quoteAddLiquidity({
+                                      poolId: pool.id,
+                                      amountA,
+                                    })
+                                    setDepositForm((prev) => ({ ...prev, amountB: quote.amountB }))
+                                  } catch (err) {
+                                    console.error("Failed to fetch quote:", err)
+                                    setDepositForm((prev) => ({ ...prev, amountB: "" }))
+                                  } finally {
+                                    setLoadingQuote(false)
+                                  }
+                                } else {
+                                  setDepositForm((prev) => ({ ...prev, amountB: "" }))
+                                }
+                              }}
                               required
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label>{pool.assetB.symbol} Amount</Label>
+                            <Label>{pool.assetB.symbol} Amount (Calculated)</Label>
                             <Input
                               type="number"
                               min="0"
                               step="any"
                               value={depositForm.amountB}
-                              onChange={(event) => setDepositForm((prev) => ({ ...prev, amountB: event.target.value }))}
-                              required
+                              readOnly
+                              className="bg-muted"
+                              placeholder={loadingQuote ? "Calculating..." : "Enter amount above"}
                             />
+                            {loadingQuote && (
+                              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                Calculating required amount...
+                              </p>
+                            )}
+                            {!loadingQuote && depositForm.amountB && (
+                              <p className="text-xs text-muted-foreground">
+                                This amount is calculated based on the pool's current ratio
+                              </p>
+                            )}
                           </div>
-                          <Button type="submit" className="w-full btn-gradient-primary" disabled={adding}>
+                          <Button type="submit" className="w-full btn-gradient-primary" disabled={adding || !depositForm.amountA || !depositForm.amountB}>
                             {adding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                             Add Liquidity
                           </Button>

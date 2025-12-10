@@ -213,3 +213,28 @@ export const getPlatformPools = async () => {
     throw toApiError(error)
   }
 }
+
+export interface QuoteAddLiquidityParams {
+  poolId: string
+  amountA: string
+}
+
+export interface QuoteAddLiquidityResponse {
+  success: boolean
+  amountA: string
+  amountB: string
+  poolRatio: number
+  assetA: string
+  assetB: string
+}
+
+export const quoteAddLiquidity = async (params: QuoteAddLiquidityParams) => {
+  try {
+    const { data } = await axiosClient.get<QuoteAddLiquidityResponse>("/liquidity-pools/quote", {
+      params,
+    })
+    return data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}
