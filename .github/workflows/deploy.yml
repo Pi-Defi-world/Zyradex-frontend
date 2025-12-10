@@ -13,17 +13,45 @@ jobs:
       - name: Checkout source repository
         uses: actions/checkout@v4
 
-      - name: Push source to Vercel repo
-        uses: cpina/github-action-push-to-another-repository@main
+      - name: Configure Git
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "GitHub Actions"
+          git config --global --add safe.directory /github/workspace
+
+      - name: Push to destination (Vercel) repo
         env:
-          API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
-        with:
-          source-directory: '.'
-          destination-github-username: 'junman140'
-          destination-repository-username: 'junman140'
-          destination-repository-name: 'tokenization-fe'
-          user-email: 'github-actions[bot]@users.noreply.github.com'
-          user-name: 'GitHub Actions'
-          target-branch: 'main'
-          commit-message: 'Sync source code for Vercel build 🚀'
-          create-target-branch-if-needed: 'true'
+          DESTINATION_REPO: "https://junman140:${{ secrets.API_TOKEN_GITHUB }}@github.com/junman140/tokenization-fe.git"
+        run: |
+          set -e
+          # Clone the repository
+          git clone "$DESTINATION_REPO" --branch main --single-branch temp_zyra_dex || {
+            echo "⚠️ Failed to clone, trying to initialize..."
+            mkdir -p temp_zyra_dex
+            cd temp_zyra_dex
+            git init
+            git checkout -b main
+            git remote add origin "$DESTINATION_REPO"
+            touch README.md
+            git add README.md
+            git commit -m "Initial commit"
+            git push -u origin main || true
+            cd ..
+            git clone "$DESTINATION_REPO" --branch main --single-branch temp_zyra_dex
+          }
+          
+          rsync -av --delete --exclude '.git' --exclude '.github/workflows' ./ temp_zyra_dex/
+          cd temp_zyra_dex
+          
+          # Configure git
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "GitHub Actions"
+
+          if [ -n "$(git status --porcelain)" ]; then
+            git add .
+            git commit -m "Sync source code for Vercel build 🚀 [skip ci]"
+            git push origin main
+            echo "✅ Synced successfully!"
+          else
+            echo "🟢 No changes detected — skipping commit."
+          fi
