@@ -6,7 +6,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { ArrowLeft, ArrowRightLeft, ArrowUpRight, ArrowDown, Loader2, Copy, ExternalLink } from "lucide-react"
+import { ArrowRightLeft, ArrowUpRight, ArrowDown, Loader2, Copy, ExternalLink } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { usePi } from "@/components/providers/pi-provider"
 import { useAccountBalances } from "@/hooks/useAccountData"
@@ -149,8 +149,7 @@ export default function TokenDetailPage({ params }: { params: { code: string } }
           onClick={() => router.back()}
           className="mb-4 -ml-2"
         >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
+          ← Back
         </Button>
 
         {/* Token Header Card */}
@@ -222,7 +221,7 @@ export default function TokenDetailPage({ params }: { params: { code: string } }
                 <Button
                   variant="outline"
                   className="h-16 flex flex-col items-center justify-center gap-1 rounded-xl border-2 hover:border-primary/50 hover:bg-muted/50 transition-all"
-                  onClick={() => router.push("/swap")} // TODO: Create send page
+                  onClick={() => router.push("/send")}
                 >
                   <ArrowUpRight className="h-5 w-5" />
                   <span className="text-xs font-medium">Send</span>

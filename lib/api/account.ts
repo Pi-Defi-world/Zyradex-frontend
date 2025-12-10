@@ -155,3 +155,28 @@ export const getAccountTransactions = async (params: AccountTransactionsParams) 
     throw toApiError(error)
   }
 }
+
+export interface SendPaymentPayload {
+  userSecret: string
+  destination: string
+  asset: { code: string; issuer?: string }
+  amount: string
+  memo?: string
+}
+
+export interface SendPaymentResponse {
+  success: boolean
+  transactionHash?: string
+  ledger?: number
+  message?: string
+  receiverNeedsTrustline?: boolean
+}
+
+export const sendPayment = async (payload: SendPaymentPayload) => {
+  try {
+    const { data } = await axiosClient.post<SendPaymentResponse>("/account/send", payload)
+    return data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}

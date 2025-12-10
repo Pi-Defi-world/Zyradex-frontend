@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ArrowDown, TrendingUp, ArrowRightLeft, Loader2, Copy, Wallet, Plus, ArrowUpRight, ChevronRight } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { usePi } from "@/components/providers/pi-provider"
@@ -15,7 +14,6 @@ import { usePiPrice } from "@/hooks/usePiPrice"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { useTokenPrices } from "@/hooks/useTokenPrice"
 import { ReceiveModal } from "@/components/receive-modal"
-import { TrustlineForm } from "@/components/forms/trustline-form"
 import { AuthErrorDisplay } from "@/components/auth-error-display"
 
 const getStoredWallet = () => {
@@ -63,7 +61,6 @@ export default function HomePage() {
       assetType: b.assetType 
     }))
   )
-  const [trustlineDialogOpen, setTrustlineDialogOpen] = useState(false)
 
   // Calculate total balance: native Pi + tokens with pools (valued in Pi)
   const totalBalance = useMemo(() => {
@@ -98,8 +95,8 @@ export default function HomePage() {
 
   const handleTrade = () => router.push("/trade")
   const handleSwap = () => router.push("/swap")
-  const handleManageTokens = () => setTrustlineDialogOpen(true)
-  const handleSend = () => router.push("/swap") // TODO: Create send page/component
+  const handleManageTokens = () => router.push("/trustlines")
+  const handleSend = () => router.push("/send")
   const handleCopy = async () => {
     const key = publicKey || ""
     try {
@@ -320,18 +317,6 @@ export default function HomePage() {
 
       <ReceiveModal open={receiveModalOpen} onOpenChange={setReceiveModalOpen} />
 
-      {/* Trustline Dialog */}
-      <Dialog open={trustlineDialogOpen} onOpenChange={setTrustlineDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Manage Token List</DialogTitle>
-            <DialogDescription>
-              Establish a trustline to add a token to your wallet.
-            </DialogDescription>
-          </DialogHeader>
-          <TrustlineForm />
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
