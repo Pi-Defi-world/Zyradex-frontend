@@ -146,12 +146,16 @@ export default function HistoryPage() {
           </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Transactions</CardTitle>
-            <CardDescription>
-              {pagination ? `${transactions.length} transaction${transactions.length !== 1 ? "s" : ""} loaded` : "Loading..."}
-            </CardDescription>
+        <Card className="border border-border/50 shadow-xl rounded-2xl">
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-xl font-bold">Transactions</CardTitle>
+                <CardDescription className="mt-1">
+                  {pagination ? `${transactions.length} transaction${transactions.length !== 1 ? "s" : ""} loaded` : "Loading..."}
+                </CardDescription>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             {error && (
@@ -172,45 +176,51 @@ export default function HistoryPage() {
                 </p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {transactions.map((tx) => (
                   <div
                     key={tx.id}
-                    className="p-4 rounded-lg border border-border/30 bg-card hover:bg-muted/50 transition-colors"
+                    className="flex items-center justify-between gap-3 p-3 border rounded-lg hover:bg-accent/50 transition-colors overflow-hidden"
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-sm font-semibold text-foreground">
-                            {getTransactionType(tx)}
-                          </span>
-                          <span
-                            className={`text-xs px-2 py-0.5 rounded-full ${
-                              tx.successful
-                                ? "bg-green-500/20 text-green-700 dark:text-green-400"
-                                : "bg-red-500/20 text-red-700 dark:text-red-400"
-                            }`}
-                          >
-                            {getTransactionStatus(tx)}
-                          </span>
-                        </div>
-                        <div className="space-y-1 text-sm text-muted-foreground">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-xs">{truncateHash(tx.hash)}</span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-5 w-5"
-                              onClick={() => viewOnExplorer(tx.hash)}
-                            >
-                              <ExternalLink className="h-3 w-3" />
-                            </Button>
-                          </div>
-                          <div>Ledger: {tx.ledger}</div>
-                          <div>Fee: {tx.fee ? (Number(tx.fee) / 10000000).toFixed(7) : "0"} Test Pi</div>
-                          <div>{formatDate(tx.createdAt)}</div>
-                        </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-medium capitalize">
+                          {getTransactionType(tx)}
+                        </span>
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-full ${
+                            tx.successful
+                              ? "bg-green-500/20 text-green-700 dark:text-green-400"
+                              : "bg-red-500/20 text-red-700 dark:text-red-400"
+                          }`}
+                        >
+                          {getTransactionStatus(tx)}
+                        </span>
                       </div>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {formatDate(tx.createdAt)}
+                      </p>
+                    </div>
+                    <div className="text-right flex-shrink-0 min-w-0 flex items-center gap-2">
+                      <div className="text-right">
+                        <p className="text-xs text-muted-foreground">Fee</p>
+                        <p className="text-sm font-semibold">
+                          {tx.fee ? (Number(tx.fee) / 10000000).toFixed(7) : "0"} Pi
+                        </p>
+                      </div>
+                      {tx.hash && (
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => viewOnExplorer(tx.hash)}
+                            title="View on explorer"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

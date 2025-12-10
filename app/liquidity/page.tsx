@@ -523,14 +523,13 @@ export default function LiquidityPage() {
                     />
                   </div>
                 </div>
-                <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm">
-                  <div className="flex justify-between items-center gap-2">
-                    <span className="text-muted-foreground">Transaction Fee</span>
-                    <span className="font-medium">~0.01 Test Pi (base fee only)</span>
+                <div className="rounded-xl border-2 border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-green-500/10 to-teal-500/10 p-4 backdrop-blur-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Transaction Fee</span>
+                    <span className="text-lg font-bold text-emerald-600 dark:text-emerald-500">
+                      ~0.01 Test Pi
+                    </span>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Pool creation only requires the blockchain base fee. Platform fees apply when adding/withdrawing liquidity.
-                  </p>
                 </div>
                 <Button type="submit" className="w-full btn-gradient-primary" disabled={creating}>
                   {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
@@ -554,10 +553,10 @@ export default function LiquidityPage() {
         </div>
 
         {platformPools.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Platform Pools</CardTitle>
-              <CardDescription>Pools created on this platform</CardDescription>
+          <Card className="border border-border/50 shadow-xl rounded-2xl">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl font-bold">Platform Pools</CardTitle>
+              <CardDescription className="mt-1">Pools created on this platform</CardDescription>
             </CardHeader>
             <CardContent>
               {loadingPlatformPools ? (
@@ -709,15 +708,11 @@ export default function LiquidityPage() {
                                     )}
                                   </div>
                                   {depositForm.amountA && !loadingQuote && quoteData && (
-                                    <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm space-y-1">
-                                      <div className="flex justify-between items-center gap-2">
-                                        <span className="text-muted-foreground">Total Fee</span>
-                                        <span className="font-medium">~{parseFloat(quoteData.totalFee || "0").toFixed(7)} Test Pi</span>
-                                      </div>
-                                      <div className="flex justify-between items-center gap-2 text-xs text-muted-foreground pt-1 border-t border-border/20">
-                                        <span>Fee Breakdown:</span>
-                                        <span className="text-right">
-                                          Platform: {quoteData.platformFee || "10"} Pi + Base: ~{quoteData.baseFee || "0.01"} Pi
+                                    <div className="rounded-xl border-2 border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-green-500/10 to-teal-500/10 p-4 backdrop-blur-sm">
+                                      <div className="flex justify-between items-center">
+                                        <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Total Fee</span>
+                                        <span className="text-lg font-bold text-emerald-600 dark:text-emerald-500">
+                                          ~{parseFloat(quoteData.totalFee || "0").toFixed(7)} Test Pi
                                         </span>
                                       </div>
                                     </div>
@@ -746,7 +741,7 @@ export default function LiquidityPage() {
         )}
 
         <div className="grid gap-4 md:grid-cols-3">
-          <Card>
+          <Card className="border border-border/50 rounded-xl">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Liquidity</CardTitle>
               <Droplets className="h-4 w-4 text-muted-foreground" />
@@ -757,20 +752,18 @@ export default function LiquidityPage() {
                   .reduce((total, pool) => total + pool.volume, 0)
                   .toLocaleString(undefined, { maximumFractionDigits: 2 })}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Sum of reserves across visible pools</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border border-border/50 rounded-xl">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Visible Pools</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{displayPools.length}</div>
-              <p className="text-xs text-muted-foreground mt-1">Filtered by your search query</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border border-border/50 rounded-xl">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Trustlines</CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
@@ -781,17 +774,16 @@ export default function LiquidityPage() {
                   .reduce((total, pool) => total + pool.trustlines, 0)
                   .toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Aggregate trustlines for visible pools</p>
             </CardContent>
           </Card>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Available Pools</CardTitle>
-            <CardDescription>Browse and manage liquidity pools</CardDescription>
+        <Card className="border border-border/50 shadow-xl rounded-2xl">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-xl font-bold">Available Pools</CardTitle>
+            <CardDescription className="mt-1">Browse and manage liquidity pools</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             {isLoading && (
               <div className="flex items-center justify-center py-12 text-muted-foreground text-sm">
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading pools...
@@ -804,29 +796,24 @@ export default function LiquidityPage() {
               <div className="text-sm text-muted-foreground">No pools match your search.</div>
             )}
             <div className="space-y-4">
-              {displayPools.map((pool) => (
+                {displayPools.map((pool) => (
                 <div
                   key={pool.id}
-                  className="flex flex-col gap-4 p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                  className="flex flex-col gap-3 p-4 border border-border/50 rounded-xl hover:bg-muted/30 transition-colors"
                 >
                   <div className="flex items-center justify-between">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-lg">{pool.pair}</h3>
-                        {pool.trustlines > 50 && <Badge variant="secondary">Active</Badge>}
-                      </div>
-                      <div className="flex gap-4 text-sm">
-                        <span className="text-muted-foreground">
-                          {pool.assetA.symbol}: <span className="font-semibold">{Number.parseFloat(pool.reserves[0]?.amount ?? "0").toLocaleString()}</span>
-                        </span>
-                        <span className="text-muted-foreground">
-                          {pool.assetB.symbol}: <span className="font-semibold">{Number.parseFloat(pool.reserves[1]?.amount ?? "0").toLocaleString()}</span>
-                        </span>
+                        <h3 className="font-bold text-lg">{pool.pair}</h3>
+                        {pool.trustlines > 50 && <Badge variant="secondary" className="text-xs">Active</Badge>}
                       </div>
                       <div className="flex gap-4 text-sm text-muted-foreground">
-                        <span>Liquidity: {pool.liquidity.toLocaleString()}</span>
-                        <span>Trustlines: {pool.trustlines.toLocaleString()}</span>
-                        <span className="text-primary">Last Modified: {new Date(pool.last_modified_time).toLocaleString()}</span>
+                        <span>
+                          {pool.assetA.symbol}: <span className="font-semibold text-foreground">{Number.parseFloat(pool.reserves[0]?.amount ?? "0").toLocaleString()}</span>
+                        </span>
+                        <span>
+                          {pool.assetB.symbol}: <span className="font-semibold text-foreground">{Number.parseFloat(pool.reserves[1]?.amount ?? "0").toLocaleString()}</span>
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -925,15 +912,11 @@ export default function LiquidityPage() {
                             )}
                           </div>
                           {depositForm.amountA && !loadingQuote && quoteData && (
-                            <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm space-y-1">
-                              <div className="flex justify-between items-center gap-2">
-                                <span className="text-muted-foreground">Total Fee</span>
-                                <span className="font-medium">~{parseFloat(quoteData.totalFee || "0").toFixed(7)} Test Pi</span>
-                              </div>
-                              <div className="flex justify-between items-center gap-2 text-xs text-muted-foreground pt-1 border-t border-border/20">
-                                <span>Fee Breakdown:</span>
-                                <span className="text-right">
-                                  Platform: {quoteData.platformFee || "10"} Pi + Base: ~{quoteData.baseFee || "0.01"} Pi
+                            <div className="rounded-xl border-2 border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-green-500/10 to-teal-500/10 p-4 backdrop-blur-sm">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Total Fee</span>
+                                <span className="text-lg font-bold text-emerald-600 dark:text-emerald-500">
+                                  ~{parseFloat(quoteData.totalFee || "0").toFixed(7)} Test Pi
                                 </span>
                               </div>
                             </div>
@@ -1007,15 +990,11 @@ export default function LiquidityPage() {
                               required
                             />
                             </div>
-                          <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm">
-                            <div className="flex justify-between items-center gap-2">
-                              <span className="text-muted-foreground">Total Fee</span>
-                              <span className="font-medium">~10.01 Test Pi</span>
-                            </div>
-                            <div className="flex justify-between items-center gap-2 text-xs text-muted-foreground pt-1 border-t border-border/20">
-                              <span>Fee Breakdown:</span>
-                              <span className="text-right">
-                                Platform: 10 Pi + Base: ~0.01 Pi
+                          <div className="rounded-xl border-2 border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-green-500/10 to-teal-500/10 p-4 backdrop-blur-sm">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Total Fee</span>
+                              <span className="text-lg font-bold text-emerald-600 dark:text-emerald-500">
+                                ~10.01 Test Pi
                               </span>
                             </div>
                           </div>

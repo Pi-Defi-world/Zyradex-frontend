@@ -5,7 +5,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { useLogger } from "@/hooks/use-logger"
 import { Loader2 } from "lucide-react"
@@ -71,6 +71,8 @@ export function MintForm() {
   const [assetCodeError, setAssetCodeError] = useState("")
   const [mintFee, setMintFee] = useState<{ platformFee: string; baseFee: string; totalFee: string } | null>(null)
   const [loadingFee, setLoadingFee] = useState(false)
+  const [showSecretDialog, setShowSecretDialog] = useState(false)
+  const [distributorSecret, setDistributorSecret] = useState("")
 
 
   const validateAssetCode = (value: string): string => {
@@ -89,7 +91,7 @@ export function MintForm() {
     setAssetCodeError(validateAssetCode(value))
   }
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  const handleMintClick = (event: React.FormEvent) => {
     event.preventDefault()
 
     const assetCodeValidationError = validateAssetCode(formData.assetCode)
@@ -99,7 +101,16 @@ export function MintForm() {
       return
     }
 
-    if (!formData.distributorSecret.trim()) {
+    if (!formData.totalSupply || parseFloat(formData.totalSupply) <= 0) {
+      toast({ title: "Invalid total supply", description: "Total supply must be a positive number.", variant: "destructive" })
+      return
+    }
+
+    setShowSecretDialog(true)
+  }
+
+  const handleSubmit = async () => {
+    if (!distributorSecret.trim()) {
       toast({ 
         title: "Secret seed required", 
         description: "Please enter your secret key to sign the transaction.",
@@ -119,7 +130,7 @@ export function MintForm() {
 
       addLog("info", `Minting ${formData.totalSupply} ${formData.assetCode}`)
       await mintToken({
-        distributorSecret: formData.distributorSecret.trim(),
+        distributorSecret: distributorSecret.trim(),
         assetCode: formData.assetCode,
         totalSupply: totalSupplyNum,
         name: formData.tokenName || formData.assetCode,
@@ -130,6 +141,8 @@ export function MintForm() {
       addLog("success", "Token minted successfully")
       toast({ title: "Token minted", description: `${formData.totalSupply} ${formData.assetCode} issued.` })
       setFormData({ distributorSecret: "", assetCode: "", totalSupply: "", tokenName: "", description: "", homeDomain: "" })
+      setDistributorSecret("")
+      setShowSecretDialog(false)
       setAssetCodeError("")
       
       // Refresh balances after successful minting to show new token
@@ -148,116 +161,134 @@ export function MintForm() {
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="distributorSecret" className="text-base font-medium">
-          Wallet Secret Key (Required)
-        </Label>
-        <Input
-          id="distributorSecret"
-          type="password"
-          placeholder="Enter your wallet secret key (starts with W...)"
-          value={formData.distributorSecret}
-          onChange={(event) => setFormData((prev) => ({ ...prev, distributorSecret: event.target.value }))}
-          required
-        />
-        <p className="text-sm text-muted-foreground">Enter your wallet secret key to sign the mint transaction. We don't store your secret key.</p>
+    <form onSubmit={handleMintClick} className="space-y-4">
+      <div className="space-y-3">
+        <div className="relative">
+          <div className="absolute top-3 left-4 text-xs text-muted-foreground font-medium z-10">Token Code</div>
+          <Input
+            id="assetCode"
+            placeholder="MYTOKEN"
+            value={formData.assetCode}
+            onChange={handleAssetCodeChange}
+            required
+            maxLength={12}
+            className={`rounded-2xl p-4 pt-8 border border-border/50 ${assetCodeError ? "border-destructive focus-visible:ring-destructive" : ""}`}
+          />
+        </div>
+        {assetCodeError && <p className="text-sm text-destructive font-medium -mt-2">{assetCodeError}</p>}
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="assetCode" className="text-base font-medium">
-          Token Code
-        </Label>
-        <Input
-          id="assetCode"
-          placeholder="e.g., MYTOKEN"
-          value={formData.assetCode}
-          onChange={handleAssetCodeChange}
-          required
-          maxLength={12}
-          className={`border-border ${assetCodeError ? "border-destructive focus-visible:ring-destructive" : ""}`}
-        />
-        {assetCodeError && <p className="text-sm text-destructive font-medium">{assetCodeError}</p>}
-        <p className="text-sm text-muted-foreground">1–12 alphanumeric characters, no spaces or symbols</p>
+      <div className="space-y-3">
+        <div className="relative">
+          <div className="absolute top-3 left-4 text-xs text-muted-foreground font-medium z-10">Token Name </div>
+          <Input
+            id="tokenName"
+            placeholder="Token display name"
+            value={formData.tokenName}
+            onChange={(event) => setFormData((prev) => ({ ...prev, tokenName: event.target.value }))}
+            className="rounded-2xl p-4 pt-8 border border-border/50"
+          />
+        </div>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="tokenName" className="text-base font-medium">
-          Token Name
-        </Label>
-        <Input
-          id="tokenName"
-          placeholder="Token display name"
-          value={formData.tokenName}
-          onChange={(event) => setFormData((prev) => ({ ...prev, tokenName: event.target.value }))}
-        />
+      <div className="space-y-3">
+        <div className="relative">
+          <div className="absolute top-3 left-4 text-xs text-muted-foreground font-medium z-10">Total Supply</div>
+          <Input
+            id="totalSupply"
+            type="number"
+            min="0"
+            step="any"
+            placeholder="1000"
+            value={formData.totalSupply}
+            onChange={(event) => setFormData((prev) => ({ ...prev, totalSupply: event.target.value }))}
+            required
+            className="rounded-2xl p-4 pt-8 border border-border/50"
+          />
+        </div>
       </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="description" className="text-base font-medium">
-          Description
-        </Label>
-        <Input
-          id="description"
-          placeholder="Short description"
-          value={formData.description}
-          onChange={(event) => setFormData((prev) => ({ ...prev, description: event.target.value }))}
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="totalSupply" className="text-base font-medium">
-          Total Supply
-        </Label>
-        <Input
-          id="totalSupply"
-          type="number"
-          min="0"
-          step="any"
-          placeholder="1000"
-          value={formData.totalSupply}
-          onChange={(event) => setFormData((prev) => ({ ...prev, totalSupply: event.target.value }))}
-          required
-          className="border-border"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="homeDomain" className="text-base font-medium">
-          Home Domain (optional)
-        </Label>
-        <Input
-          id="homeDomain"
-          placeholder="e.g., dex.example.com"
-          value={formData.homeDomain}
-          onChange={(event) => setFormData((prev) => ({ ...prev, homeDomain: event.target.value }))}
-          className="border-border"
-        />
-      </div>
-
-      {error && <p className="text-sm text-destructive">{error.message}</p>}
 
       {mintFee && (
-        <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm space-y-1">
-          <div className="flex justify-between items-center gap-2">
-            <span className="text-muted-foreground">Total Fee</span>
-            <span className="font-medium">~{parseFloat(mintFee.totalFee).toFixed(7)} Test Pi</span>
-          </div>
-          <div className="flex justify-between items-center gap-2 text-xs text-muted-foreground pt-1 border-t border-border/20">
-            <span>Fee Breakdown:</span>
-            <span className="text-right">
-              Platform: {mintFee.platformFee} Pi + Base: ~{mintFee.baseFee} Pi
+        <div className="rounded-xl border-2 border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-green-500/10 to-teal-500/10 p-4 backdrop-blur-sm">
+          <div className="flex justify-between items-center">
+            <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Total Fee</span>
+            <span className="text-lg font-bold text-emerald-600 dark:text-emerald-500">
+              ~{parseFloat(mintFee.totalFee).toFixed(7)} Test Pi
             </span>
           </div>
         </div>
       )}
 
-      <Button type="submit" className="w-full btn-gradient-primary" disabled={isLoading}>
-        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        {isLoading ? "Minting..." : "Mint Token"}
+      {error && <p className="text-sm text-destructive">{error.message}</p>}
+
+      <Button 
+        type="submit" 
+        className="w-full h-14 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 text-white font-bold text-lg rounded-xl shadow-lg hover:shadow-emerald-500/25 transition-all disabled:opacity-50" 
+        disabled={isLoading || !formData.assetCode || !formData.totalSupply}
+      >
+        {isLoading ? (
+          <>
+            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+            Minting...
+          </>
+        ) : (
+          "Mint Token"
+        )}
       </Button>
     </form>
 
+    <Dialog open={showSecretDialog} onOpenChange={setShowSecretDialog}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Confirm Mint</DialogTitle>
+          <DialogDescription>
+            Enter your secret seed to sign and execute the mint transaction.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Secret Seed</label>
+            <Input
+              type="password"
+              placeholder="Enter your secret seed (starts with S...)"
+              value={distributorSecret}
+              onChange={(event) => setDistributorSecret(event.target.value)}
+              className="font-mono"
+              autoFocus
+            />
+            <p className="text-xs text-muted-foreground">
+              We don't store your secret seed. It's only used to sign this transaction.
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => {
+                setShowSecretDialog(false)
+                setDistributorSecret("")
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="flex-1 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600"
+              onClick={handleSubmit}
+              disabled={isLoading || !distributorSecret.trim()}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Minting...
+                </>
+              ) : (
+                "Confirm Mint"
+              )}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
     </>
   )
 }
