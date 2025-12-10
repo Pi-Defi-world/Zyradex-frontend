@@ -6,7 +6,6 @@ import { Wallet, Activity, Coins, TrendingUp, Droplets, Shield, Loader2 } from "
 
 import { TokenCard, type TokenSummary } from "@/components/token-card"
 import { TransactionHistory } from "@/components/transaction-history"
-import { ActivityChart, type ActivityPoint } from "@/components/activity-chart"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -41,24 +40,6 @@ const formatMintedToken = (token: TokenSummary): TokenSummary => ({
   description: token.description,
 })
 
-const buildActivitySeries = (operations: ReturnType<typeof useAccountOperations>["operations"]): ActivityPoint[] => {
-  if (!operations.length) return []
-
-  const aggregation = new Map<string, number>()
-
-  operations.forEach((op) => {
-    if (!op.createdAt) return
-    const date = new Date(op.createdAt)
-    const label = date.toLocaleDateString(undefined, { month: "short", day: "numeric" })
-    const amount = Number.parseFloat(op.amount || "0")
-    const signedAmount = op.action?.includes("sent") || op.action?.includes("merged") ? -Math.abs(amount) : Math.abs(amount)
-    aggregation.set(label, (aggregation.get(label) ?? 0) + (Number.isFinite(signedAmount) ? signedAmount : 0))
-  })
-
-  return Array.from(aggregation.entries())
-    .map(([date, volume]) => ({ date, volume: Number(volume.toFixed(3)) }))
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-}
 
 export default function DashboardPage() {
   const { user, isAuthenticated } = usePi()
@@ -115,8 +96,6 @@ export default function DashboardPage() {
         })),
     [mintedTokens]
   )
-
-  const activitySeries = useMemo(() => buildActivitySeries(operations), [operations])
 
   const stats = [
     {
@@ -242,12 +221,6 @@ export default function DashboardPage() {
                   <CardTitle>Recent Activity</CardTitle>
                   <CardDescription>Transaction flow aggregated by day</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <ActivityChart
-                    series={activitySeries}
-                    isLoading={operationsLoading && !activitySeries.length}
-                  />
-                </CardContent>
               </Card>
             </TabsContent>
             <TabsContent value="history" className="space-y-4">
