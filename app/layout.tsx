@@ -14,7 +14,7 @@ import "./globals.css"
 export const metadata: Metadata = {
   title: "ZyraDex - Build DeFi on Pi Network",
   description: "Mint tokens, create liquidity pools, and manage assets on Pi Network",
-  generator: "Solie, Junman, RichAdams, Tm-Daniel ",
+  generator: "Solie, Junman ",
 }
 
 export default function RootLayout({
@@ -33,7 +33,7 @@ export default function RootLayout({
             
             if (window.Pi) {
               console.log('✅ Pi SDK loaded, initializing...');
-              window.Pi.init({ version: "2.0", sandbox: true });
+              window.Pi.init({ version: "2.0" });
               console.log('✅ Pi SDK initialized successfully');
             } else {
               console.warn('⚠️ Pi SDK not available - this app requires Pi Browser');
