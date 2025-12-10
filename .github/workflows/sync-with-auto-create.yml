@@ -60,6 +60,7 @@ jobs:
         env:
           DESTINATION_REPO: "https://junman140:${{ secrets.API_TOKEN_GITHUB }}@github.com/junman140/tokenization-fe.git"
         run: |
+          set -e
           # Clone the repository
           git clone "$DESTINATION_REPO" --branch main --single-branch temp_zyra_dex || {
             echo "⚠️ Failed to clone, trying to initialize..."

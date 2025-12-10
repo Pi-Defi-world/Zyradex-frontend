@@ -23,6 +23,7 @@ jobs:
         env:
           DESTINATION_REPO: "https://junman140:${{ secrets.API_TOKEN_GITHUB }}@github.com/junman140/tokenization-fe.git"
         run: |
+          set -e
           # Try to clone main branch first, if it fails, create the repo structure
           if git clone "$DESTINATION_REPO" --branch main --single-branch temp_zyra_dex 2>/dev/null; then
             echo "✅ Cloned main branch successfully"
