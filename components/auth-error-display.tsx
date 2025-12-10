@@ -20,21 +20,44 @@ export function AuthErrorDisplay({ error, className = "", onRetry }: AuthErrorDi
   const router = useRouter()
   const { isAuthenticated } = usePi()
 
-  // Only show for auth-related errors
+  // Show for auth-related errors and Pi API errors
   const isAuthError = error?.status === 401 || error?.status === 403
+  const isPiApiError = error?.status === 503 || 
+    error?.message?.toLowerCase().includes("pi network api") ||
+    error?.message?.toLowerCase().includes("pi api")
 
-  if (!error || !isAuthError) {
+  if (!error || (!isAuthError && !isPiApiError)) {
     return null
   }
 
+  // Determine alert variant and title based on error type
+  const isPiApiError = error?.status === 503 || 
+    error?.message?.toLowerCase().includes("pi network api") ||
+    error?.message?.toLowerCase().includes("pi api")
+  
+  const alertVariant = isPiApiError ? "default" : "destructive"
+  const alertTitle = isPiApiError 
+    ? "Pi Network API Temporarily Unavailable" 
+    : "Authentication Required"
+
   return (
-    <Alert variant="destructive" className={className}>
+    <Alert variant={alertVariant} className={className}>
       <AlertCircle className="h-4 w-4" />
-      <AlertTitle>Authentication Required</AlertTitle>
+      <AlertTitle>{alertTitle}</AlertTitle>
       <AlertDescription className="mt-2 space-y-3">
-        <p className="text-sm">{error.message || "Your session has expired. Please sign in again."}</p>
+        <p className="text-sm">
+          {isPiApiError 
+            ? "Pi Network's API is temporarily unavailable. This is usually a temporary issue. Please wait a moment and try again."
+            : error.message || "Your session has expired. Please sign in again."
+          }
+        </p>
         {error.suggestion && (
           <p className="text-xs text-muted-foreground">{error.suggestion}</p>
+        )}
+        {isPiApiError && (
+          <p className="text-xs text-muted-foreground">
+            The error is on Pi Network's side, not with your account. Your authentication should still be valid once Pi Network's API is back online.
+          </p>
         )}
         <div className="flex gap-2 mt-3">
           {onRetry && (
@@ -44,10 +67,10 @@ export function AuthErrorDisplay({ error, className = "", onRetry }: AuthErrorDi
               onClick={onRetry}
               className="h-8"
             >
-              Retry
+              {isPiApiError ? "Retry Now" : "Retry"}
             </Button>
           )}
-          {!isAuthenticated && (
+          {!isAuthenticated && !isPiApiError && (
             <Button
               variant="default"
               size="sm"

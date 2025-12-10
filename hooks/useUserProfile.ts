@@ -105,9 +105,31 @@ export const useUserProfile = (): UseUserProfileReturn => {
         backendUser = result.user
         token = result.token
       } catch (signInError: any) {
-        // If signin fails with "Invalid access token", clear auth and retry with fresh token
         const errorMessage = signInError?.message?.toLowerCase() || ""
-        if (errorMessage.includes("invalid") || errorMessage.includes("access token") || errorMessage.includes("expired")) {
+        const statusCode = (signInError as any)?.status || signInError?.response?.status
+        
+        // Handle Pi Network API errors (500) - these are often temporary
+        if (statusCode === 500 || errorMessage.includes("pi network api")) {
+          console.log("⚠️ Pi Network API error detected, may be temporary. Retrying once...")
+          // Wait a bit before retry
+          await new Promise(resolve => setTimeout(resolve, 2000))
+          
+          try {
+            // Retry with the same token (it might be a temporary Pi API issue)
+            const retryResult = await signIn(payload)
+            backendUser = retryResult.user
+            token = retryResult.token
+            console.log("✅ Retry successful after Pi API error")
+          } catch (retryError: any) {
+            // If retry also fails, throw with clearer message
+            const enhancedError = new Error("Pi Network API is currently unavailable. This is usually temporary. Please try again in a few moments.")
+            ;(enhancedError as any).status = 503
+            ;(enhancedError as any).isPiApiError = true
+            throw enhancedError
+          }
+        }
+        // If signin fails with "Invalid access token", clear auth and retry with fresh token
+        else if (errorMessage.includes("invalid") || errorMessage.includes("access token") || errorMessage.includes("expired")) {
           console.log("🔄 Access token invalid, getting fresh token...")
           // Clear the old auth result and get a fresh token
           const freshSession = await authenticate()
@@ -157,14 +179,17 @@ export const useUserProfile = (): UseUserProfileReturn => {
       if (typeof window !== "undefined") {
         const errorMessage = apiError.message?.toLowerCase() || ""
         const statusCode = (apiError as any)?.status || (err as any)?.response?.status
+        const isPiApiError = (err as any)?.isPiApiError || errorMessage.includes("pi network api") || errorMessage.includes("pi api")
+        
+        // Don't clear storage for Pi API errors (503) - these are temporary and user might still be authenticated
+        // Only clear for actual auth failures
         const isAuthError = 
-          statusCode === 401 || 
-          statusCode === 403 || 
-          statusCode === 500 ||
+          (statusCode === 401 || statusCode === 403) ||
+          (statusCode === 500 && !isPiApiError) ||
           errorMessage.includes("invalid") ||
           errorMessage.includes("not found") ||
           errorMessage.includes("unauthorized") ||
-          errorMessage.includes("internal server error") ||
+          (!isPiApiError && errorMessage.includes("internal server error")) ||
           errorMessage.includes("access token")
         
         if (isAuthError) {

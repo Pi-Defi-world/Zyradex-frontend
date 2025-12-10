@@ -114,7 +114,24 @@ const attemptTokenRefresh = async (): Promise<string | null> => {
         timeout: REQUEST_TIMEOUT,
       })
       
-      const result = await signInClient.post<{ user: any; token: string }>("/users/signin", payload).then(res => res.data)
+      let result
+      try {
+        result = await signInClient.post<{ user: any; token: string }>("/users/signin", payload).then(res => res.data)
+      } catch (signInErr: any) {
+        // If signin itself fails with 500 (Pi API error), don't clear auth - it's a temporary issue
+        const statusCode = signInErr?.response?.status || signInErr?.status
+        const errorMessage = signInErr?.response?.data?.message || signInErr?.message || ""
+        
+        if (statusCode === 500 && (errorMessage.toLowerCase().includes("pi network") || errorMessage.toLowerCase().includes("pi api"))) {
+          console.log("⚠️ Pi Network API error during token refresh - this is temporary")
+          // Return null to indicate refresh failed, but don't clear auth data
+          // The user might still be authenticated, just Pi API is down
+          return null
+        }
+        // Re-throw other errors
+        throw signInErr
+      }
+      
       const newToken = result.token
 
       // Validate token is not expired
@@ -142,13 +159,26 @@ const attemptTokenRefresh = async (): Promise<string | null> => {
     } catch (error: any) {
       console.error("🔄 Failed to refresh token:", error)
       
-      // If refresh fails, clear all auth data
-      clearAuthToken()
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("dex_user_token")
-        localStorage.removeItem("dex_user_profile")
-        localStorage.removeItem("pi_access_token")
-        localStorage.removeItem("pi_user")
+      // Check if it's a Pi API error (temporary issue)
+      const statusCode = error?.response?.status || error?.status
+      const errorMessage = error?.response?.data?.message || error?.message || ""
+      const isPiApiError = statusCode === 500 && (
+        errorMessage.toLowerCase().includes("pi network api") || 
+        errorMessage.toLowerCase().includes("pi api")
+      )
+      
+      // Don't clear auth data for Pi API errors - they're temporary
+      if (!isPiApiError) {
+        // If refresh fails, clear all auth data
+        clearAuthToken()
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("dex_user_token")
+          localStorage.removeItem("dex_user_profile")
+          localStorage.removeItem("pi_access_token")
+          localStorage.removeItem("pi_user")
+        }
+      } else {
+        console.log("⚠️ Pi Network API error during refresh - not clearing auth data (temporary issue)")
       }
       
       return null
@@ -252,7 +282,16 @@ export const toApiError = (error: unknown): ApiError => {
       } else if (status === 404) {
         message = errorData?.message || "Resource not found"
       } else if (status === 500) {
-        message = errorData?.message || "Server error. Please try again later."
+        // Check if it's a Pi Network API error (temporary issue)
+        const isPiApiError = errorData?.message?.toLowerCase().includes("pi network api") || 
+                            errorData?.message?.toLowerCase().includes("pi api") ||
+                            message.toLowerCase().includes("pi network api") ||
+                            message.toLowerCase().includes("pi api")
+        if (isPiApiError) {
+          message = errorData?.message || "Pi Network API is temporarily unavailable. Please try again in a few moments."
+        } else {
+          message = errorData?.message || "Server error. Please try again later."
+        }
       } else if (status === 400) {
         message = errorData?.message || "Invalid request. Please check your input."
       } else if (status === 401) {
@@ -267,10 +306,18 @@ export const toApiError = (error: unknown): ApiError => {
       }
     }
 
+    // Detect Pi Network API errors (temporary issues)
+    const isPiApiError = message?.toLowerCase().includes("pi network api") || 
+                        message?.toLowerCase().includes("pi api") ||
+                        errorData?.message?.toLowerCase().includes("pi network api") ||
+                        errorData?.message?.toLowerCase().includes("pi api")
+
     // Build suggestion based on error type
     let suggestion = errorData?.suggestion
     if (!suggestion) {
-      if (canRetry && status !== 429) {
+      if (isPiApiError) {
+        suggestion = "This is a temporary issue with Pi Network's API, not your account. Please wait a moment and try again."
+      } else if (canRetry && status !== 429) {
         suggestion = "This error may be temporary. Please try again."
       } else if (status === 429) {
         const retryAfter = errorData?.retryAfter || 60
@@ -282,9 +329,14 @@ export const toApiError = (error: unknown): ApiError => {
       }
     }
 
+    // For Pi API errors, treat as 503 (service unavailable) rather than 500 (server error)
+    // This prevents clearing auth data and indicates it's temporary
+    const finalStatus = (status === 500 && isPiApiError) ? 503 : status
+    const finalCanRetry = isPiApiError ? true : canRetry
+
     return {
       message,
-      status,
+      status: finalStatus,
       code: errorData?.code,
       details: errorData?.details || errorData?.error,
       suggestion,
@@ -292,14 +344,24 @@ export const toApiError = (error: unknown): ApiError => {
       reason: errorData?.reason,
       retryAfter: errorData?.retryAfter,
       requestId: errorData?.requestId,
-      canRetry,
+      canRetry: finalCanRetry,
     }
   }
 
   if (error instanceof Error) {
+    const message = error.message || "An error occurred"
+    // Check if it's a Pi API error (even if it's an Error instance, not AxiosError)
+    const isPiApiError = message.toLowerCase().includes("pi network api") || 
+                        message.toLowerCase().includes("pi api") ||
+                        (error as any).isPiApiError === true
+    
     return { 
-      message: error.message || "An error occurred",
-      canRetry: false
+      message,
+      status: isPiApiError ? 503 : undefined,
+      canRetry: isPiApiError,
+      suggestion: isPiApiError 
+        ? "This is a temporary issue with Pi Network's API, not your account. Please wait a moment and try again."
+        : undefined
     }
   }
 
