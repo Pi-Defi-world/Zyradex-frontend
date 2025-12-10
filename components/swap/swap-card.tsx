@@ -56,7 +56,29 @@ export function SwapCard() {
 
   // Get user balances for Token A dropdown
   const publicKey = profile?.public_key || localWallet || user?.wallet_address || undefined
-  const { balances, refresh: refreshBalances } = useAccountBalances(publicKey)
+  const { balances: rawBalances, refresh: refreshBalances } = useAccountBalances(publicKey)
+  
+  // Filter out duplicate native entries (ensure only one native/Test Pi entry)
+  const balances = useMemo(() => {
+    const seen = new Set<string>()
+    return rawBalances.filter((balance) => {
+      const isNative = balance.assetType === "native" || balance.assetCode === "native" || balance.assetCode === "Test Pi"
+      if (isNative) {
+        if (seen.has("native")) {
+          return false // Skip duplicate native entries
+        }
+        seen.add("native")
+        return true
+      }
+      // For non-native tokens, use code:issuer as unique key
+      const key = balance.assetIssuer ? `${balance.assetCode}:${balance.assetIssuer}` : balance.assetCode
+      if (seen.has(key)) {
+        return false // Skip duplicates
+      }
+      seen.add(key)
+      return true
+    })
+  }, [rawBalances])
 
   // Token input state
   const [tokenA, setTokenA] = useState<string>("")

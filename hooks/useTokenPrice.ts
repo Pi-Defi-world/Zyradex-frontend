@@ -102,71 +102,90 @@ export const useTokenPrices = (balances: Array<{ assetCode?: string; assetIssuer
   const [loadingTokens, setLoadingTokens] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    const fetchPrices = async () => {
-      const priceMap = new Map<string, number | null>()
-      const loadingSet = new Set<string>()
+    // Debounce to avoid too many API calls
+    const timeoutId = setTimeout(() => {
+      const fetchPrices = async () => {
+        const priceMap = new Map<string, number | null>()
+        const loadingSet = new Set<string>()
 
-      for (const balance of balances) {
-        if (balance.assetType === "native") {
-          priceMap.set("native", 1) // Native Pi is worth 1 Pi
-          continue
-        }
+        // Process tokens in batches to avoid rate limiting
+        const tokensToFetch = balances.filter(
+          (b) => b.assetType !== "native" && b.assetCode
+        )
 
-        if (!balance.assetCode) continue
+        // Process in smaller batches with delays
+        const batchSize = 3
+        for (let i = 0; i < tokensToFetch.length; i += batchSize) {
+          const batch = tokensToFetch.slice(i, i + batchSize)
+          
+          await Promise.all(
+            batch.map(async (balance) => {
+              const tokenKey = balance.assetIssuer 
+                ? `${balance.assetCode}:${balance.assetIssuer}` 
+                : balance.assetCode!
 
-        const tokenKey = balance.assetIssuer 
-          ? `${balance.assetCode}:${balance.assetIssuer}` 
-          : balance.assetCode
+              loadingSet.add(tokenKey)
 
-        loadingSet.add(tokenKey)
+              try {
+                const tokenDescriptor = balance.assetIssuer 
+                  ? `${balance.assetCode}:${balance.assetIssuer}` 
+                  : balance.assetCode!
 
-        try {
-          const tokenDescriptor = balance.assetIssuer 
-            ? `${balance.assetCode}:${balance.assetIssuer}` 
-            : balance.assetCode
+                const poolsResponse = await getPoolsForPair({
+                  tokenA: tokenDescriptor,
+                  tokenB: "native",
+                })
 
-          const poolsResponse = await getPoolsForPair({
-            tokenA: tokenDescriptor,
-            tokenB: "native",
-          })
+                if (poolsResponse.success && poolsResponse.pools.length > 0) {
+                  const pool = poolsResponse.pools[0]
+                  try {
+                    const quote = await quoteSwap({
+                      poolId: pool.id,
+                      from: tokenDescriptor,
+                      to: "native",
+                      amount: "1",
+                      slippagePercent: 1,
+                    })
 
-          if (poolsResponse.success && poolsResponse.pools.length > 0) {
-            const pool = poolsResponse.pools[0]
-            try {
-              const quote = await quoteSwap({
-                poolId: pool.id,
-                from: tokenDescriptor,
-                to: "native",
-                amount: "1",
-                slippagePercent: 1,
-              })
-
-              if (quote.success && quote.expectedOutput) {
-                const price = parseFloat(quote.expectedOutput)
-                priceMap.set(tokenKey, isNaN(price) ? null : price)
-              } else {
+                    if (quote.success && quote.expectedOutput) {
+                      const price = parseFloat(quote.expectedOutput)
+                      priceMap.set(tokenKey, isNaN(price) ? null : price)
+                    } else {
+                      priceMap.set(tokenKey, null)
+                    }
+                  } catch {
+                    priceMap.set(tokenKey, null)
+                  }
+                } else {
+                  priceMap.set(tokenKey, null)
+                }
+              } catch {
                 priceMap.set(tokenKey, null)
+              } finally {
+                loadingSet.delete(tokenKey)
               }
-            } catch {
-              priceMap.set(tokenKey, null)
-            }
-          } else {
-            priceMap.set(tokenKey, null)
+            })
+          )
+
+          // Add delay between batches to avoid rate limiting
+          if (i + batchSize < tokensToFetch.length) {
+            await new Promise((resolve) => setTimeout(resolve, 500))
           }
-        } catch {
-          priceMap.set(tokenKey, null)
-        } finally {
-          loadingSet.delete(tokenKey)
         }
+
+        // Set native price
+        priceMap.set("native", 1)
+
+        setPrices(priceMap)
+        setLoadingTokens(loadingSet)
       }
 
-      setPrices(priceMap)
-      setLoadingTokens(loadingSet)
-    }
+      if (balances.length > 0) {
+        fetchPrices()
+      }
+    }, 500) // Debounce by 500ms
 
-    if (balances.length > 0) {
-      fetchPrices()
-    }
+    return () => clearTimeout(timeoutId)
   }, [balances])
 
   const getPrice = (assetCode?: string, assetIssuer?: string, assetType?: string): number | null => {
