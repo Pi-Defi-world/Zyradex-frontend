@@ -409,7 +409,7 @@ export function SwapCard() {
           </div>
 
             {/* Swap Button */}
-            <div className="flex justify-center my-2 relative z-20">
+            <div className="flex justify-center mt-2 mb-4 relative z-20">
             <Button
               variant="outline"
               size="icon"

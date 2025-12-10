@@ -22,15 +22,12 @@ export default function HistoryPage() {
   const [localWallet, setLocalWallet] = useState<string | null>(null)
   const [cursor, setCursor] = useState<string | undefined>(undefined)
   const [order, setOrder] = useState<"asc" | "desc">("desc")
-
-  // Priority: profile.public_key (from DB) > localWallet (from localStorage)
   const publicKey = profile?.public_key || localWallet || undefined
 
   React.useEffect(() => {
     if (typeof window !== "undefined") {
       const stored = getStoredWallet()
       setLocalWallet(stored)
-      // Sync with profile public_key if available
       if (profile?.public_key && stored !== profile.public_key) {
         localStorage.setItem("zyradex-wallet-address", profile.public_key)
         setLocalWallet(profile.public_key)
@@ -60,7 +57,6 @@ export default function HistoryPage() {
   }
 
   const handlePrevPage = () => {
-    // For previous page, we'd need to track history or reset
     setCursor(undefined)
   }
 
@@ -105,7 +101,7 @@ export default function HistoryPage() {
           <Card>
             <CardHeader>
               <CardTitle>Transaction History</CardTitle>
-              <CardDescription>View your transaction history on the Pi Network</CardDescription>
+              <CardDescription>View your transaction history on Zyradex</CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground text-center py-8">
