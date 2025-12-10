@@ -16,12 +16,14 @@ jobs:
       - name: Push source to Vercel repo
         uses: cpina/github-action-push-to-another-repository@main
         env:
-          API_TOKEN_GITHUB: ${{ secrets.DEPLOY_TOKEN }}
+          API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
         with:
-          source-directory: '.'       
+          source-directory: '.'
           destination-github-username: 'junman140'
+          destination-repository-username: 'junman140'
           destination-repository-name: 'tokenization-fe'
           user-email: 'github-actions[bot]@users.noreply.github.com'
           user-name: 'GitHub Actions'
           target-branch: 'main'
           commit-message: 'Sync source code for Vercel build 🚀'
+          create-target-branch-if-needed: 'true'
