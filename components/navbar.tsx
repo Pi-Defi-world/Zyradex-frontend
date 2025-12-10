@@ -39,7 +39,7 @@ function MobileBottomNav() {
 
   const navItems = [
     { href: "/", icon: Home, label: "Home" },
-    { href: "/mint", icon: Coins, label: "Mint" },
+    { href: "/mint", icon: Coins, label: "LaunchPad" },
     { href: "/swap", icon: ArrowRightLeft, label: "Swap"},
     { href: "/liquidity", icon: Droplets, label: "Liquidity" },
     { href: "/profile", icon: User, label: "Profile" },
@@ -125,7 +125,7 @@ export function Navbar({ isConnected = false, onConnect }: NavbarProps) {
           <div className="hidden md:flex items-center space-x-6">
             <Link href="/" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Home</Link>
             <Link href="/swap" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Swap</Link>
-            <Link href="/mint" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Mint</Link>
+            <Link href="/mint" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">LaunchPad</Link>
             <Link href="/liquidity" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Liquidity</Link>
             <Link href="/profile" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Profile</Link>
           </div>

@@ -161,7 +161,7 @@ export default function LiquidityPage() {
       .finally(() => {
         setLoadingPlatformPools(false)
       })
-  }, [])
+  }, [refreshKey])
 
 
   const { pools, isLoading, error } = useLiquidityPools({ limit: 30 }, { refreshKey })
@@ -384,7 +384,7 @@ export default function LiquidityPage() {
                     <Label htmlFor="tokenA-select">Token A</Label>
                     {userTokens.length > 0 ? (
                       <Select
-                        value={createForm.tokenACode && createForm.tokenAIssuer ? `${createForm.tokenACode}:${createForm.tokenAIssuer}` : ""}
+                        value={createForm.tokenACode === "native" ? "native" : (createForm.tokenACode && createForm.tokenAIssuer ? `${createForm.tokenACode}:${createForm.tokenAIssuer}` : "")}
                         onValueChange={(value: string) => {
                           if (value === "native") {
                             setCreateForm((prev) => ({ ...prev, tokenACode: "native", tokenAIssuer: "" }))
@@ -435,7 +435,7 @@ export default function LiquidityPage() {
                     <Label htmlFor="tokenB-select">Token B</Label>
                     {userTokens.length > 0 ? (
                       <Select
-                        value={createForm.tokenBCode && createForm.tokenBIssuer ? `${createForm.tokenBCode}:${createForm.tokenBIssuer}` : ""}
+                        value={createForm.tokenBCode === "native" ? "native" : (createForm.tokenBCode && createForm.tokenBIssuer ? `${createForm.tokenBCode}:${createForm.tokenBIssuer}` : "")}
                         onValueChange={(value: string) => {
                           if (value === "native") {
                             setCreateForm((prev) => ({ ...prev, tokenBCode: "native", tokenBIssuer: "" }))
@@ -552,29 +552,127 @@ export default function LiquidityPage() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {platformPools.map((platformPool) => (
-                    <div
-                      key={platformPool.poolId}
-                      className="flex items-center justify-between p-3 rounded-lg border bg-card"
-                    >
-                      <div className="flex-1">
-                        <div className="font-medium">
-                          {platformPool.baseToken}/{platformPool.quoteToken}
+                  {platformPools.map((platformPool) => {
+                    // Convert platform pool to ILiquidityPool format if pool data exists
+                    const poolForInteraction = platformPool.pool ? {
+                      id: platformPool.poolId,
+                      reserves: platformPool.pool.reserves,
+                      total_shares: platformPool.pool.total_shares,
+                      fee_bp: platformPool.pool.fee_bp,
+                      last_modified_time: platformPool.pool.last_modified_time,
+                      total_trustlines: "0",
+                    } as ILiquidityPool : null;
+                    const formattedPool = poolForInteraction ? formatPool(poolForInteraction) : null;
+                    
+                    return (
+                      <div
+                        key={platformPool.poolId}
+                        className="flex flex-col gap-3 p-3 rounded-lg border bg-card"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="font-medium">
+                              {platformPool.baseToken}/{platformPool.quoteToken}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              Pool ID: {platformPool.poolId.slice(0, 16)}...
+                            </div>
+                            {platformPool.pool && formattedPool && (
+                              <div className="text-xs text-muted-foreground mt-1 space-y-1">
+                                <div>Total Shares: {parseFloat(platformPool.pool.total_shares || "0").toFixed(2)}</div>
+                                <div className="flex gap-4">
+                                  <span>
+                                    {formattedPool.assetA.symbol}: <span className="font-semibold">{Number.parseFloat(formattedPool.reserves[0]?.amount ?? "0").toLocaleString()}</span>
+                                  </span>
+                                  <span>
+                                    {formattedPool.assetB.symbol}: <span className="font-semibold">{Number.parseFloat(formattedPool.reserves[1]?.amount ?? "0").toLocaleString()}</span>
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                            {platformPool.error && (
+                              <div className="text-xs text-destructive mt-1">
+                                {platformPool.error}
+                              </div>
+                            )}
+                          </div>
+                          <Badge variant={platformPool.verified ? "default" : "secondary"}>
+                            {platformPool.verified ? "Verified" : "Unverified"}
+                          </Badge>
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          Pool ID: {platformPool.poolId.slice(0, 16)}...
-                        </div>
-                        {platformPool.pool && (
-                          <div className="text-xs text-muted-foreground mt-1">
-                            Total Shares: {parseFloat(platformPool.pool.total_shares || "0").toFixed(2)}
+                        {formattedPool && poolForInteraction && (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setActivePool(poolForInteraction)
+                                    setDepositForm(defaultDepositForm)
+                                  }}
+                                >
+                                  <Plus className="mr-2 h-4 w-4" />
+                                  Add Liquidity
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Add Liquidity to {formattedPool.pair}</DialogTitle>
+                                  <DialogDescription>Deposit matching amounts to increase the pool depth.</DialogDescription>
+                                </DialogHeader>
+                                <form className="space-y-4" onSubmit={(event) => handleDeposit(event, poolForInteraction)}>
+                                  <div className="space-y-2">
+                                    <Label htmlFor="deposit-userSecret">Secret Seed (Required)</Label>
+                                    <Input
+                                      id="deposit-userSecret"
+                                      type="password"
+                                      placeholder="Enter your secret seed (starts with S...)"
+                                      value={depositForm.userSecret}
+                                      onChange={(event) => setDepositForm((prev) => ({ ...prev, userSecret: event.target.value }))}
+                                      required
+                                    />
+                                    <p className="text-xs text-muted-foreground">Enter your secret seed to sign this transaction. We don't store your secret seed.</p>
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label>{formattedPool.assetA.symbol} Amount</Label>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      step="any"
+                                      value={depositForm.amountA}
+                                      onChange={(event) => setDepositForm((prev) => ({ ...prev, amountA: event.target.value }))}
+                                      required
+                                    />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label>{formattedPool.assetB.symbol} Amount</Label>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      step="any"
+                                      value={depositForm.amountB}
+                                      onChange={(event) => setDepositForm((prev) => ({ ...prev, amountB: event.target.value }))}
+                                      required
+                                    />
+                                  </div>
+                                  <Button type="submit" className="w-full btn-gradient-primary" disabled={adding}>
+                                    {adding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                    Add Liquidity
+                                  </Button>
+                                </form>
+                              </DialogContent>
+                            </Dialog>
+                            <Link href={`/swap?from=${formattedPool.assetA.symbol}&to=${formattedPool.assetB.symbol}`}>
+                              <Button variant="outline" size="sm">
+                                Trade
+                              </Button>
+                            </Link>
                           </div>
                         )}
                       </div>
-                      <Badge variant={platformPool.verified ? "default" : "secondary"}>
-                        {platformPool.verified ? "Verified" : "Unverified"}
-                      </Badge>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
