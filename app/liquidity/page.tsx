@@ -129,13 +129,18 @@ export default function LiquidityPage() {
       setLoadingUserTokens(true)
       getUserTokens(walletAddress)
         .then((data) => {
-          setUserTokens(
-            data.tokens.map((t) => ({
-              code: t.code,
-              issuer: t.issuer || "",
+          // Map tokens and identify native token properly
+          const tokens = data.tokens.map((t: any) => {
+            // Check if it's native token by assetType or if code is null/undefined and issuer is null
+            const isNative = t.assetType === 'native' || (!t.code && !t.issuer) || t.code === 'Test Pi'
+            return {
+              code: isNative ? 'native' : (t.code || ''),
+              issuer: isNative ? '' : (t.issuer || ''),
               amount: t.amount,
-            }))
-          )
+              assetType: t.assetType,
+            }
+          })
+          setUserTokens(tokens)
         })
         .catch((err) => {
           console.error("Failed to fetch user tokens:", err)
@@ -173,7 +178,7 @@ export default function LiquidityPage() {
   const [depositForm, setDepositForm] = useState<DepositFormState>(defaultDepositForm)
   const [withdrawForm, setWithdrawForm] = useState<WithdrawFormState>(defaultWithdrawForm)
   const [activePool, setActivePool] = useState<ILiquidityPool | null>(null)
-  const [userTokens, setUserTokens] = useState<Array<{ code: string; issuer: string | null; amount: number }>>([])
+  const [userTokens, setUserTokens] = useState<Array<{ code: string; issuer: string; amount: number; assetType?: string }>>([])
   const [loadingUserTokens, setLoadingUserTokens] = useState(false)
   const [platformPools, setPlatformPools] = useState<any[]>([])
   const [loadingPlatformPools, setLoadingPlatformPools] = useState(false)
@@ -382,7 +387,7 @@ export default function LiquidityPage() {
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="tokenA-select">Token A</Label>
-                    {userTokens.length > 0 ? (
+                    {walletAddress ? (
                       <Select
                         value={createForm.tokenACode === "native" ? "native" : (createForm.tokenACode && createForm.tokenAIssuer ? `${createForm.tokenACode}:${createForm.tokenAIssuer}` : "")}
                         onValueChange={(value: string) => {
@@ -400,7 +405,7 @@ export default function LiquidityPage() {
                         <SelectContent>
                           <SelectItem value="native">Native (Test Pi)</SelectItem>
                           {userTokens
-                            .filter((t) => t.code !== "native" || t.issuer === "")
+                            .filter((t) => t.code !== "native")
                             .map((token) => (
                               <SelectItem
                                 key={`${token.code}:${token.issuer}`}
@@ -433,7 +438,7 @@ export default function LiquidityPage() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="tokenB-select">Token B</Label>
-                    {userTokens.length > 0 ? (
+                    {walletAddress ? (
                       <Select
                         value={createForm.tokenBCode === "native" ? "native" : (createForm.tokenBCode && createForm.tokenBIssuer ? `${createForm.tokenBCode}:${createForm.tokenBIssuer}` : "")}
                         onValueChange={(value: string) => {
@@ -451,7 +456,7 @@ export default function LiquidityPage() {
                         <SelectContent>
                           <SelectItem value="native">Native (Test Pi)</SelectItem>
                           {userTokens
-                            .filter((t) => t.code !== "native" || t.issuer === "")
+                            .filter((t) => t.code !== "native")
                             .map((token) => (
                               <SelectItem
                                 key={`${token.code}:${token.issuer}`}

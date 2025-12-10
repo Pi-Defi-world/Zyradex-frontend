@@ -50,7 +50,6 @@ export default function DashboardPage() {
     if (isAuthenticated) {
       const stored = getStoredWallet()
       setLocalWallet(stored)
-      // Also sync with profile public_key if available
       if (profile?.public_key && stored !== profile.public_key) {
         if (typeof window !== "undefined") {
           localStorage.setItem("zyradex-wallet-address", profile.public_key)
