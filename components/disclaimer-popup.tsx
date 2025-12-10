@@ -21,7 +21,6 @@ export function DisclaimerPopup({ open, onOpenChange }: DisclaimerPopupProps) {
 
   const handleSaveAndContinue = () => {
     if (isAgreed) {
-      // Mark as accepted for this session
       if (typeof window !== "undefined") {
         sessionStorage.setItem("zyradex-disclaimer-accepted", "true")
       }
@@ -35,7 +34,6 @@ export function DisclaimerPopup({ open, onOpenChange }: DisclaimerPopupProps) {
         className="max-w-2xl w-[90vw] max-h-[85vh] !p-0 !grid-rows-[auto_1fr_auto] !gap-0"
         showCloseButton={false}
       >
-        {/* Header */}
         <div className="p-6 pb-4 border-b">
           <DialogTitle className="flex items-center gap-2 text-xl font-bold">
             <AlertCircle className="h-6 w-6 text-yellow-500" />
@@ -43,7 +41,6 @@ export function DisclaimerPopup({ open, onOpenChange }: DisclaimerPopupProps) {
           </DialogTitle>
         </div>
         
-        {/* Scrollable Content */}
         <div className="overflow-hidden">
           <ScrollArea className="h-full">
             <div className="p-6 space-y-4 text-sm text-muted-foreground leading-relaxed">
@@ -66,7 +63,6 @@ export function DisclaimerPopup({ open, onOpenChange }: DisclaimerPopupProps) {
           </ScrollArea>
         </div>
         
-        {/* Footer with buttons */}
         <div className="p-6 pt-4 border-t space-y-4">
           <div className="flex items-center space-x-2">
             <Checkbox 
