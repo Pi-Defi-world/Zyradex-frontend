@@ -210,6 +210,20 @@ export function MintForm() {
         </div>
       </div>
 
+      <div className="space-y-3">
+        <div className="relative">
+          <div className="absolute top-3 left-4 text-xs text-muted-foreground font-medium z-10">Domain (Optional)</div>
+          <Input
+            id="homeDomain"
+            type="text"
+            placeholder="https://example.com"
+            value={formData.homeDomain}
+            onChange={(event) => setFormData((prev) => ({ ...prev, homeDomain: event.target.value }))}
+            className="rounded-2xl p-4 pt-8 border border-border/50"
+          />
+        </div>
+      </div>
+
       {mintFee && (
         <div className="rounded-xl border-2 border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-green-500/10 to-teal-500/10 p-4 backdrop-blur-sm">
           <div className="flex justify-between items-center">

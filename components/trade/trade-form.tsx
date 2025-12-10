@@ -3,10 +3,10 @@
 import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Loader2, Search } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
@@ -54,6 +54,7 @@ export function TradeForm({ publicKey }: TradeFormProps) {
   const [price, setPrice] = useState("")
   const [buyAmount, setBuyAmount] = useState("") // For buy offers
   const [userSecret, setUserSecret] = useState<string>("")
+  const [showSecretDialog, setShowSecretDialog] = useState(false)
 
   // Search assets for buying token
   const { assets: searchResults, isLoading: searchingAssets } = useSearchAssets(
@@ -68,7 +69,7 @@ export function TradeForm({ publicKey }: TradeFormProps) {
   const { createSellOffer, isLoading: creatingSell, error: sellError } = useCreateSellOffer()
   const { createBuyOffer, isLoading: creatingBuy, error: buyError } = useCreateBuyOffer()
 
-  const handleSubmit = async () => {
+  const handleCreateOffer = () => {
     if (!publicKey) {
       toast({ title: "Wallet required", description: "Please connect your wallet first.", variant: "destructive" })
       return
@@ -91,6 +92,10 @@ export function TradeForm({ publicKey }: TradeFormProps) {
       }
     }
 
+    setShowSecretDialog(true)
+  }
+
+  const handleSubmit = async () => {
     if (!userSecret.trim()) {
       toast({ 
         title: "Secret seed required", 
@@ -101,7 +106,6 @@ export function TradeForm({ publicKey }: TradeFormProps) {
     }
 
     try {
-
       const sellingDescriptor = tokenToDescriptor(sellingTokenParsed)
       const buyingDescriptor = tokenToDescriptor(buyingTokenParsed)
 
@@ -130,6 +134,7 @@ export function TradeForm({ publicKey }: TradeFormProps) {
       setBuyAmount("")
       setPrice("")
       setUserSecret("") // Clear secret after successful transaction
+      setShowSecretDialog(false) // Close dialog
       
       // Refresh balances after successful offer creation
       // Backend already clears cache, but we refresh to get the latest data
@@ -152,24 +157,26 @@ export function TradeForm({ publicKey }: TradeFormProps) {
   return (
     <>
       <AuthErrorDisplay error={sellError || buyError || balancesError} />
-      <Card>
-        <CardHeader>
-          <CardTitle>Create Trade Offer</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <Card className="relative overflow-hidden border border-border/50 bg-card shadow-xl rounded-2xl">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-foreground">Create Trade Offer</h2>
+          </div>
+
           <Tabs value={tradeType} onValueChange={(v) => setTradeType(v as "sell" | "buy")}>
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-2 mb-6">
               <TabsTrigger value="sell">Sell</TabsTrigger>
               <TabsTrigger value="buy">Buy</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="sell" className="space-y-4 mt-4">
-              <div className="space-y-2">
-                <Label>Selling Token (You Own)</Label>
-                <Select value={sellingToken} onValueChange={setSellingToken}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select token to sell" />
-                  </SelectTrigger>
+            <TabsContent value="sell" className="space-y-4">
+              <div className="space-y-3">
+                <div className="relative">
+                  <div className="absolute top-3 left-4 text-xs text-muted-foreground font-medium z-10">Selling Token</div>
+                  <Select value={sellingToken} onValueChange={setSellingToken}>
+                    <SelectTrigger className="rounded-2xl p-4 pt-8 border border-border/50 h-auto">
+                      <SelectValue placeholder="Select token to sell" />
+                    </SelectTrigger>
                   <SelectContent>
                     {balances.map((balance) => {
                       const isNative = balance.assetType === "native"
@@ -186,19 +193,22 @@ export function TradeForm({ publicKey }: TradeFormProps) {
                       )
                     })}
                   </SelectContent>
-                </Select>
+                  </Select>
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>Buying Token</Label>
+              <div className="space-y-3">
                 <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search for token (e.g., WPI, ZYRA)"
-                    value={buyingTokenSearch}
-                    onChange={(e) => setBuyingTokenSearch(e.target.value)}
-                    className="pl-9"
-                  />
+                  <div className="absolute top-3 left-4 text-xs text-muted-foreground font-medium z-10">Buying Token</div>
+                  <div className="relative">
+                    <Search className="absolute left-4 top-4 h-4 w-4 text-muted-foreground z-10" />
+                    <Input
+                      placeholder="Search for token (e.g., WPI, ZYRA)"
+                      value={buyingTokenSearch}
+                      onChange={(e) => setBuyingTokenSearch(e.target.value)}
+                      className="rounded-2xl p-4 pt-8 pl-10 border border-border/50"
+                    />
+                  </div>
                 </div>
                 {buyingTokenSearch.length >= 2 && (
                   <div className="border rounded-lg max-h-48 overflow-y-auto">
@@ -240,38 +250,45 @@ export function TradeForm({ publicKey }: TradeFormProps) {
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label>Amount to Sell</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="any"
-                  placeholder="0.00"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
+              <div className="space-y-3">
+                <div className="relative">
+                  <div className="absolute top-3 left-4 text-xs text-muted-foreground font-medium z-10">Amount to Sell</div>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="any"
+                    placeholder="0.00"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="rounded-2xl p-4 pt-8 border border-border/50"
+                  />
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>Price (per unit)</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="any"
-                  placeholder="0.00"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                />
+              <div className="space-y-3">
+                <div className="relative">
+                  <div className="absolute top-3 left-4 text-xs text-muted-foreground font-medium z-10">Price (per unit)</div>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="any"
+                    placeholder="0.00"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    className="rounded-2xl p-4 pt-8 border border-border/50"
+                  />
+                </div>
               </div>
             </TabsContent>
 
-            <TabsContent value="buy" className="space-y-4 mt-4">
-              <div className="space-y-2">
-                <Label>Selling Token (You'll Pay With)</Label>
-                <Select value={sellingToken} onValueChange={setSellingToken}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select token to pay with" />
-                  </SelectTrigger>
+            <TabsContent value="buy" className="space-y-4">
+              <div className="space-y-3">
+                <div className="relative">
+                  <div className="absolute top-3 left-4 text-xs text-muted-foreground font-medium z-10">Selling Token (You'll Pay With)</div>
+                  <Select value={sellingToken} onValueChange={setSellingToken}>
+                    <SelectTrigger className="rounded-2xl p-4 pt-8 border border-border/50 h-auto">
+                      <SelectValue placeholder="Select token to pay with" />
+                    </SelectTrigger>
                   <SelectContent>
                     {balances.map((balance) => {
                       const isNative = balance.assetType === "native"
@@ -288,19 +305,22 @@ export function TradeForm({ publicKey }: TradeFormProps) {
                       )
                     })}
                   </SelectContent>
-                </Select>
+                  </Select>
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>Buying Token</Label>
+              <div className="space-y-3">
                 <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search for token (e.g., WPI, ZYRA)"
-                    value={buyingTokenSearch}
-                    onChange={(e) => setBuyingTokenSearch(e.target.value)}
-                    className="pl-9"
-                  />
+                  <div className="absolute top-3 left-4 text-xs text-muted-foreground font-medium z-10">Buying Token</div>
+                  <div className="relative">
+                    <Search className="absolute left-4 top-4 h-4 w-4 text-muted-foreground z-10" />
+                    <Input
+                      placeholder="Search for token (e.g., WPI, ZYRA)"
+                      value={buyingTokenSearch}
+                      onChange={(e) => setBuyingTokenSearch(e.target.value)}
+                      className="rounded-2xl p-4 pt-8 pl-10 border border-border/50"
+                    />
+                  </div>
                 </div>
                 {buyingTokenSearch.length >= 2 && (
                   <div className="border rounded-lg max-h-48 overflow-y-auto">
@@ -342,44 +362,37 @@ export function TradeForm({ publicKey }: TradeFormProps) {
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label>Amount to Buy</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="any"
-                  placeholder="0.00"
-                  value={buyAmount}
-                  onChange={(e) => setBuyAmount(e.target.value)}
-                />
+              <div className="space-y-3">
+                <div className="relative">
+                  <div className="absolute top-3 left-4 text-xs text-muted-foreground font-medium z-10">Amount to Buy</div>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="any"
+                    placeholder="0.00"
+                    value={buyAmount}
+                    onChange={(e) => setBuyAmount(e.target.value)}
+                    className="rounded-2xl p-4 pt-8 border border-border/50"
+                  />
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>Price (per unit)</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="any"
-                  placeholder="0.00"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                />
+              <div className="space-y-3">
+                <div className="relative">
+                  <div className="absolute top-3 left-4 text-xs text-muted-foreground font-medium z-10">Price (per unit)</div>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="any"
+                    placeholder="0.00"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    className="rounded-2xl p-4 pt-8 border border-border/50"
+                  />
+                </div>
               </div>
             </TabsContent>
           </Tabs>
-
-          <div className="mt-4 space-y-2">
-            <Label>Secret Seed (Required for Transaction)</Label>
-            <Input
-              type="password"
-              placeholder="Enter your secret seed (starts with S...)"
-              value={userSecret}
-              onChange={(event) => setUserSecret(event.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Enter your secret seed to sign this transaction. We don't store your secret seed.
-            </p>
-          </div>
 
           {/* Only show non-auth errors here */}
           {(sellError || buyError) && sellError?.status !== 401 && sellError?.status !== 403 && buyError?.status !== 401 && buyError?.status !== 403 && (
@@ -389,15 +402,75 @@ export function TradeForm({ publicKey }: TradeFormProps) {
           )}
 
           <Button
-            className="w-full mt-4 btn-gradient-primary"
-            onClick={handleSubmit}
-            disabled={creatingSell || creatingBuy || !userSecret.trim()}
+            className="w-full h-14 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 text-white font-bold text-lg rounded-xl shadow-lg hover:shadow-emerald-500/25 transition-all disabled:opacity-50 mt-6"
+            onClick={handleCreateOffer}
+            disabled={creatingSell || creatingBuy}
           >
-            {(creatingSell || creatingBuy) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {creatingSell || creatingBuy ? "Creating..." : tradeType === "sell" ? "Create Sell Offer" : "Create Buy Offer"}
+            {(creatingSell || creatingBuy) ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              tradeType === "sell" ? "Create Sell Offer" : "Create Buy Offer"
+            )}
           </Button>
         </CardContent>
       </Card>
+
+      {/* Secret Seed Dialog */}
+      <Dialog open={showSecretDialog} onOpenChange={setShowSecretDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirm {tradeType === "sell" ? "Sell" : "Buy"} Offer</DialogTitle>
+            <DialogDescription>
+              Enter your secret seed to sign and execute the transaction.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Secret Seed</label>
+              <Input
+                type="password"
+                placeholder="Enter your secret seed (starts with S...)"
+                value={userSecret}
+                onChange={(event) => setUserSecret(event.target.value)}
+                className="font-mono"
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground">
+                We don't store your secret seed. It's only used to sign this transaction.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setShowSecretDialog(false)
+                  setUserSecret("")
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600"
+                onClick={handleSubmit}
+                disabled={creatingSell || creatingBuy || !userSecret.trim()}
+              >
+                {(creatingSell || creatingBuy) ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  "Confirm"
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

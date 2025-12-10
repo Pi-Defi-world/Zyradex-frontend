@@ -109,7 +109,12 @@ export const useAccountBalances = (publicKey?: string) => {
 
   const balances = data?.balances ?? []
   const totalBalance = useMemo(
-    () => balances.reduce((total, entry) => total + (Number(entry.amount) || 0), 0),
+    () => {
+      const native = balances.find(b => b.assetType === "native")
+      const nativeAmount = native ? Number(native.amount) || 0 : 0
+      // For now, only count native Pi. Token prices will be calculated separately in components
+      return nativeAmount
+    },
     [balances]
   )
 

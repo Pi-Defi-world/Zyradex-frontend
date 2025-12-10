@@ -28,7 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Loader2, Plus, Droplets, TrendingUp, Users, Search, Shield, User } from "lucide-react"
+import { Loader2, Plus, Droplets, TrendingUp, Users, Search } from "lucide-react"
 import type React from "react"
 import Link from "next/link"
 
@@ -168,7 +168,11 @@ export default function LiquidityPage() {
   }, [refreshKey])
 
 
-  const { pools, isLoading, error } = useLiquidityPools({ limit: 30 }, { refreshKey })
+  const [currentPage, setCurrentPage] = useState(1)
+  const [cursor, setCursor] = useState<string | undefined>(undefined)
+  const pageSize = 10
+  
+  const { pools, isLoading, error, pagination } = useLiquidityPools({ limit: pageSize, cursor }, { refreshKey })
   const { createLiquidityPool, isLoading: creating } = useCreateLiquidityPool()
   const { addLiquidity, isLoading: adding } = useAddLiquidity()
   const { withdrawLiquidity, isLoading: withdrawing } = useWithdrawLiquidity()
@@ -182,16 +186,49 @@ export default function LiquidityPage() {
   const [platformPools, setPlatformPools] = useState<any[]>([])
   const [loadingPlatformPools, setLoadingPlatformPools] = useState(false)
   const [poolExistsError, setPoolExistsError] = useState<PoolExistsError | null>(null)
-  const [hasStoredSecret, setHasStoredSecret] = useState(false)
   const [loadingQuote, setLoadingQuote] = useState(false)
+  const [showWithdrawSecretDialog, setShowWithdrawSecretDialog] = useState(false)
+  const [withdrawSecret, setWithdrawSecret] = useState("")
   const [quoteData, setQuoteData] = useState<{ totalFee?: string; platformFee?: string; baseFee?: string } | null>(null)
 
 
   const displayPools = useMemo(() => {
     const formatted = pools.map(formatPool)
-    if (!searchQuery.trim()) return formatted
+    
+    // Rank pools: active pools first, then empty/low trade pools at bottom
+    const ranked = formatted.sort((a, b) => {
+      // Check if pools are empty (very low liquidity or volume)
+      const isEmptyA = a.liquidity < 0.01 || a.volume < 0.01
+      const isEmptyB = b.liquidity < 0.01 || b.volume < 0.01
+      
+      // Check if pools have low trade activity (low trustlines)
+      const hasLowTradesA = a.trustlines < 5
+      const hasLowTradesB = b.trustlines < 5
+      
+      // Empty pools go to bottom
+      if (isEmptyA && !isEmptyB) return 1
+      if (!isEmptyA && isEmptyB) return -1
+      
+      // If both empty, sort by liquidity descending
+      if (isEmptyA && isEmptyB) {
+        return b.liquidity - a.liquidity
+      }
+      
+      // Low trade pools go below active pools
+      if (hasLowTradesA && !hasLowTradesB) return 1
+      if (!hasLowTradesA && hasLowTradesB) return -1
+      
+      // For active pools, sort by liquidity (total shares) descending, then by trustlines descending
+      const liquidityDiff = b.liquidity - a.liquidity
+      if (liquidityDiff !== 0) return liquidityDiff
+      
+      return b.trustlines - a.trustlines
+    })
+    
+    // Filter by search query if provided
+    if (!searchQuery.trim()) return ranked
     const query = searchQuery.trim().toUpperCase()
-    return formatted.filter((pool) =>
+    return ranked.filter((pool) =>
       pool.assetA.symbol.toUpperCase().includes(query) || pool.assetB.symbol.toUpperCase().includes(query)
     )
   }, [pools, searchQuery])
@@ -226,6 +263,8 @@ export default function LiquidityPage() {
       setPoolExistsError(null)
       setRefreshKey(Date.now())
       setCreateForm(defaultCreateForm) // Clear secret
+      setCursor(undefined) // Reset pagination
+      setCurrentPage(1)
     } catch (err: any) {
       // Handle pool exists error
       if (err.poolExists && err.poolId) {
@@ -274,6 +313,8 @@ export default function LiquidityPage() {
       resetForms()
       setRefreshKey(Date.now())
       setDepositForm(defaultDepositForm) // Clear secret
+      setCursor(undefined) // Reset pagination
+      setCurrentPage(1)
     } catch (err: any) {
       const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Failed to add liquidity"
       const suggestion = err && typeof err === "object" && "suggestion" in err ? (err as any).suggestion : undefined
@@ -288,9 +329,20 @@ export default function LiquidityPage() {
     }
   }
 
-  const handleWithdraw = async (event: React.FormEvent<HTMLFormElement>, pool: ILiquidityPool) => {
-    event.preventDefault()
-    if (!withdrawForm.userSecret.trim()) {
+  const handleWithdrawClick = (pool: ILiquidityPool) => {
+    if (!withdrawForm.shareAmount || parseFloat(withdrawForm.shareAmount) <= 0) {
+      toast({ 
+        title: "Share amount required", 
+        description: "Please enter a valid pool share amount to withdraw.",
+        variant: "destructive" 
+      })
+      return
+    }
+    setShowWithdrawSecretDialog(true)
+  }
+
+  const handleWithdraw = async (pool: ILiquidityPool) => {
+    if (!withdrawSecret.trim()) {
       toast({ 
         title: "Secret seed required", 
         description: "Please enter your secret seed to sign the transaction.",
@@ -300,14 +352,18 @@ export default function LiquidityPage() {
     }
     try {
       await withdrawLiquidity({
-        userSecret: withdrawForm.userSecret.trim(),
+        userSecret: withdrawSecret.trim(),
         poolId: pool.id,
         amount: withdrawForm.shareAmount,
       })
       toast({ title: "Liquidity withdrawn", description: `${pool.id} updated successfully.` })
       resetForms()
       setRefreshKey(Date.now())
-      setWithdrawForm(defaultWithdrawForm) // Clear secret
+      setWithdrawForm(defaultWithdrawForm) // Clear form
+      setWithdrawSecret("") // Clear secret
+      setShowWithdrawSecretDialog(false) // Close dialog
+      setCursor(undefined) // Reset pagination
+      setCurrentPage(1)
     } catch (err: any) {
       const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Failed to withdraw"
       const suggestion = err && typeof err === "object" && "suggestion" in err ? (err as any).suggestion : undefined
@@ -936,6 +992,7 @@ export default function LiquidityPage() {
                           onClick={() => {
                             setActivePool(pool)
                             setWithdrawForm(defaultWithdrawForm)
+                            setWithdrawSecret("")
                           }}
                         >
                             <span className="mr-2">−</span>
@@ -947,48 +1004,21 @@ export default function LiquidityPage() {
                             <DialogTitle>Withdraw from {pool.pair}</DialogTitle>
                           <DialogDescription>Redeem liquidity by providing your pool share percentage.</DialogDescription>
                           </DialogHeader>
-                        <form className="space-y-4" onSubmit={(event) => handleWithdraw(event, pool)}>
-                          {!hasStoredSecret && (
-                            <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-4 space-y-3">
-                              <div className="flex items-start gap-2">
-                                <Shield className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
-                                <div className="flex-1 space-y-2">
-                                  <p className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
-                                    Account Required
-                                  </p>
-                                  <p className="text-xs text-yellow-600 dark:text-yellow-500">
-                                    You need to import your account and set up authentication to withdraw liquidity. This allows you to use PIN/password instead of entering your secret key manually.
-                                  </p>
-                                </div>
-                              </div>
-                              <Link href="/profile" className="block">
-                                <Button type="button" variant="outline" className="w-full" size="sm">
-                                  <User className="mr-2 h-4 w-4" />
-                                  Go to Profile to Import Account
-                                </Button>
-                              </Link>
+                        <div className="space-y-4">
+                          <div className="space-y-3">
+                            <div className="relative">
+                              <div className="absolute top-3 left-4 text-xs text-muted-foreground font-medium z-10">Pool Share to Withdraw</div>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="any"
+                                placeholder="Enter pool share amount"
+                                value={withdrawForm.shareAmount}
+                                onChange={(event) => setWithdrawForm((prev) => ({ ...prev, shareAmount: event.target.value }))}
+                                className="rounded-2xl p-4 pt-8 border border-border/50"
+                              />
                             </div>
-                          )}
-                          {hasStoredSecret && (
-                            <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm">
-                              <div className="flex items-center gap-2 text-muted-foreground">
-                                <Shield className="h-4 w-4" />
-                                <span>You'll be prompted for your PIN/password when you submit</span>
-                              </div>
-                            </div>
-                          )}
-                            <div className="space-y-2">
-                            <Label>Pool Share to Withdraw</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              step="any"
-                              placeholder="Enter pool share amount"
-                              value={withdrawForm.shareAmount}
-                              onChange={(event) => setWithdrawForm((prev) => ({ ...prev, shareAmount: event.target.value }))}
-                              required
-                            />
-                            </div>
+                          </div>
                           <div className="rounded-xl border-2 border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-green-500/10 to-teal-500/10 p-4 backdrop-blur-sm">
                             <div className="flex justify-between items-center">
                               <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Total Fee</span>
@@ -997,21 +1027,136 @@ export default function LiquidityPage() {
                               </span>
                             </div>
                           </div>
-                          <Button type="submit" className="w-full" variant="destructive" disabled={withdrawing}>
-                            {withdrawing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                              Withdraw Liquidity
-                            </Button>
-                          </form>
+                          <Button 
+                            className="w-full h-14 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white font-bold text-lg rounded-xl shadow-lg hover:shadow-red-500/25 transition-all disabled:opacity-50" 
+                            onClick={() => handleWithdrawClick(pool)}
+                            disabled={withdrawing || !withdrawForm.shareAmount}
+                          >
+                            {withdrawing ? (
+                              <>
+                                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                Withdrawing...
+                              </>
+                            ) : (
+                              "Withdraw Liquidity"
+                            )}
+                          </Button>
+                        </div>
                         </DialogContent>
                       </Dialog>
+                      
+                      <Link href={`/swap?from=${pool.assetA.symbol}&to=${pool.assetB.symbol}`}>
+                        <Button variant="outline" size="sm">
+                          Trade
+                        </Button>
+                      </Link>
                   </div>
                 </div>
               ))}
             </div>
+            
+            {/* Pagination Controls */}
+            {!isLoading && (pagination?.hasMore || currentPage > 1) && (
+              <div className="flex items-center justify-between pt-4 border-t border-border/50">
+                <div className="text-sm text-muted-foreground">
+                  Page {currentPage}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setCurrentPage(1)
+                      setCursor(undefined)
+                    }}
+                    disabled={currentPage === 1 || isLoading}
+                  >
+                    First
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setCurrentPage(prev => Math.max(1, prev - 1))
+                      setCursor(undefined) // Reset to first page for simplicity
+                    }}
+                    disabled={currentPage === 1 || isLoading}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (pagination?.nextCursor) {
+                        setCursor(pagination.nextCursor)
+                        setCurrentPage(prev => prev + 1)
+                      }
+                    }}
+                    disabled={!pagination?.hasMore || isLoading}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
+      {/* Withdraw Secret Dialog */}
+      <Dialog open={showWithdrawSecretDialog} onOpenChange={setShowWithdrawSecretDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirm Withdraw</DialogTitle>
+            <DialogDescription>
+              Enter your secret seed to sign and execute the withdraw transaction.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Secret Seed</label>
+              <Input
+                type="password"
+                placeholder="Enter your secret seed (starts with S...)"
+                value={withdrawSecret}
+                onChange={(event) => setWithdrawSecret(event.target.value)}
+                className="font-mono"
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground">
+                We don't store your secret seed. It's only used to sign this transaction.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setShowWithdrawSecretDialog(false)
+                  setWithdrawSecret("")
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600"
+                onClick={() => activePool && handleWithdraw(activePool)}
+                disabled={withdrawing || !withdrawSecret.trim()}
+              >
+                {withdrawing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Withdrawing...
+                  </>
+                ) : (
+                  "Confirm Withdraw"
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
