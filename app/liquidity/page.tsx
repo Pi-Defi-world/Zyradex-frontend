@@ -1,5 +1,5 @@
+// @ts-nocheck
 "use client"
-// @ts-nocheck - Temporary workaround for React 19 type incompatibility with lucide-react
 
 import { useMemo, useState, useEffect } from "react"
 import {
@@ -161,15 +161,6 @@ export default function LiquidityPage() {
       .finally(() => {
         setLoadingPlatformPools(false)
       })
-  }, [])
-
-  // Check for stored secret (for password-based authentication)
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      // Check if user has imported account with encrypted secret
-      const hasEncryptedSecret = localStorage.getItem("zyradex-encrypted-secret") !== null
-      setHasStoredSecret(hasEncryptedSecret)
-    }
   }, [])
 
 
@@ -394,7 +385,7 @@ export default function LiquidityPage() {
                     {userTokens.length > 0 ? (
                       <Select
                         value={createForm.tokenACode && createForm.tokenAIssuer ? `${createForm.tokenACode}:${createForm.tokenAIssuer}` : ""}
-                        onValueChange={(value) => {
+                        onValueChange={(value: string) => {
                           if (value === "native") {
                             setCreateForm((prev) => ({ ...prev, tokenACode: "native", tokenAIssuer: "" }))
                           } else {
@@ -445,7 +436,7 @@ export default function LiquidityPage() {
                     {userTokens.length > 0 ? (
                       <Select
                         value={createForm.tokenBCode && createForm.tokenBIssuer ? `${createForm.tokenBCode}:${createForm.tokenBIssuer}` : ""}
-                        onValueChange={(value) => {
+                        onValueChange={(value: string) => {
                           if (value === "native") {
                             setCreateForm((prev) => ({ ...prev, tokenBCode: "native", tokenBIssuer: "" }))
                           } else {
