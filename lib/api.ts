@@ -82,43 +82,36 @@ const attemptTokenRefresh = async (): Promise<string | null> => {
 
   isRefreshing = true
   refreshPromise = (async () => {
-    try {
-      console.log("🔄 Attempting to refresh authentication token...")
-      
-      // PRIMARY APPROACH: Get fresh token from Pi SDK
-      // If SDK has a valid session, authenticate() will return immediately without showing consent
-      // This is the source of truth - trust the SDK's session state
-      let piAccessToken: string | null = null
-      let piUser: any = null
-      
       try {
-        console.log("🔄 Getting current authentication state from Pi SDK...")
-        window.Pi.init({ version: "2.0" })
+        // PRIMARY APPROACH: Get fresh token from Pi SDK
+        // If SDK has a valid session, authenticate() will return immediately without showing consent
+        // This is the source of truth - trust the SDK's session state
+        let piAccessToken: string | null = null
+        let piUser: any = null
         
-        const onIncompletePaymentFound = (payment: any) => {
-          console.log("⚠️ Incomplete payment found during refresh:", payment)
-        }
-        
-        // Call authenticate() - if SDK has valid session, this returns immediately
-        // If session expired, it will show consent screen
-        const freshAuth = await window.Pi.authenticate(["username", "payments", "wallet_address"], onIncompletePaymentFound)
-        
-        if (freshAuth?.accessToken) {
-          piAccessToken = freshAuth.accessToken
-          piUser = freshAuth.user
+        try {
+          window.Pi.init({ version: "2.0" })
           
-          // Update stored credentials with fresh token from SDK
-          localStorage.setItem("pi_access_token", piAccessToken)
-          localStorage.setItem("pi_user", JSON.stringify(piUser))
+          const onIncompletePaymentFound = (payment: any) => {
+            // Silent - don't show toasts for incomplete payments during refresh
+          }
           
-          console.log("✅ Got fresh access token from Pi SDK")
-        } else {
-          console.log("🔄 Pi SDK authenticate() did not return access token")
+          // Call authenticate() - if SDK has valid session, this returns immediately
+          // If session expired, it will show consent screen
+          const freshAuth = await window.Pi.authenticate(["username", "payments", "wallet_address"], onIncompletePaymentFound)
+          
+          if (freshAuth?.accessToken) {
+            piAccessToken = freshAuth.accessToken
+            piUser = freshAuth.user
+            
+            // Update stored credentials with fresh token from SDK
+            localStorage.setItem("pi_access_token", piAccessToken)
+            localStorage.setItem("pi_user", JSON.stringify(piUser))
+          }
+        } catch (piAuthError: any) {
+          // Fall through to try stored token as fallback
+          // Don't show error here - we'll try stored token first
         }
-      } catch (piAuthError: any) {
-        console.warn("🔄 Pi SDK authenticate() failed, falling back to stored token:", piAuthError?.message)
-        // Fall through to try stored token as fallback
-      }
       
       // FALLBACK: If SDK didn't provide token, try stored token from localStorage
       if (!piAccessToken) {
@@ -514,8 +507,21 @@ axiosClient.interceptors.response.use(
       const shouldAttemptRefresh = isExpired || isInvalidToken || !errorData?.code || errorData?.code === "AUTH_ERROR"
       
       if (shouldAttemptRefresh) {
+        // Log for debugging (even if console not visible)
         console.log(`🔒 Token issue detected (${errorData?.code || 'unknown'}), attempting refresh...`)
         console.log(`🔒 Original request: ${config.method?.toUpperCase()} ${config.url}`)
+        
+        // Show user-friendly notification about refresh attempt
+        if (typeof window !== "undefined") {
+          // Dispatch event to show refresh attempt notification
+          window.dispatchEvent(new CustomEvent("auth:refreshing", {
+            detail: { 
+              message: "Refreshing your session...",
+              code: errorData?.code || 'unknown'
+            }
+          }))
+        }
+        
         config._authRetry = true
 
         try {
@@ -524,6 +530,16 @@ axiosClient.interceptors.response.use(
           if (newToken) {
             // Retry the original request with the new token
             console.log("✅ Token refresh successful, retrying original request...")
+            
+            // Show success notification
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new CustomEvent("auth:refreshed", {
+                detail: { 
+                  message: "Session refreshed successfully"
+                }
+              }))
+            }
+            
             config.headers.Authorization = `Bearer ${newToken}`
             const retryResponse = await axiosClient(config)
             console.log("✅ Original request succeeded after token refresh")
@@ -536,8 +552,9 @@ axiosClient.interceptors.response.use(
             if (typeof window !== "undefined") {
               window.dispatchEvent(new CustomEvent("auth:expired", {
                 detail: { 
-                  message: "Your session has expired. Please sign in again.",
-                  error: toApiError(error)
+                  message: "Unable to refresh session. Please sign in again.",
+                  error: toApiError(error),
+                  code: errorData?.code
                 }
               }))
             }
@@ -551,6 +568,17 @@ axiosClient.interceptors.response.use(
             response: refreshError?.response?.data,
             status: refreshError?.response?.status
           })
+          
+          // Show error notification
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("auth:refresh-failed", {
+              detail: { 
+                message: refreshError?.message || "Failed to refresh session",
+                error: toApiError(refreshError)
+              }
+            }))
+          }
+          
           return Promise.reject(error)
         }
       } else {

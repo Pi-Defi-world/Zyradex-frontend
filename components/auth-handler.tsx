@@ -21,15 +21,20 @@ export function AuthHandler() {
       const customEvent = event as CustomEvent
       const error = customEvent.detail?.error
       const message = customEvent.detail?.message || "Your session has expired"
+      const code = customEvent.detail?.code
 
-      console.log("Auth expired event received:", message)
+      // Show user-friendly error message with more details
+      const errorMessage = code === "TOKEN_EXPIRED" 
+        ? "Your session has expired. Refreshing..."
+        : code === "INVALID_TOKEN"
+        ? "Your session token is invalid. Refreshing..."
+        : message || "Please sign in again to continue."
 
-      // Show user-friendly error message
       toast({
-        title: "Session Expired",
-        description: message || "Please sign in again to continue.",
+        title: "Session Issue",
+        description: errorMessage,
         variant: "destructive",
-        duration: 5000,
+        duration: 7000,
       })
 
       // Clear auth state
@@ -38,16 +43,21 @@ export function AuthHandler() {
       // Try to refresh profile if user is still authenticated with Pi
       if (isAuthenticated) {
         try {
-          console.log("Attempting to refresh user profile...")
           await refresh()
           toast({
             title: "Session Restored",
             description: "Your session has been restored successfully.",
             variant: "default",
+            duration: 3000,
           })
         } catch (err) {
-          console.error("Failed to refresh profile:", err)
           // If refresh fails, redirect to profile page for re-authentication
+          toast({
+            title: "Authentication Required",
+            description: "Please sign in again to continue.",
+            variant: "destructive",
+            duration: 5000,
+          })
           router.push("/profile")
         }
       } else {
@@ -56,12 +66,54 @@ export function AuthHandler() {
       }
     }
 
-    // Listen for auth expiration events
+    const handleAuthRefreshing = (event: Event) => {
+      const customEvent = event as CustomEvent
+      const message = customEvent.detail?.message || "Refreshing your session..."
+      
+      toast({
+        title: "Refreshing Session",
+        description: message,
+        variant: "default",
+        duration: 3000,
+      })
+    }
+
+    const handleAuthRefreshed = (event: Event) => {
+      const customEvent = event as CustomEvent
+      const message = customEvent.detail?.message || "Session refreshed"
+      
+      toast({
+        title: "Session Refreshed",
+        description: message,
+        variant: "default",
+        duration: 2000,
+      })
+    }
+
+    const handleAuthRefreshFailed = (event: Event) => {
+      const customEvent = event as CustomEvent
+      const message = customEvent.detail?.message || "Failed to refresh session"
+      
+      toast({
+        title: "Refresh Failed",
+        description: message + " Please try again or sign in.",
+        variant: "destructive",
+        duration: 5000,
+      })
+    }
+
+    // Listen for auth events
     if (typeof window !== "undefined") {
       window.addEventListener("auth:expired", handleAuthExpired)
+      window.addEventListener("auth:refreshing", handleAuthRefreshing)
+      window.addEventListener("auth:refreshed", handleAuthRefreshed)
+      window.addEventListener("auth:refresh-failed", handleAuthRefreshFailed)
       
       return () => {
         window.removeEventListener("auth:expired", handleAuthExpired)
+        window.removeEventListener("auth:refreshing", handleAuthRefreshing)
+        window.removeEventListener("auth:refreshed", handleAuthRefreshed)
+        window.removeEventListener("auth:refresh-failed", handleAuthRefreshFailed)
       }
     }
   }, [toast, router, clearAuth, isAuthenticated, refresh])
