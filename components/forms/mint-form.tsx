@@ -77,7 +77,7 @@ export function MintForm() {
     if (!formData.distributorSecret.trim()) {
       toast({ 
         title: "Secret seed required", 
-        description: "Please enter your distributor secret seed to sign the transaction.",
+        description: "Please enter your secret key to sign the transaction.",
         variant: "destructive" 
       })
       return
@@ -126,17 +126,17 @@ export function MintForm() {
       <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="distributorSecret" className="text-base font-medium">
-          Distributor Secret Seed (Required)
+          Wallet Secret Key (Required)
         </Label>
         <Input
           id="distributorSecret"
           type="password"
-          placeholder="Enter your distributor secret seed (starts with S...)"
+          placeholder="Enter your wallet secret key (starts with W...)"
           value={formData.distributorSecret}
           onChange={(event) => setFormData((prev) => ({ ...prev, distributorSecret: event.target.value }))}
           required
         />
-        <p className="text-sm text-muted-foreground">Enter your distributor secret seed to sign the mint transaction. We don't store your secret seed.</p>
+        <p className="text-sm text-muted-foreground">Enter your wallet secret key to sign the mint transaction. We don't store your secret key.</p>
       </div>
 
       <div className="space-y-2">

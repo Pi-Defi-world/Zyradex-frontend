@@ -129,9 +129,7 @@ export default function LiquidityPage() {
       setLoadingUserTokens(true)
       getUserTokens(walletAddress)
         .then((data) => {
-          // Map tokens and identify native token properly
           const tokens = data.tokens.map((t: any) => {
-            // Check if it's native token by assetType or if code is null/undefined and issuer is null
             const isNative = t.assetType === 'native' || (!t.code && !t.issuer) || t.code === 'Test Pi'
             return {
               code: isNative ? 'native' : (t.code || ''),
