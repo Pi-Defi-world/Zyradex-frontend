@@ -506,10 +506,16 @@ axiosClient.interceptors.response.use(
 
       const errorData = error.response?.data as { expired?: boolean; code?: string; message?: string } | undefined
       const isExpired = errorData?.expired === true || errorData?.code === "TOKEN_EXPIRED"
+      const isInvalidToken = errorData?.code === "INVALID_TOKEN"
       
-      // Only attempt refresh if token is expired, not if it's invalid
-      if (isExpired) {
-        console.log("🔒 Token expired, attempting refresh...")
+      // Attempt refresh for expired tokens, and also for invalid tokens
+      // (invalid tokens might be stale/expired tokens that weren't properly marked)
+      // Only skip refresh if it's a clear non-expiration issue like USER_NOT_FOUND
+      const shouldAttemptRefresh = isExpired || isInvalidToken || !errorData?.code || errorData?.code === "AUTH_ERROR"
+      
+      if (shouldAttemptRefresh) {
+        console.log(`🔒 Token issue detected (${errorData?.code || 'unknown'}), attempting refresh...`)
+        console.log(`🔒 Original request: ${config.method?.toUpperCase()} ${config.url}`)
         config._authRetry = true
 
         try {
@@ -517,12 +523,14 @@ axiosClient.interceptors.response.use(
           
           if (newToken) {
             // Retry the original request with the new token
-            console.log("🔄 Retrying original request with refreshed token...")
+            console.log("✅ Token refresh successful, retrying original request...")
             config.headers.Authorization = `Bearer ${newToken}`
-            return axiosClient(config)
+            const retryResponse = await axiosClient(config)
+            console.log("✅ Original request succeeded after token refresh")
+            return retryResponse
           } else {
             // Refresh failed - clear auth and reject
-            console.log("🔒 Token refresh failed, clearing authentication")
+            console.error("❌ Token refresh failed - no new token received")
             
             // Dispatch a custom event that components can listen to
             if (typeof window !== "undefined") {
@@ -536,19 +544,24 @@ axiosClient.interceptors.response.use(
             
             return Promise.reject(error)
           }
-        } catch (refreshError) {
-          console.error("🔒 Error during token refresh:", refreshError)
+        } catch (refreshError: any) {
+          console.error("❌ Error during token refresh:", refreshError)
+          console.error("❌ Refresh error details:", {
+            message: refreshError?.message,
+            response: refreshError?.response?.data,
+            status: refreshError?.response?.status
+          })
           return Promise.reject(error)
         }
       } else {
-        // Invalid token (not expired) - don't attempt refresh, just reject
-        console.log("🔒 Invalid token (not expired), clearing authentication")
+        // Specific error that shouldn't trigger refresh (e.g., USER_NOT_FOUND)
+        console.log(`🔒 Authentication error (${errorData?.code}): ${errorData?.message || 'Unknown error'}`)
         
         if (typeof window !== "undefined") {
           const errorData = error.response?.data as { message?: string } | undefined
           window.dispatchEvent(new CustomEvent("auth:expired", {
             detail: { 
-              message: errorData?.message || "Invalid authentication. Please sign in again.",
+              message: errorData?.message || "Authentication failed. Please sign in again.",
               error: toApiError(error)
             }
           }))
