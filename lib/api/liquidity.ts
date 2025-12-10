@@ -226,6 +226,9 @@ export interface QuoteAddLiquidityResponse {
   poolRatio: number
   assetA: string
   assetB: string
+  platformFee: string
+  baseFee: string
+  totalFee: string
 }
 
 export const quoteAddLiquidity = async (params: QuoteAddLiquidityParams) => {

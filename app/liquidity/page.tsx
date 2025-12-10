@@ -183,6 +183,7 @@ export default function LiquidityPage() {
   const [poolExistsError, setPoolExistsError] = useState<PoolExistsError | null>(null)
   const [hasStoredSecret, setHasStoredSecret] = useState(false)
   const [loadingQuote, setLoadingQuote] = useState(false)
+  const [quoteData, setQuoteData] = useState<{ totalFee?: string; platformFee?: string; baseFee?: string } | null>(null)
 
 
   const displayPools = useMemo(() => {
@@ -522,6 +523,15 @@ export default function LiquidityPage() {
                     />
                   </div>
                 </div>
+                <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm">
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="text-muted-foreground">Transaction Fee</span>
+                    <span className="font-medium">~0.01 Test Pi (base fee only)</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Pool creation only requires the blockchain base fee. Platform fees apply when adding/withdrawing liquidity.
+                  </p>
+                </div>
                 <Button type="submit" className="w-full btn-gradient-primary" disabled={creating}>
                   {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                   Create Pool
@@ -611,10 +621,11 @@ export default function LiquidityPage() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => {
-                                    setActivePool(poolForInteraction)
-                                    setDepositForm(defaultDepositForm)
-                                  }}
+                          onClick={() => {
+                            setActivePool(poolForInteraction)
+                            setDepositForm(defaultDepositForm)
+                            setQuoteData(null)
+                          }}
                                 >
                                   <Plus className="mr-2 h-4 w-4" />
                                   Add Liquidity
@@ -658,14 +669,17 @@ export default function LiquidityPage() {
                                               amountA,
                                             })
                                             setDepositForm((prev) => ({ ...prev, amountB: quote.amountB }))
+                                            setQuoteData({ totalFee: quote.totalFee, platformFee: quote.platformFee, baseFee: quote.baseFee })
                                           } catch (err) {
                                             console.error("Failed to fetch quote:", err)
                                             setDepositForm((prev) => ({ ...prev, amountB: "" }))
+                                            setQuoteData(null)
                                           } finally {
                                             setLoadingQuote(false)
                                           }
                                         } else {
                                           setDepositForm((prev) => ({ ...prev, amountB: "" }))
+                                          setQuoteData(null)
                                         }
                                       }}
                                       required
@@ -694,6 +708,20 @@ export default function LiquidityPage() {
                                       </p>
                                     )}
                                   </div>
+                                  {depositForm.amountA && !loadingQuote && quoteData && (
+                                    <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm space-y-1">
+                                      <div className="flex justify-between items-center gap-2">
+                                        <span className="text-muted-foreground">Total Fee</span>
+                                        <span className="font-medium">~{parseFloat(quoteData.totalFee || "0").toFixed(7)} Test Pi</span>
+                                      </div>
+                                      <div className="flex justify-between items-center gap-2 text-xs text-muted-foreground pt-1 border-t border-border/20">
+                                        <span>Fee Breakdown:</span>
+                                        <span className="text-right">
+                                          Platform: {quoteData.platformFee || "10"} Pi + Base: ~{quoteData.baseFee || "0.01"} Pi
+                                        </span>
+                                      </div>
+                                    </div>
+                                  )}
                                   <Button type="submit" className="w-full btn-gradient-primary" disabled={adding || !depositForm.amountA || !depositForm.amountB}>
                                     {adding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                                     Add Liquidity
@@ -812,6 +840,7 @@ export default function LiquidityPage() {
                           onClick={() => {
                             setActivePool(pool)
                             setDepositForm(defaultDepositForm)
+                            setQuoteData(null)
                           }}
                         >
                           <Plus className="mr-2 h-4 w-4" />
@@ -856,14 +885,17 @@ export default function LiquidityPage() {
                                       amountA,
                                     })
                                     setDepositForm((prev) => ({ ...prev, amountB: quote.amountB }))
+                                    setQuoteData({ totalFee: quote.totalFee, platformFee: quote.platformFee, baseFee: quote.baseFee })
                                   } catch (err) {
                                     console.error("Failed to fetch quote:", err)
                                     setDepositForm((prev) => ({ ...prev, amountB: "" }))
+                                    setQuoteData(null)
                                   } finally {
                                     setLoadingQuote(false)
                                   }
                                 } else {
                                   setDepositForm((prev) => ({ ...prev, amountB: "" }))
+                                  setQuoteData(null)
                                 }
                               }}
                               required
@@ -892,6 +924,20 @@ export default function LiquidityPage() {
                               </p>
                             )}
                           </div>
+                          {depositForm.amountA && !loadingQuote && quoteData && (
+                            <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm space-y-1">
+                              <div className="flex justify-between items-center gap-2">
+                                <span className="text-muted-foreground">Total Fee</span>
+                                <span className="font-medium">~{parseFloat(quoteData.totalFee || "0").toFixed(7)} Test Pi</span>
+                              </div>
+                              <div className="flex justify-between items-center gap-2 text-xs text-muted-foreground pt-1 border-t border-border/20">
+                                <span>Fee Breakdown:</span>
+                                <span className="text-right">
+                                  Platform: {quoteData.platformFee || "10"} Pi + Base: ~{quoteData.baseFee || "0.01"} Pi
+                                </span>
+                              </div>
+                            </div>
+                          )}
                           <Button type="submit" className="w-full btn-gradient-primary" disabled={adding || !depositForm.amountA || !depositForm.amountB}>
                             {adding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                             Add Liquidity
@@ -961,6 +1007,18 @@ export default function LiquidityPage() {
                               required
                             />
                             </div>
+                          <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm">
+                            <div className="flex justify-between items-center gap-2">
+                              <span className="text-muted-foreground">Total Fee</span>
+                              <span className="font-medium">~10.01 Test Pi</span>
+                            </div>
+                            <div className="flex justify-between items-center gap-2 text-xs text-muted-foreground pt-1 border-t border-border/20">
+                              <span>Fee Breakdown:</span>
+                              <span className="text-right">
+                                Platform: 10 Pi + Base: ~0.01 Pi
+                              </span>
+                            </div>
+                          </div>
                           <Button type="submit" className="w-full" variant="destructive" disabled={withdrawing}>
                             {withdrawing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                               Withdraw Liquidity

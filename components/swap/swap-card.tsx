@@ -822,9 +822,19 @@ export function SwapCard() {
                         <span className="font-medium text-green-500 truncate min-w-0 text-right">{quote.minOut}</span>
                       </div>
                       <div className="flex justify-between items-center gap-2">
-                        <span className="text-muted-foreground shrink-0">Pool Fee</span>
-                        <span className="font-medium">{quote.fee}%</span>
+                        <span className="text-muted-foreground shrink-0">Total Fee</span>
+                        <span className="font-medium">
+                          {quote.totalFee ? `${quote.totalFee.toFixed(2)}%` : `${quote.fee}%`}
+                        </span>
                       </div>
+                      {quote.platformFee && quote.fee && (
+                        <div className="flex justify-between items-center gap-2 text-xs text-muted-foreground pt-1 border-t border-border/20">
+                          <span className="shrink-0">Fee Breakdown:</span>
+                          <span className="text-right">
+                            Pool: {quote.fee}% + Platform: {quote.platformFee.toFixed(2)}%
+                          </span>
+                        </div>
+                      )}
                       <div className="flex justify-between items-center gap-2">
                         <span className="text-muted-foreground shrink-0">Slippage</span>
                         <span className="font-medium">{quote.slippagePercent}%</span>

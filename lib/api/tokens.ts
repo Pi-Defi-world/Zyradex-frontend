@@ -51,6 +51,26 @@ export interface BurnTokenResponse {
   txHash: string
 }
 
+export interface MintFeeResponse {
+  success: boolean
+  fee: {
+    platformFee: string
+    platformFeeStroops: string
+    baseFee: string
+    totalFee: string
+    feeRecipient: string
+  }
+}
+
+export const getMintFee = async () => {
+  try {
+    const { data } = await axiosClient.get<MintFeeResponse>("/tokens/mint-fee")
+    return data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}
+
 export const fetchTokens = async () => {
   try {
     const { data } = await axiosClient.get<FetchTokensResponse>("/tokens")

@@ -186,13 +186,6 @@ const ProfilePage: React.FC = () => {
   }
 
   const mainNavItems = [
-    // {
-    //   title: "Dashboard",
-    //   description: "View your portfolio and stats",
-    //   icon: LayoutDashboard,
-    //   href: "/dashboard",
-    //   showChevron: true,
-    // },
     {
       title: "My Assets",
       description: "Manage your assets",
@@ -201,7 +194,7 @@ const ProfilePage: React.FC = () => {
       showChevron: true,
     },
     {
-      title: "Create Asset",
+      title: "Launchpad",
       description: "Create new assets",
       icon: Rocket,
       href: "/mint",
@@ -228,45 +221,38 @@ const ProfilePage: React.FC = () => {
       href: "/history",
       showChevron: true,
     },
-    {
-      title: "Settings",
-      description: "Wallet settings",
-      icon: Settings,
-      href: "/settings",
-      showChevron: true,
-    },
   ]
 
-  const additionalMenuItems = [
-    {
-      title: "Terms of Service",
-      description: "Read our terms and conditions",
-      icon: FileText,
-      href: "/terms",
-      showChevron: true,
-    },
-    {
-      title: "Privacy Policy",
-      description: "Learn about our privacy practices",
-      icon: FileText,
-      href: "/privacy",
-      showChevron: true,
-    },
-    // {
-    //   title: "API Documentation",
-    //   description: "Pi Network Oracle API docs",
-    //   icon: BookOpen,
-    //   href: "/api-docs",
-    //   showChevron: true,
-    // },
-    {
-      title: "Contact Us",
-      description: "Get help and support",
-      icon: MessageCircle,
-      href: "/contact",
-      showChevron: true,
-    },
-  ]
+  // const additionalMenuItems = [
+  //   {
+  //     title: "Terms of Service",
+  //     description: "Read our terms and conditions",
+  //     icon: FileText,
+  //     href: "/terms",
+  //     showChevron: true,
+  //   },
+  //   {
+  //     title: "Privacy Policy",
+  //     description: "Learn about our privacy practices",
+  //     icon: FileText,
+  //     href: "/privacy",
+  //     showChevron: true,
+  //   },
+  //   // {
+  //   //   title: "API Documentation",
+  //   //   description: "Pi Network Oracle API docs",
+  //   //   icon: BookOpen,
+  //   //   href: "/api-docs",
+  //   //   showChevron: true,
+  //   // },
+  //   {
+  //     title: "Contact Us",
+  //     description: "Get help and support",
+  //     icon: MessageCircle,
+  //     href: "/contact",
+  //     showChevron: true,
+  //   },
+  // ]
 
   const walletDisplay = storedWalletAddress || user?.wallet_address
   const truncatedWallet = walletDisplay ? `${walletDisplay.slice(0, 6)}...${walletDisplay.slice(-6)}` : null
@@ -274,15 +260,6 @@ const ProfilePage: React.FC = () => {
   return (
     <div className="min-h-screen premium-gradient pt-16 pb-20 p-3 sm:p-4">
       <div className="max-w-md mx-auto space-y-6">
-        {/* <div className="flex items-center justify-between">
-          <h1 className="text-xl sm:text-2xl font-bold text-foreground">Profile</h1>
-          {!isAuthenticated && (
-            <Button size="sm" onClick={handlePiConnect} disabled={isLoading}>
-              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plug className="mr-2 h-4 w-4" />}
-              Connect Pi
-            </Button>
-          )}
-        </div> */}
 
         <Card>
           <CardHeader>
@@ -408,42 +385,6 @@ const ProfilePage: React.FC = () => {
           ))}
         </div>
 
-        <div className="space-y-3">
-          <h2 className="text-lg font-semibold text-foreground">More</h2>
-          {additionalMenuItems.map((item) => (
-            <Link key={item.title} href={item.href} className="block w-full">
-              <div className="bg-card rounded-xl p-4 hover:bg-muted/50 transition-colors border border-border/30 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3 min-w-0 flex-1">
-                    <item.icon className="h-5 w-5 text-muted-foreground shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <div className="font-semibold text-sm text-foreground truncate">{item.title}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">{item.description}</div>
-                    </div>
-                  </div>
-                  {item.showChevron && <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 ml-2" />}
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
-
-        {isAuthenticated && (
-          <div>
-            <button
-              onClick={signOut}
-              className="w-full flex items-center justify-between p-4 bg-card rounded-xl hover:bg-muted/50 transition-colors border border-border/30 shadow-sm text-destructive"
-            >
-              <div className="flex items-center space-x-3 min-w-0 flex-1">
-                <LogOut className="h-5 w-5 text-destructive shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <div className="font-semibold text-sm text-destructive truncate">Disconnect Wallet</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">Logout from your ZyraDex wallet</div>
-                </div>
-              </div>
-            </button>
-          </div>
-        )}
       </div>
 
       <Dialog open={showSecretDialog} onOpenChange={setShowSecretDialog}>

@@ -13,6 +13,7 @@ import { useMintToken } from "@/hooks/useTokenRegistry"
 import { usePi } from "@/components/providers/pi-provider"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { useAccountBalances } from "@/hooks/useAccountData"
+import { getMintFee } from "@/lib/api/tokens"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -37,6 +38,28 @@ export function MintForm() {
     setWalletAddress(address)
   }, [profile?.public_key, user?.wallet_address])
 
+  // Fetch mint fee on component mount
+  useEffect(() => {
+    const fetchMintFee = async () => {
+      setLoadingFee(true)
+      try {
+        const feeData = await getMintFee()
+        if (feeData.success && feeData.fee) {
+          setMintFee({
+            platformFee: feeData.fee.platformFee,
+            baseFee: feeData.fee.baseFee,
+            totalFee: feeData.fee.totalFee,
+          })
+        }
+      } catch (err) {
+        console.error("Failed to fetch mint fee:", err)
+      } finally {
+        setLoadingFee(false)
+      }
+    }
+    fetchMintFee()
+  }, [])
+
   const [formData, setFormData] = useState({
     distributorSecret: "",
     assetCode: "",
@@ -46,6 +69,8 @@ export function MintForm() {
     homeDomain: "",
   })
   const [assetCodeError, setAssetCodeError] = useState("")
+  const [mintFee, setMintFee] = useState<{ platformFee: string; baseFee: string; totalFee: string } | null>(null)
+  const [loadingFee, setLoadingFee] = useState(false)
 
 
   const validateAssetCode = (value: string): string => {
@@ -211,6 +236,21 @@ export function MintForm() {
       </div>
 
       {error && <p className="text-sm text-destructive">{error.message}</p>}
+
+      {mintFee && (
+        <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-sm space-y-1">
+          <div className="flex justify-between items-center gap-2">
+            <span className="text-muted-foreground">Total Fee</span>
+            <span className="font-medium">~{parseFloat(mintFee.totalFee).toFixed(7)} Test Pi</span>
+          </div>
+          <div className="flex justify-between items-center gap-2 text-xs text-muted-foreground pt-1 border-t border-border/20">
+            <span>Fee Breakdown:</span>
+            <span className="text-right">
+              Platform: {mintFee.platformFee} Pi + Base: ~{mintFee.baseFee} Pi
+            </span>
+          </div>
+        </div>
+      )}
 
       <Button type="submit" className="w-full btn-gradient-primary" disabled={isLoading}>
         {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
