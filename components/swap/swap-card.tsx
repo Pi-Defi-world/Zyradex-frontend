@@ -14,9 +14,6 @@ import { useToast } from "@/hooks/use-toast"
 import { usePoolsForPair, useSwapQuote, useExecuteSwap } from "@/hooks/useSwapData"
 import { useAccountBalances } from "@/hooks/useAccountData"
 import { listLiquidityPools } from "@/lib/api/liquidity"
-import { useRouter } from "next/navigation"
-import { useSearchAssets } from "@/hooks/useTrade"
-import { Search } from "lucide-react"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -48,7 +45,6 @@ export function SwapCard() {
   const { user } = usePi()
   const { profile } = useUserProfile()
   const { toast } = useToast()
-  const router = useRouter()
   const [localWallet, setLocalWallet] = useState<string | null>(null)
 
   useEffect(() => {
@@ -69,8 +65,6 @@ export function SwapCard() {
   const [slippagePercent, setSlippagePercent] = useState<number>(1)
   const [pairedTokens, setPairedTokens] = useState<string[]>([])
   const [loadingPairedTokens, setLoadingPairedTokens] = useState(false)
-  const [tokenBSearch, setTokenBSearch] = useState<string>("")
-  const [tokenBInputMode, setTokenBInputMode] = useState<"dropdown" | "search">("dropdown")
   
   const walletAddress = localWallet || profile?.public_key || user?.wallet_address
   const [userSecret, setUserSecret] = useState<string>("")
@@ -228,29 +222,10 @@ export function SwapCard() {
 
   const handleTokenBChange = (value: string) => {
     setTokenB(value)
-    setTokenBSearch("")
     setSelectedPoolId("")
     setFromAmount("")
     setSlippagePercent(1) // Reset to default
   }
-
-  // Search for assets when user types Token B
-  const tokenBSearchCode = useMemo(() => {
-    if (!tokenBSearch || tokenBSearch.trim() === "") return undefined
-    const trimmed = tokenBSearch.trim()
-    // If it's "native", return it
-    if (trimmed.toLowerCase() === "native") return "native"
-    // If it contains ":", extract just the code part for search
-    if (trimmed.includes(":")) {
-      return trimmed.split(":")[0].trim()
-    }
-    return trimmed
-  }, [tokenBSearch])
-
-  const { assets: searchedAssets, isLoading: searchingAssets } = useSearchAssets(
-    tokenBSearchCode && tokenBInputMode === "search" ? tokenBSearchCode : undefined,
-    10
-  )
 
   const handleSwapTokens = () => {
     const temp = tokenA
@@ -389,8 +364,8 @@ export function SwapCard() {
           <div className="space-y-4">
             {/* You Pay Section */}
             <div className="relative">
-              <div className="absolute top-3 left-4 text-xs text-muted-foreground font-medium">You pay</div>
-              <div className="flex items-center gap-2 bg-muted/30 rounded-2xl p-4 pt-8 border border-border/50">
+              <div className="absolute top-3 left-4 text-xs text-muted-foreground font-medium z-10">You pay</div>
+              <div className="flex items-center gap-2 bg-muted/30 rounded-2xl p-4 pt-8 pb-12 border border-border/50">
                 <Input
                   type="number"
                   min="0"
@@ -398,58 +373,58 @@ export function SwapCard() {
                   placeholder="0.0"
                   value={fromAmount}
                   onChange={(event) => setFromAmount(event.target.value)}
-                  className="border-0 bg-transparent text-2xl font-semibold p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0"
+                  className="border-0 bg-transparent text-2xl font-semibold p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0 flex-1"
                 />
-                <Select value={tokenA} onValueChange={handleTokenAChange}>
+            <Select value={tokenA} onValueChange={handleTokenAChange}>
                   <SelectTrigger className="w-auto min-w-[120px] border-0 bg-muted hover:bg-muted/80 h-12 rounded-xl">
                     <SelectValue placeholder="Select" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {balances.map((balance) => {
-                      const isNative = balance.assetType === "native"
-                      const displayName = isNative ? "Test Pi" : balance.assetCode
-                      const value = isNative ? "native" : (balance.assetIssuer ? `${balance.assetCode}:${balance.assetIssuer}` : balance.assetCode)
-                      const amount = Number(balance.amount).toLocaleString(undefined, { maximumFractionDigits: 6 })
-                      return (
-                        <SelectItem key={value} value={value}>
-                          <div className="flex items-center justify-between w-full">
+              </SelectTrigger>
+              <SelectContent>
+                {balances.map((balance) => {
+                  const isNative = balance.assetType === "native"
+                  const displayName = isNative ? "Test Pi" : balance.assetCode
+                  const value = isNative ? "native" : (balance.assetIssuer ? `${balance.assetCode}:${balance.assetIssuer}` : balance.assetCode)
+                  const amount = Number(balance.amount).toLocaleString(undefined, { maximumFractionDigits: 6 })
+                  return (
+                    <SelectItem key={value} value={value}>
+                      <div className="flex items-center justify-between w-full">
                             <span className="font-medium">{displayName}</span>
-                            <span className="text-xs text-muted-foreground ml-2">{amount}</span>
-                          </div>
-                        </SelectItem>
-                      )
-                    })}
-                  </SelectContent>
-                </Select>
+                        <span className="text-xs text-muted-foreground ml-2">{amount}</span>
+                      </div>
+                    </SelectItem>
+                  )
+                })}
+              </SelectContent>
+            </Select>
               </div>
               {tokenA && (
-                <div className="absolute bottom-2 right-4 text-xs text-muted-foreground">
+                <div className="absolute bottom-3 left-4 text-xs text-muted-foreground">
                   Balance: {balances.find(b => {
                     const isNative = b.assetType === "native"
                     const value = isNative ? "native" : (b.assetIssuer ? `${b.assetCode}:${b.assetIssuer}` : b.assetCode)
                     return value === tokenA
                   })?.amount || "0.00"}
-                </div>
+          </div>
               )}
-            </div>
+          </div>
 
             {/* Swap Button */}
-            <div className="flex justify-center -my-2 relative z-10">
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-10 w-10 rounded-full bg-background border-2 border-border hover:border-primary/50 hover:bg-muted/50 transition-all"
-                onClick={handleSwapTokens}
-                disabled={!tokenA || !tokenB}
-              >
+            <div className="flex justify-center -my-3 relative z-20">
+            <Button
+              variant="outline"
+              size="icon"
+                className="h-10 w-10 rounded-full bg-background border-2 border-border hover:border-primary/50 hover:bg-muted/50 transition-all shadow-md"
+              onClick={handleSwapTokens}
+              disabled={!tokenA || !tokenB}
+            >
                 <ArrowDown className="h-5 w-5" />
-              </Button>
-            </div>
+            </Button>
+          </div>
 
             {/* You Receive Section */}
             <div className="relative">
-              <div className="absolute top-3 left-4 text-xs text-muted-foreground font-medium">You receive</div>
-              <div className="flex items-center gap-2 bg-muted/30 rounded-2xl p-4 pt-8 border border-border/50">
+              <div className="absolute top-3 left-4 text-xs text-muted-foreground font-medium z-10">You receive</div>
+              <div className="flex items-center gap-2 bg-muted/30 rounded-2xl p-4 pt-8 pb-12 border border-border/50">
                 {quote && quote.expectedOutput ? (
                   <div className="flex-1 text-2xl font-semibold text-foreground">
                     {quote.expectedOutput}
@@ -467,75 +442,37 @@ export function SwapCard() {
                   <div className="w-auto min-w-[120px] h-12 rounded-xl bg-muted/50 border border-border/50 flex items-center justify-center">
                     <Loader2 className="h-4 w-4 animate-spin" />
                   </div>
-                ) : pairedTokens.length === 0 ? (
-                  <div className="space-y-2 flex-1">
-                    <Input
-                      placeholder="Search token"
-                      value={tokenBSearch}
-                      onChange={(e) => {
-                        setTokenBSearch(e.target.value)
-                        setTokenBInputMode("search")
-                      }}
-                      className="h-12 rounded-xl"
-                    />
-                    {tokenBSearch && searchingAssets && (
-                      <div className="absolute top-full left-0 right-0 mt-2 bg-background border rounded-lg p-2 max-h-40 overflow-y-auto z-50">
-                        <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-                      </div>
-                    )}
-                    {tokenBSearch && !searchingAssets && searchedAssets.length > 0 && (
-                      <div className="absolute top-full left-0 right-0 mt-2 bg-background border rounded-lg p-2 max-h-40 overflow-y-auto z-50 shadow-lg">
-                        {searchedAssets.map((asset) => {
-                          const assetValue = asset.asset_type === "native" 
-                            ? "native" 
-                            : `${asset.asset_code}:${asset.asset_issuer}`
-                          const displayName = asset.asset_type === "native" ? "Test Pi" : asset.asset_code
-                          return (
-                            <button
-                              key={assetValue}
-                              onClick={() => {
-                                handleTokenBChange(assetValue)
-                                setTokenBSearch("")
-                              }}
-                              className="w-full text-left p-2 rounded hover:bg-muted transition-colors text-sm"
-                            >
-                              <div className="font-medium">{displayName}</div>
-                              {asset.asset_type !== "native" && (
-                                <div className="text-xs text-muted-foreground truncate">
-                                  {asset.asset_issuer.slice(0, 8)}...{asset.asset_issuer.slice(-6)}
-                                </div>
-                              )}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
                 ) : (
-                  <Select value={tokenB} onValueChange={handleTokenBChange}>
+                    <Select value={tokenB} onValueChange={handleTokenBChange}>
                     <SelectTrigger className="w-auto min-w-[120px] border-0 bg-muted hover:bg-muted/80 h-12 rounded-xl">
-                      <SelectValue placeholder="Select" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {pairedTokens.map((token) => {
-                        const isNative = token === "native"
-                        const displayName = isNative ? "Test Pi" : (token.includes(":") ? token.split(":")[0] : token)
-                        return (
-                          <SelectItem key={token} value={token}>
-                            {displayName}
-                          </SelectItem>
-                        )
-                      })}
-                    </SelectContent>
-                  </Select>
+                      <SelectValue placeholder={pairedTokens.length > 0 ? "Select" : "No pairs"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                      {pairedTokens.length > 0 ? (
+                        pairedTokens.map((token) => {
+                          const isNative = token === "native"
+                          const displayName = isNative ? "Test Pi" : (token.includes(":") ? token.split(":")[0] : token)
+                          return (
+                            <SelectItem key={token} value={token}>
+                              {displayName}
+                            </SelectItem>
+                          )
+                        })
+                      ) : (
+                        <div className="p-2 text-sm text-muted-foreground text-center">
+                          No pairs found
+                        </div>
+                      )}
+                      </SelectContent>
+                    </Select>
                 )}
               </div>
               {tokenB && quote && (
-                <div className="absolute bottom-2 right-4 text-xs text-muted-foreground">
+                <div className="absolute bottom-3 left-4 text-xs text-muted-foreground">
                   ≈ ${(parseFloat(quote.expectedOutput || "0") * 1).toFixed(2)}
                 </div>
-              )}
-            </div>
+            )}
+          </div>
             {/* Quote Display - Eye-catching colors */}
             {quote && quote.expectedOutput && (
               <div className="rounded-xl border-2 border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-green-500/10 to-teal-500/10 p-4 space-y-2 backdrop-blur-sm">
@@ -555,8 +492,8 @@ export function SwapCard() {
                     {quote.totalFee ? `${quote.totalFee.toFixed(2)}%` : `${quote.fee}%`}
                   </span>
                 </div>
-              </div>
-            )}
+                </div>
+              )}
 
             {/* Transaction Details - Collapsible */}
             {quote && quote.expectedOutput && (
@@ -570,28 +507,20 @@ export function SwapCard() {
                 </button>
                 {showDetails && (
                   <div className="mt-3 space-y-2 text-sm">
-                    {quote.platformFee && quote.fee && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Fee Breakdown</span>
-                        <span className="text-right">
-                          Pool: {quote.fee}% + {quote.platformFee.toFixed(2)}% Platform Fee
-                        </span>
-                      </div>
-                    )}
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Slippage</span>
                       <span>{quote.slippagePercent}%</span>
-                    </div>
+                          </div>
                     {selectedPool && (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Pool Fee</span>
                         <span>{(selectedPool.fee_bp / 100).toFixed(2)}%</span>
-                      </div>
-                    )}
+                </div>
+              )}
                   </div>
                 )}
-              </div>
-            )}
+                </div>
+              )}
 
             {/* Swap Button */}
             <Button
@@ -623,8 +552,8 @@ export function SwapCard() {
               <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
                 <div className="font-medium">Error fetching pools:</div>
                 <div className="text-xs mt-1">{poolsError.message}</div>
-              </div>
-            )}
+                    </div>
+                  )}
 
             {quoteError && (
               <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
@@ -646,20 +575,20 @@ export function SwapCard() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
+          <div className="space-y-2">
               <label className="text-sm font-medium">Secret Seed</label>
-              <Input
-                type="password"
-                placeholder="Enter your secret seed (starts with S...)"
-                value={userSecret}
-                onChange={(event) => setUserSecret(event.target.value)}
+            <Input
+              type="password"
+              placeholder="Enter your secret seed (starts with S...)"
+              value={userSecret}
+              onChange={(event) => setUserSecret(event.target.value)}
                 className="font-mono"
                 autoFocus
-              />
-              <p className="text-xs text-muted-foreground">
+            />
+            <p className="text-xs text-muted-foreground">
                 We don't store your secret seed. It's only used to sign this transaction.
-              </p>
-            </div>
+            </p>
+          </div>
             <div className="flex gap-3">
               <Button
                 variant="outline"
@@ -671,22 +600,22 @@ export function SwapCard() {
               >
                 Cancel
               </Button>
-              <Button
+          <Button
                 className="flex-1 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600"
-                onClick={handleSubmit}
+            onClick={handleSubmit}
                 disabled={executing || !userSecret.trim()}
-              >
-                {executing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Executing...
-                  </>
-                ) : (
+          >
+            {executing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Executing...
+              </>
+            ) : (
                   "Confirm Swap"
-                )}
-              </Button>
+            )}
+          </Button>
             </div>
-          </div>
+      </div>
         </DialogContent>
       </Dialog>
     </Card>
