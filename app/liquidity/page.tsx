@@ -565,18 +565,18 @@ export default function LiquidityPage() {
                     const formattedPool = poolForInteraction ? formatPool(poolForInteraction) : null;
                     
                     return (
-                      <div
-                        key={platformPool.poolId}
+                    <div
+                      key={platformPool.poolId}
                         className="flex flex-col gap-3 p-3 rounded-lg border bg-card"
-                      >
+                    >
                         <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="font-medium">
-                              {platformPool.baseToken}/{platformPool.quoteToken}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              Pool ID: {platformPool.poolId.slice(0, 16)}...
-                            </div>
+                      <div className="flex-1">
+                        <div className="font-medium">
+                          {platformPool.baseToken}/{platformPool.quoteToken}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Pool ID: {platformPool.poolId.slice(0, 16)}...
+                        </div>
                             {platformPool.pool && formattedPool && (
                               <div className="text-xs text-muted-foreground mt-1 space-y-1">
                                 <div>Total Shares: {parseFloat(platformPool.pool.total_shares || "0").toFixed(2)}</div>
@@ -593,13 +593,13 @@ export default function LiquidityPage() {
                             {platformPool.error && (
                               <div className="text-xs text-destructive mt-1">
                                 {platformPool.error}
-                              </div>
-                            )}
                           </div>
-                          <Badge variant={platformPool.verified ? "default" : "secondary"}>
-                            {platformPool.verified ? "Verified" : "Unverified"}
-                          </Badge>
-                        </div>
+                        )}
+                      </div>
+                      <Badge variant={platformPool.verified ? "default" : "secondary"}>
+                        {platformPool.verified ? "Verified" : "Unverified"}
+                      </Badge>
+                    </div>
                         {formattedPool && poolForInteraction && (
                           <div className="flex flex-wrap items-center gap-2">
                             <Dialog>

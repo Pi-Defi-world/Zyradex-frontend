@@ -8,6 +8,7 @@ import { Navbar } from "@/components/navbar"
 import { Suspense } from "react"
 import { PiProvider } from "@/components/providers/pi-provider"
 import { DisclaimerProvider } from "@/components/disclaimer-provider"
+import { ErrorBoundary } from "@/components/errors/ErrorBoundary"
 import Script from 'next/script'
 import "./globals.css"
 
@@ -42,12 +43,14 @@ export default function RootLayout({
         </Script>
         <PiProvider>
           <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
-            <Suspense fallback={null}>
-              <Navbar />
-              {children}
-              <Toaster />
-              <DisclaimerProvider />
-            </Suspense>
+            <ErrorBoundary>
+              <Suspense fallback={null}>
+                <Navbar />
+                {children}
+                <Toaster />
+                <DisclaimerProvider />
+              </Suspense>
+            </ErrorBoundary>
           </ThemeProvider>
         </PiProvider>
       </body>
