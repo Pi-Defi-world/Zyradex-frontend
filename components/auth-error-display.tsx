@@ -31,10 +31,6 @@ export function AuthErrorDisplay({ error, className = "", onRetry }: AuthErrorDi
   }
 
   // Determine alert variant and title based on error type
-  const isPiApiError = error?.status === 503 || 
-    error?.message?.toLowerCase().includes("pi network api") ||
-    error?.message?.toLowerCase().includes("pi api")
-  
   const alertVariant = isPiApiError ? "default" : "destructive"
   const alertTitle = isPiApiError 
     ? "Pi Network API Temporarily Unavailable" 

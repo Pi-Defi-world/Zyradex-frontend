@@ -110,7 +110,7 @@ export const useUserProfile = (): UseUserProfileReturn => {
         
         // Handle Pi Network API errors (500) - these are often temporary
         if (statusCode === 500 || errorMessage.includes("pi network api")) {
-          console.log("⚠️ Pi Network API error detected, may be temporary. Retrying once...")
+          console.log(" Pi Network API error detected, may be temporary. Retrying once...")
           // Wait a bit before retry
           await new Promise(resolve => setTimeout(resolve, 2000))
           
@@ -119,7 +119,7 @@ export const useUserProfile = (): UseUserProfileReturn => {
             const retryResult = await signIn(payload)
             backendUser = retryResult.user
             token = retryResult.token
-            console.log("✅ Retry successful after Pi API error")
+            console.log(" Retry successful after Pi API error")
           } catch (retryError: any) {
             // If retry also fails, throw with clearer message
             const enhancedError = new Error("Pi Network API is currently unavailable. This is usually temporary. Please try again in a few moments.")
@@ -130,7 +130,7 @@ export const useUserProfile = (): UseUserProfileReturn => {
         }
         // If signin fails with "Invalid access token", clear auth and retry with fresh token
         else if (errorMessage.includes("invalid") || errorMessage.includes("access token") || errorMessage.includes("expired")) {
-          console.log("🔄 Access token invalid, getting fresh token...")
+          console.log("Access token invalid, getting fresh token...")
           // Clear the old auth result and get a fresh token
           const freshSession = await authenticate()
           if (!freshSession?.accessToken) {
@@ -193,7 +193,7 @@ export const useUserProfile = (): UseUserProfileReturn => {
           errorMessage.includes("access token")
         
         if (isAuthError) {
-          console.log("🧹 Clearing local storage due to authentication error")
+          console.log("Clearing local storage due to authentication error")
           localStorage.removeItem(USER_TOKEN_KEY)
           localStorage.removeItem(USER_PROFILE_KEY)
           localStorage.removeItem("zyradex-wallet-address")
