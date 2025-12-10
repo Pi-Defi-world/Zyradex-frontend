@@ -12,6 +12,7 @@ import { useTokenRegistry } from "@/hooks/useTokenRegistry"
 import { usePiPrice } from "@/hooks/usePiPrice"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { ReceiveModal } from "@/components/receive-modal"
+import { AuthErrorDisplay } from "@/components/auth-error-display"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -49,8 +50,8 @@ export default function HomePage() {
   const publicKey = isAuthenticated 
     ? (profile?.public_key || user?.wallet_address || localWallet || undefined) 
     : undefined
-  const { balances, totalBalance, isLoading: balancesLoading } = useAccountBalances(publicKey)
-  const { tokens, isLoading: tokensLoading } = useTokenRegistry()
+  const { balances, totalBalance, isLoading: balancesLoading, error: balancesError } = useAccountBalances(publicKey)
+  const { tokens, isLoading: tokensLoading, error: tokensError, retry: retryTokens } = useTokenRegistry()
 
   // Calculate USD equivalent
   const usdBalance = useMemo(() => {
@@ -92,6 +93,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen premium-gradient pt-16 pb-20">
       <div className="container mx-auto px-4 py-8 space-y-6 max-w-3xl">
+        <AuthErrorDisplay error={balancesError || tokensError} onRetry={retryTokens} />
         <Card className="shadow-xl rounded-2xl">
           <CardHeader className="pb-4">
             <div className="space-y-1">

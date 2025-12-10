@@ -7,6 +7,7 @@ import { ActiveOffers } from "@/components/trade/active-offers"
 import { RecentTrades } from "@/components/trade/recent-trades"
 import { usePi } from "@/components/providers/pi-provider"
 import { useUserProfile } from "@/hooks/useUserProfile"
+import { AuthErrorDisplay } from "@/components/auth-error-display"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -41,9 +42,13 @@ export default function TradePage() {
     ? (profile?.public_key || user?.wallet_address || localWallet || undefined)
     : undefined
 
+  // Get errors from hooks that might have auth errors
+  const { error: profileError } = useUserProfile()
+
   return (
     <div className="min-h-screen premium-gradient pt-16 pb-20">
       <div className="container mx-auto px-4 py-6 space-y-6">
+        <AuthErrorDisplay error={profileError} />
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Trading Form - Main Section */}
           <div className="lg:col-span-2">

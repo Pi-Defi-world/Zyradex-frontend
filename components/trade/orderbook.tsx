@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Loader2 } from "lucide-react"
 import { useOrderBook } from "@/hooks/useTrade"
+import { AuthErrorDisplay } from "@/components/auth-error-display"
 
 interface OrderbookProps {
   onBaseChange?: (base: string) => void
@@ -33,6 +34,7 @@ export function Orderbook({ onBaseChange, onCounterChange }: OrderbookProps) {
         <CardTitle>Order Book</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        <AuthErrorDisplay error={error} />
         <div className="space-y-2">
           <Label>Base Asset</Label>
           <Input
@@ -63,7 +65,7 @@ export function Orderbook({ onBaseChange, onCounterChange }: OrderbookProps) {
             <Loader2 className="h-4 w-4 animate-spin mr-2" />
             Loading order book...
           </div>
-        ) : error ? (
+        ) : error && error.status !== 401 && error.status !== 403 ? (
           <div className="text-sm text-destructive py-8 text-center">
             {error.message || "Failed to load order book"}
           </div>

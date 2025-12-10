@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast"
 import { usePoolsForPair, useSwapQuote, useExecuteSwap } from "@/hooks/useSwapData"
 import { useAccountBalances } from "@/hooks/useAccountData"
 import { listLiquidityPools } from "@/lib/api/liquidity"
+import { AuthErrorDisplay } from "@/components/auth-error-display"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -353,6 +354,7 @@ export function SwapCard() {
     <Card className="relative overflow-hidden border border-border/50 bg-card shadow-xl rounded-2xl">
       <div className="relative">
         <CardContent className="p-6">
+          <AuthErrorDisplay error={poolsError || quoteError} />
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-foreground">Swap</h2>
@@ -547,15 +549,15 @@ export function SwapCard() {
               )}
             </Button>
 
-            {/* Error Messages */}
-            {poolsError && (
+            {/* Error Messages - Only show non-auth errors here */}
+            {poolsError && poolsError.status !== 401 && poolsError.status !== 403 && (
               <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
                 <div className="font-medium">Error fetching pools:</div>
                 <div className="text-xs mt-1">{poolsError.message}</div>
                     </div>
                   )}
 
-            {quoteError && (
+            {quoteError && quoteError.status !== 401 && quoteError.status !== 403 && (
               <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
                 <div className="font-medium">Failed to fetch quote:</div>
                 <div className="text-xs mt-1">{quoteError.message || "Unknown error"}</div>

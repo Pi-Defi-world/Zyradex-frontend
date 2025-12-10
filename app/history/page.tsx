@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { useAccountTransactions } from "@/hooks/useAccountData"
 import { formatDistanceToNow } from "date-fns"
+import { AuthErrorDisplay } from "@/components/auth-error-display"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -120,6 +121,7 @@ export default function HistoryPage() {
   return (
     <div className="min-h-screen premium-gradient pt-16 pb-20 p-3 sm:p-4">
       <div className="max-w-4xl mx-auto space-y-6">
+        <AuthErrorDisplay error={error} onRetry={refresh} />
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" onClick={() => router.back()}>
@@ -154,11 +156,6 @@ export default function HistoryPage() {
             </div>
           </CardHeader>
           <CardContent>
-            {error && (
-              <div className="mb-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-                <p className="text-sm text-destructive">{error.message || "Failed to load transactions"}</p>
-              </div>
-            )}
 
             {isLoading && transactions.length === 0 ? (
               <div className="flex items-center justify-center py-12">

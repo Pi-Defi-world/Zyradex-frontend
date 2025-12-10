@@ -1,17 +1,24 @@
 "use client"
 
 import { useMemo } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Loader2 } from "lucide-react"
 import { useTokenRegistry } from "@/hooks/useTokenRegistry"
+import { usePi } from "@/components/providers/pi-provider"
 
 const formatSupply = (value?: number) =>
   (value ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })
 
 export default function MyTokensPage() {
   const { tokens, isLoading, error } = useTokenRegistry()
+  const { isAuthenticated } = usePi()
+  const router = useRouter()
+
+  // Check if error is auth-related
+  const isAuthError = error?.status === 401 || error?.status === 403
 
   return (
     <div className="min-h-screen premium-gradient pt-16 pb-20">
@@ -23,7 +30,24 @@ export default function MyTokensPage() {
               <CardDescription>Tokens created through the platform registry</CardDescription>
             </CardHeader>
             <CardContent>
-              {error && <p className="text-sm text-destructive">{error.message}</p>}
+              {error && (
+                <div className="mb-4 p-4 rounded-lg border border-destructive/50 bg-destructive/10">
+                  <p className="text-sm font-medium text-destructive mb-2">{error.message}</p>
+                  {error.suggestion && (
+                    <p className="text-xs text-muted-foreground mb-3">{error.suggestion}</p>
+                  )}
+                  {isAuthError && !isAuthenticated && (
+                    <Button 
+                      onClick={() => router.push("/profile")}
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                    >
+                      Sign In to Continue
+                    </Button>
+                  )}
+                </div>
+              )}
               {isLoading && !tokens.length && (
                 <div className="flex items-center justify-center py-12 text-muted-foreground">
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading tokens...

@@ -9,6 +9,7 @@ import { Suspense } from "react"
 import { PiProvider } from "@/components/providers/pi-provider"
 import { DisclaimerProvider } from "@/components/disclaimer-provider"
 import { ErrorBoundary } from "@/components/errors/ErrorBoundary"
+import { AuthHandler } from "@/components/auth-handler"
 import Script from 'next/script'
 import "./globals.css"
 
@@ -45,6 +46,7 @@ export default function RootLayout({
           <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
             <ErrorBoundary>
               <Suspense fallback={null}>
+                <AuthHandler />
                 <Navbar />
                 {children}
                 <Toaster />

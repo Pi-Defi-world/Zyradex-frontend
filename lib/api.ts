@@ -1,4 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios"
+import { signIn } from "./api/auth"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
 
@@ -54,6 +55,111 @@ export const setAuthToken = (token?: string | null) => {
 }
 
 export const clearAuthToken = () => setAuthToken(undefined)
+
+/**
+ * Attempt to refresh the authentication token
+ * Returns the new token if successful, null if refresh is not possible
+ */
+let isRefreshing = false
+let refreshPromise: Promise<string | null> | null = null
+
+const attemptTokenRefresh = async (): Promise<string | null> => {
+  // If already refreshing, wait for that to complete
+  if (isRefreshing && refreshPromise) {
+    return refreshPromise
+  }
+
+  // Check if we have a Pi access token to use for refresh
+  if (typeof window === "undefined") {
+    return null
+  }
+
+  const piAccessToken = localStorage.getItem("pi_access_token")
+  const piUserStr = localStorage.getItem("pi_user")
+
+  if (!piAccessToken || !piUserStr) {
+    console.log("🔄 No Pi access token found, cannot refresh auth")
+    return null
+  }
+
+  let piUser: any
+  try {
+    piUser = JSON.parse(piUserStr)
+  } catch {
+    console.error("🔄 Failed to parse Pi user data")
+    return null
+  }
+
+  isRefreshing = true
+  refreshPromise = (async () => {
+    try {
+      console.log("🔄 Attempting to refresh authentication token...")
+      
+      const payload = {
+        authResult: {
+          accessToken: piAccessToken,
+          user: {
+            username: piUser.username || "",
+            uid: piUser.uid || "",
+          },
+        },
+      }
+
+      // Create a clean axios instance for signin to avoid including expired token
+      const signInClient = axios.create({
+        baseURL: `${API_BASE_URL.replace(/\/$/, "")}/v1`,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        timeout: REQUEST_TIMEOUT,
+      })
+      
+      const result = await signInClient.post<{ user: any; token: string }>("/users/signin", payload).then(res => res.data)
+      const newToken = result.token
+
+      // Validate token is not expired
+      try {
+        const jwtDecode = (await import("jwt-decode")).jwtDecode
+        const claims = jwtDecode<{ exp?: number }>(newToken)
+        if (claims.exp && claims.exp * 1000 < Date.now()) {
+          console.error("🔄 Received expired token from refresh")
+          return null
+        }
+      } catch {
+        // If we can't decode, assume it's valid and let the backend validate
+      }
+
+      // Update token in storage and axios client
+      setAuthToken(newToken)
+      
+      // Update profile in localStorage
+      if (typeof window !== "undefined") {
+        localStorage.setItem("dex_user_profile", JSON.stringify(result.user))
+      }
+
+      console.log("✅ Successfully refreshed authentication token")
+      return newToken
+    } catch (error: any) {
+      console.error("🔄 Failed to refresh token:", error)
+      
+      // If refresh fails, clear all auth data
+      clearAuthToken()
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("dex_user_token")
+        localStorage.removeItem("dex_user_profile")
+        localStorage.removeItem("pi_access_token")
+        localStorage.removeItem("pi_user")
+      }
+      
+      return null
+    } finally {
+      isRefreshing = false
+      refreshPromise = null
+    }
+  })()
+
+  return refreshPromise
+}
 
 export interface ApiError {
   message: string
@@ -229,7 +335,50 @@ axiosClient.interceptors.response.use(
     return response
   },
   async (error: AxiosError) => {
-    const config = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
+    const config = error.config as InternalAxiosRequestConfig & { 
+      _retry?: boolean
+      _authRetry?: boolean
+    }
+
+    // Handle 401 Unauthorized errors - attempt token refresh
+    if (error.response?.status === 401 && !config._authRetry) {
+      // Don't attempt refresh on signin endpoint to avoid infinite loops
+      if (config.url?.includes("/users/signin")) {
+        return Promise.reject(error)
+      }
+
+      console.log("🔒 Received 401 error, attempting token refresh...")
+      config._authRetry = true
+
+      try {
+        const newToken = await attemptTokenRefresh()
+        
+        if (newToken) {
+          // Retry the original request with the new token
+          console.log("🔄 Retrying original request with refreshed token...")
+          config.headers.Authorization = `Bearer ${newToken}`
+          return axiosClient(config)
+        } else {
+          // Refresh failed - clear auth and reject
+          console.log("🔒 Token refresh failed, clearing authentication")
+          
+          // Dispatch a custom event that components can listen to
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("auth:expired", {
+              detail: { 
+                message: "Your session has expired. Please sign in again.",
+                error: toApiError(error)
+              }
+            }))
+          }
+          
+          return Promise.reject(error)
+        }
+      } catch (refreshError) {
+        console.error("🔒 Error during token refresh:", refreshError)
+        return Promise.reject(error)
+      }
+    }
 
     // Don't retry if already retried or not a retryable error
     if (config._retry || !isRetryableError(error) || retryCount >= MAX_RETRIES) {

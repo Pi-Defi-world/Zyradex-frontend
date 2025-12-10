@@ -43,6 +43,7 @@ import { usePi } from "@/components/providers/pi-provider"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { getUserTokens, getPlatformPools, quoteAddLiquidity, type PoolExistsError } from "@/lib/api/liquidity"
 import type { ILiquidityPool } from "@/lib/types"
+import { AuthErrorDisplay } from "@/components/auth-error-display"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -324,6 +325,7 @@ export default function LiquidityPage() {
   return (
     <div className="min-h-screen premium-gradient pt-16 pb-20">
       <div className="container mx-auto px-4 py-6 space-y-6">
+        <AuthErrorDisplay error={error} />
         <div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Liquidity Pools</h1>
@@ -788,9 +790,6 @@ export default function LiquidityPage() {
               <div className="flex items-center justify-center py-12 text-muted-foreground text-sm">
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading pools...
               </div>
-            )}
-            {error && (
-              <div className="text-sm text-destructive">{error.message}</div>
             )}
             {!isLoading && !displayPools.length && !error && (
               <div className="text-sm text-muted-foreground">No pools match your search.</div>

@@ -45,33 +45,42 @@ export const useTokenRegistry = () => {
   const [error, setError] = useState<ApiError | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
-  useEffect(() => {
-    let cancelled = false
-
+  const fetchTokens = useCallback(async () => {
     setIsLoading(true)
     setError(null)
 
-    fetchTokensRequest()
-      .then((response) => {
-        if (!cancelled) {
-          setData(response)
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(toApiError(err))
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsLoading(false)
-        }
-      })
+    try {
+      const response = await fetchTokensRequest()
+      setData(response)
+    } catch (err) {
+      const apiError = toApiError(err)
+      setError(apiError)
+      // If it's an auth error, the interceptor will handle refresh/retry
+      // We just need to set the error so UI can display it
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    fetchTokens().catch(() => {
+      // Error already handled in fetchTokens
+      if (!cancelled) {
+        setIsLoading(false)
+      }
+    })
 
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [fetchTokens])
+
+  // Retry function for manual retries
+  const retry = useCallback(() => {
+    fetchTokens()
+  }, [fetchTokens])
 
   const tokens = useMemo<TokenRecord[]>(() => data?.tokens ?? [], [data])
 
@@ -80,6 +89,7 @@ export const useTokenRegistry = () => {
     error,
     isLoading,
     tokens,
+    retry,
   }
 }
 

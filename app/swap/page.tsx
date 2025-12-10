@@ -6,6 +6,7 @@ import { PriceChart, type PricePoint } from "@/components/swap/price-chart"
 import { RecentSwaps } from "@/components/swap/recent-swaps"
 import { useAccountOperations } from "@/hooks/useAccountData"
 import { usePi } from "@/components/providers/pi-provider"
+import { AuthErrorDisplay } from "@/components/auth-error-display"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -38,13 +39,14 @@ export default function SwapPage() {
   }, [])
 
   const publicKey = user?.wallet_address || localWallet || undefined
-  const { operations, isLoading } = useAccountOperations(publicKey, { limit: 40 })
+  const { operations, isLoading, error: operationsError } = useAccountOperations(publicKey, { limit: 40 })
 
   const chartSeries = useMemo(() => computePriceSeries(operations), [operations])
 
   return (
     <div className="min-h-screen premium-gradient pt-16 pb-20">
       <div className="container mx-auto px-4 py-6 space-y-6">
+        <AuthErrorDisplay error={operationsError} />
         <div className="hidden lg:grid lg:grid-cols-5 lg:gap-6 lg:mb-6">
           <div className="lg:col-span-3">
             <PriceChart series={chartSeries} isLoading={isLoading} />

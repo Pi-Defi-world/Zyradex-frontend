@@ -7,11 +7,12 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Loader2, Lock, Search, User } from "lucide-react"
+import { Loader2, Search } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { useAccountBalances } from "@/hooks/useAccountData"
 import { useCreateSellOffer, useCreateBuyOffer, useSearchAssets } from "@/hooks/useTrade"
+import { AuthErrorDisplay } from "@/components/auth-error-display"
 
 interface TradeFormProps {
   publicKey?: string
@@ -146,8 +147,11 @@ export function TradeForm({ publicKey }: TradeFormProps) {
     setBuyingTokenSearch("")
   }
 
+  const { error: balancesError } = useAccountBalances(publicKey)
+
   return (
     <>
+      <AuthErrorDisplay error={sellError || buyError || balancesError} />
       <Card>
         <CardHeader>
           <CardTitle>Create Trade Offer</CardTitle>
@@ -377,7 +381,8 @@ export function TradeForm({ publicKey }: TradeFormProps) {
             </p>
           </div>
 
-          {(sellError || buyError) && (
+          {/* Only show non-auth errors here */}
+          {(sellError || buyError) && sellError?.status !== 401 && sellError?.status !== 403 && buyError?.status !== 401 && buyError?.status !== 403 && (
             <div className="mt-4 p-3 bg-destructive/10 text-destructive text-sm rounded">
               {(sellError || buyError)?.message || "An error occurred"}
             </div>
