@@ -210,60 +210,6 @@ export default function HomePage() {
           </CardContent>
         </Card>
 
-        {/* Minted Tokens Section */}
-        {mintedTokens.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Copy className="h-5 w-5" />
-                Minted Tokens
-              </CardTitle>
-              <CardDescription>Tokens you've created</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {tokensLoading ? (
-                <div className="flex items-center justify-center py-12 text-muted-foreground">
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Loading tokens...
-                </div>
-              ) : mintedTokens.length === 0 ? (
-                <div className="text-sm text-muted-foreground py-6 text-center">
-                  You haven't minted any tokens yet.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {mintedTokens.map((token, index) => (
-                    <div
-                      key={`${token.assetCode}-${token.issuer}-${index}`}
-                      className="flex items-center justify-between p-3 rounded-lg border bg-muted/50 hover:bg-muted transition-colors"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-foreground truncate">
-                          {token.name || token.assetCode}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {token.assetCode} • {token.issuer.slice(0, 8)}...{token.issuer.slice(-6)}
-                        </p>
-                        {token.description && (
-                          <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
-                            {token.description}
-                          </p>
-                        )}
-                      </div>
-                      <div className="text-right ml-4">
-                        <p className="font-semibold text-foreground">
-                          {token.totalSupply?.toLocaleString(undefined, { maximumFractionDigits: 2 }) || "0"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">Total Supply</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
         {/* Connect Wallet CTA */}
         {!publicKey && (
           <Card>
