@@ -69,24 +69,14 @@ const attemptTokenRefresh = async (): Promise<string | null> => {
     return refreshPromise
   }
 
-  // Check if we have a Pi access token to use for refresh
+  // Check if we're in a browser environment
   if (typeof window === "undefined") {
     return null
   }
 
-  const piAccessToken = localStorage.getItem("pi_access_token")
-  const piUserStr = localStorage.getItem("pi_user")
-
-  if (!piAccessToken || !piUserStr) {
-    console.log("🔄 No Pi access token found, cannot refresh auth")
-    return null
-  }
-
-  let piUser: any
-  try {
-    piUser = JSON.parse(piUserStr)
-  } catch {
-    console.error("🔄 Failed to parse Pi user data")
+  // Check if Pi SDK is available - this is the primary source of truth
+  if (!window.Pi) {
+    console.log("🔄 Pi SDK not available, cannot refresh auth")
     return null
   }
 
@@ -95,14 +85,64 @@ const attemptTokenRefresh = async (): Promise<string | null> => {
     try {
       console.log("🔄 Attempting to refresh authentication token...")
       
-      const payload = {
-        authResult: {
-          accessToken: piAccessToken,
-          user: {
-            username: piUser.username || "",
-            uid: piUser.uid || "",
-          },
-        },
+      // PRIMARY APPROACH: Get fresh token from Pi SDK
+      // If SDK has a valid session, authenticate() will return immediately without showing consent
+      // This is the source of truth - trust the SDK's session state
+      let piAccessToken: string | null = null
+      let piUser: any = null
+      
+      try {
+        console.log("🔄 Getting current authentication state from Pi SDK...")
+        window.Pi.init({ version: "2.0" })
+        
+        const onIncompletePaymentFound = (payment: any) => {
+          console.log("⚠️ Incomplete payment found during refresh:", payment)
+        }
+        
+        // Call authenticate() - if SDK has valid session, this returns immediately
+        // If session expired, it will show consent screen
+        const freshAuth = await window.Pi.authenticate(["username", "payments", "wallet_address"], onIncompletePaymentFound)
+        
+        if (freshAuth?.accessToken) {
+          piAccessToken = freshAuth.accessToken
+          piUser = freshAuth.user
+          
+          // Update stored credentials with fresh token from SDK
+          localStorage.setItem("pi_access_token", piAccessToken)
+          localStorage.setItem("pi_user", JSON.stringify(piUser))
+          
+          console.log("✅ Got fresh access token from Pi SDK")
+        } else {
+          console.log("🔄 Pi SDK authenticate() did not return access token")
+        }
+      } catch (piAuthError: any) {
+        console.warn("🔄 Pi SDK authenticate() failed, falling back to stored token:", piAuthError?.message)
+        // Fall through to try stored token as fallback
+      }
+      
+      // FALLBACK: If SDK didn't provide token, try stored token from localStorage
+      if (!piAccessToken) {
+        const storedToken = localStorage.getItem("pi_access_token")
+        const storedUserStr = localStorage.getItem("pi_user")
+        
+        if (storedToken && storedUserStr) {
+          try {
+            piUser = JSON.parse(storedUserStr)
+            piAccessToken = storedToken
+            console.log("🔄 Using stored Pi access token as fallback")
+          } catch {
+            console.error("🔄 Failed to parse stored Pi user data")
+            return null
+          }
+        } else {
+          console.log("🔄 No stored Pi credentials available")
+          return null
+        }
+      }
+      
+      if (!piAccessToken || !piUser) {
+        console.log("🔄 Unable to get Pi access token from SDK or storage")
+        return null
       }
 
       // Create a clean axios instance for signin to avoid including expired token
@@ -114,22 +154,77 @@ const attemptTokenRefresh = async (): Promise<string | null> => {
         timeout: REQUEST_TIMEOUT,
       })
       
+      const payload = {
+        authResult: {
+          accessToken: piAccessToken,
+          user: {
+            username: piUser.username || "",
+            uid: piUser.uid || "",
+          },
+        },
+      }
+      
       let result
       try {
         result = await signInClient.post<{ user: any; token: string }>("/users/signin", payload).then(res => res.data)
       } catch (signInErr: any) {
-        // If signin itself fails with 500 (Pi API error), don't clear auth - it's a temporary issue
         const statusCode = signInErr?.response?.status || signInErr?.status
         const errorMessage = signInErr?.response?.data?.message || signInErr?.message || ""
         
+        // Handle Pi Network API errors (temporary issues)
         if (statusCode === 500 && (errorMessage.toLowerCase().includes("pi network") || errorMessage.toLowerCase().includes("pi api"))) {
           console.log("⚠️ Pi Network API error during token refresh - this is temporary")
           // Return null to indicate refresh failed, but don't clear auth data
           // The user might still be authenticated, just Pi API is down
           return null
         }
-        // Re-throw other errors
-        throw signInErr
+        
+        // If token is invalid/expired and we used stored token, try SDK one more time
+        const isInvalidToken = statusCode === 401 || 
+                              statusCode === 403 ||
+                              errorMessage.toLowerCase().includes("invalid access token") ||
+                              errorMessage.toLowerCase().includes("expired access token") ||
+                              errorMessage.toLowerCase().includes("invalid or expired")
+        
+        if (isInvalidToken && piAccessToken === localStorage.getItem("pi_access_token")) {
+          // We used stored token and it failed - try SDK one more time
+          console.log("🔄 Stored token invalid, attempting one more time with Pi SDK...")
+          try {
+            window.Pi.init({ version: "2.0" })
+            const onIncompletePaymentFound = (payment: any) => {
+              console.log("⚠️ Incomplete payment found during retry:", payment)
+            }
+            
+            const retryAuth = await window.Pi.authenticate(["username", "payments", "wallet_address"], onIncompletePaymentFound)
+            
+            if (retryAuth?.accessToken) {
+              // Update and retry with fresh SDK token
+              localStorage.setItem("pi_access_token", retryAuth.accessToken)
+              localStorage.setItem("pi_user", JSON.stringify(retryAuth.user))
+              
+              const retryPayload = {
+                authResult: {
+                  accessToken: retryAuth.accessToken,
+                  user: {
+                    username: retryAuth.user?.username || "",
+                    uid: retryAuth.user?.uid || "",
+                  },
+                },
+              }
+              
+              result = await signInClient.post<{ user: any; token: string }>("/users/signin", retryPayload).then(res => res.data)
+              console.log("✅ Successfully refreshed with retry from Pi SDK")
+            } else {
+              throw signInErr
+            }
+          } catch (retryError) {
+            console.error("🔄 Retry with Pi SDK also failed")
+            throw signInErr
+          }
+        } else {
+          // Re-throw other errors
+          throw signInErr
+        }
       }
       
       const newToken = result.token
@@ -409,35 +504,56 @@ axiosClient.interceptors.response.use(
         return Promise.reject(error)
       }
 
-      console.log("🔒 Received 401 error, attempting token refresh...")
-      config._authRetry = true
+      const errorData = error.response?.data as { expired?: boolean; code?: string; message?: string } | undefined
+      const isExpired = errorData?.expired === true || errorData?.code === "TOKEN_EXPIRED"
+      
+      // Only attempt refresh if token is expired, not if it's invalid
+      if (isExpired) {
+        console.log("🔒 Token expired, attempting refresh...")
+        config._authRetry = true
 
-      try {
-        const newToken = await attemptTokenRefresh()
-        
-        if (newToken) {
-          // Retry the original request with the new token
-          console.log("🔄 Retrying original request with refreshed token...")
-          config.headers.Authorization = `Bearer ${newToken}`
-          return axiosClient(config)
-        } else {
-          // Refresh failed - clear auth and reject
-          console.log("🔒 Token refresh failed, clearing authentication")
+        try {
+          const newToken = await attemptTokenRefresh()
           
-          // Dispatch a custom event that components can listen to
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(new CustomEvent("auth:expired", {
-              detail: { 
-                message: "Your session has expired. Please sign in again.",
-                error: toApiError(error)
-              }
-            }))
+          if (newToken) {
+            // Retry the original request with the new token
+            console.log("🔄 Retrying original request with refreshed token...")
+            config.headers.Authorization = `Bearer ${newToken}`
+            return axiosClient(config)
+          } else {
+            // Refresh failed - clear auth and reject
+            console.log("🔒 Token refresh failed, clearing authentication")
+            
+            // Dispatch a custom event that components can listen to
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new CustomEvent("auth:expired", {
+                detail: { 
+                  message: "Your session has expired. Please sign in again.",
+                  error: toApiError(error)
+                }
+              }))
+            }
+            
+            return Promise.reject(error)
           }
-          
+        } catch (refreshError) {
+          console.error("🔒 Error during token refresh:", refreshError)
           return Promise.reject(error)
         }
-      } catch (refreshError) {
-        console.error("🔒 Error during token refresh:", refreshError)
+      } else {
+        // Invalid token (not expired) - don't attempt refresh, just reject
+        console.log("🔒 Invalid token (not expired), clearing authentication")
+        
+        if (typeof window !== "undefined") {
+          const errorData = error.response?.data as { message?: string } | undefined
+          window.dispatchEvent(new CustomEvent("auth:expired", {
+            detail: { 
+              message: errorData?.message || "Invalid authentication. Please sign in again.",
+              error: toApiError(error)
+            }
+          }))
+        }
+        
         return Promise.reject(error)
       }
     }
