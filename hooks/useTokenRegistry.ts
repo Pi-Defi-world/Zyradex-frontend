@@ -55,8 +55,6 @@ export const useTokenRegistry = () => {
     } catch (err) {
       const apiError = toApiError(err)
       setError(apiError)
-      // If it's an auth error, the interceptor will handle refresh/retry
-      // We just need to set the error so UI can display it
     } finally {
       setIsLoading(false)
     }
@@ -77,11 +75,6 @@ export const useTokenRegistry = () => {
     }
   }, [fetchTokens])
 
-  // Retry function for manual retries
-  const retry = useCallback(() => {
-    fetchTokens()
-  }, [fetchTokens])
-
   const tokens = useMemo<TokenRecord[]>(() => data?.tokens ?? [], [data])
 
   return {
@@ -89,7 +82,6 @@ export const useTokenRegistry = () => {
     error,
     isLoading,
     tokens,
-    retry,
   }
 }
 

@@ -8,8 +8,6 @@ import { Navbar } from "@/components/navbar"
 import { Suspense } from "react"
 import { PiProvider } from "@/components/providers/pi-provider"
 import { DisclaimerProvider } from "@/components/disclaimer-provider"
-import { ErrorBoundary } from "@/components/errors/ErrorBoundary"
-import { AuthHandler } from "@/components/auth-handler"
 import Script from 'next/script'
 import "./globals.css"
 
@@ -30,29 +28,26 @@ export default function RootLayout({
         <Script src="https://sdk.minepi.com/pi-sdk.js" strategy="beforeInteractive" />
         <Script id="pi-init" strategy="afterInteractive">
           {`
-            console.log('🔍 Pi initialization script running...');
+            console.log('Pi initialization script running...');
             console.log('Pi SDK available:', !!window.Pi);
             
             if (window.Pi) {
-              console.log('✅ Pi SDK loaded, initializing...');
-              window.Pi.init({ version: "2.0" });
-              console.log('✅ Pi SDK initialized successfully');
+              console.log('Pi SDK loaded, initializing...');
+              window.Pi.init({ version: "2.0", sandbox: true });
+              console.log('Pi SDK initialized successfully');
             } else {
-              console.warn('⚠️ Pi SDK not available - this app requires Pi Browser');
+              console.warn('Pi SDK not available - this app requires Pi Browser');
             }
           `}
         </Script>
         <PiProvider>
           <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
-            <ErrorBoundary>
-              <Suspense fallback={null}>
-                <AuthHandler />
-                <Navbar />
-                {children}
-                <Toaster />
-                <DisclaimerProvider />
-              </Suspense>
-            </ErrorBoundary>
+            <Suspense fallback={null}>
+              <Navbar />
+              {children}
+              <Toaster />
+              <DisclaimerProvider />
+            </Suspense>
           </ThemeProvider>
         </PiProvider>
       </body>

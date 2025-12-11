@@ -43,7 +43,6 @@ import { usePi } from "@/components/providers/pi-provider"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { getUserTokens, getPlatformPools, quoteAddLiquidity, type PoolExistsError } from "@/lib/api/liquidity"
 import type { ILiquidityPool } from "@/lib/types"
-import { AuthErrorDisplay } from "@/components/auth-error-display"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -381,7 +380,6 @@ export default function LiquidityPage() {
   return (
     <div className="min-h-screen premium-gradient pt-16 pb-20">
       <div className="container mx-auto px-4 py-6 space-y-6">
-        <AuthErrorDisplay error={error} />
         <div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Liquidity Pools</h1>
@@ -463,15 +461,21 @@ export default function LiquidityPage() {
                         <SelectContent>
                           <SelectItem value="native">Native (Test Pi)</SelectItem>
                           {userTokens
-                            .filter((t) => t.code !== "native")
-                            .map((token) => (
-                              <SelectItem
-                                key={`${token.code}:${token.issuer}`}
-                                value={`${token.code}:${token.issuer}`}
-                              >
-                                {token.code} {token.issuer ? `(${token.issuer.slice(0, 8)}...)` : ""} - {token.amount.toFixed(4)}
-                              </SelectItem>
-                            ))}
+                            .filter((t) => t.code !== "native" && t.code && t.code.trim() !== "")
+                            .map((token) => {
+                              const value = token.issuer ? `${token.code}:${token.issuer}` : token.code || "unknown"
+                              // Ensure value is never empty
+                              if (!value || value.trim() === "") return null
+                              return (
+                                <SelectItem
+                                  key={value}
+                                  value={value}
+                                >
+                                  {token.code} {token.issuer ? `(${token.issuer.slice(0, 8)}...)` : ""} - {token.amount.toFixed(4)}
+                                </SelectItem>
+                              )
+                            })
+                            .filter(Boolean)}
                         </SelectContent>
                       </Select>
                     ) : (
@@ -514,15 +518,21 @@ export default function LiquidityPage() {
                         <SelectContent>
                           <SelectItem value="native">Native (Test Pi)</SelectItem>
                           {userTokens
-                            .filter((t) => t.code !== "native")
-                            .map((token) => (
-                              <SelectItem
-                                key={`${token.code}:${token.issuer}`}
-                                value={`${token.code}:${token.issuer}`}
-                              >
-                                {token.code} {token.issuer ? `(${token.issuer.slice(0, 8)}...)` : ""} - {token.amount.toFixed(4)}
-                              </SelectItem>
-                            ))}
+                            .filter((t) => t.code !== "native" && t.code && t.code.trim() !== "")
+                            .map((token) => {
+                              const value = token.issuer ? `${token.code}:${token.issuer}` : token.code || "unknown"
+                              // Ensure value is never empty
+                              if (!value || value.trim() === "") return null
+                              return (
+                                <SelectItem
+                                  key={value}
+                                  value={value}
+                                >
+                                  {token.code} {token.issuer ? `(${token.issuer.slice(0, 8)}...)` : ""} - {token.amount.toFixed(4)}
+                                </SelectItem>
+                              )
+                            })
+                            .filter(Boolean)}
                         </SelectContent>
                       </Select>
                     ) : (

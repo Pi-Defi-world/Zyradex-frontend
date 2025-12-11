@@ -12,7 +12,6 @@ import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { useAccountBalances } from "@/hooks/useAccountData"
 import { useCreateSellOffer, useCreateBuyOffer, useSearchAssets } from "@/hooks/useTrade"
-import { AuthErrorDisplay } from "@/components/auth-error-display"
 
 interface TradeFormProps {
   publicKey?: string
@@ -71,7 +70,7 @@ export function TradeForm({ publicKey }: TradeFormProps) {
 
   const handleCreateOffer = () => {
     if (!publicKey) {
-      toast({ title: "Wallet required", description: "Please connect your wallet first.", variant: "destructive" })
+      toast({ title: "Wallet required", description: "Wallet required", variant: "destructive" })
       return
     }
 
@@ -99,7 +98,7 @@ export function TradeForm({ publicKey }: TradeFormProps) {
     if (!userSecret.trim()) {
       toast({ 
         title: "Secret seed required", 
-        description: "Please enter your secret seed to sign the transaction.",
+        description: "Your secret seed is required to sign the transaction.",
         variant: "destructive" 
       })
       return
@@ -156,7 +155,6 @@ export function TradeForm({ publicKey }: TradeFormProps) {
 
   return (
     <>
-      <AuthErrorDisplay error={sellError || buyError || balancesError} />
       <Card className="relative overflow-hidden border border-border/50 bg-card shadow-xl rounded-2xl">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-6">
@@ -178,20 +176,26 @@ export function TradeForm({ publicKey }: TradeFormProps) {
                       <SelectValue placeholder="Select token to sell" />
                     </SelectTrigger>
                   <SelectContent>
-                    {balances.map((balance) => {
-                      const isNative = balance.assetType === "native"
-                      const displayName = isNative ? "Test Pi" : balance.assetCode
-                      const value = isNative ? "native" : (balance.assetIssuer ? `${balance.assetCode}:${balance.assetIssuer}` : balance.assetCode)
-                      const amount = Number(balance.amount).toLocaleString(undefined, { maximumFractionDigits: 6 })
-                      return (
-                        <SelectItem key={value} value={value}>
-                          <div className="flex items-center justify-between w-full">
-                            <span>{displayName}</span>
-                            <span className="text-xs text-muted-foreground ml-2">{amount}</span>
-                          </div>
-                        </SelectItem>
-                      )
-                    })}
+                    {balances
+                      .filter((balance) => {
+                        // Filter out balances that would result in empty value
+                        if (balance.assetType === "native") return true
+                        return balance.assetCode && balance.assetCode.trim() !== ""
+                      })
+                      .map((balance) => {
+                        const isNative = balance.assetType === "native"
+                        const displayName = isNative ? "Test Pi" : balance.assetCode
+                        const value = isNative ? "native" : (balance.assetIssuer ? `${balance.assetCode}:${balance.assetIssuer}` : balance.assetCode || "unknown")
+                        const amount = Number(balance.amount).toLocaleString(undefined, { maximumFractionDigits: 6 })
+                        return (
+                          <SelectItem key={value} value={value}>
+                            <div className="flex items-center justify-between w-full">
+                              <span>{displayName}</span>
+                              <span className="text-xs text-muted-foreground ml-2">{amount}</span>
+                            </div>
+                          </SelectItem>
+                        )
+                      })}
                   </SelectContent>
                   </Select>
                 </div>
@@ -284,26 +288,32 @@ export function TradeForm({ publicKey }: TradeFormProps) {
             <TabsContent value="buy" className="space-y-4">
               <div className="space-y-3">
                 <div className="relative">
-                  <div className="absolute top-3 left-4 text-xs text-muted-foreground font-medium z-10">Selling Token (You'll Pay With)</div>
+                  <div className="absolute top-3 left-4 text-xs text-muted-foreground font-medium z-10"> You'll Pay </div>
                   <Select value={sellingToken} onValueChange={setSellingToken}>
                     <SelectTrigger className="rounded-2xl p-4 pt-8 border border-border/50 h-auto">
                       <SelectValue placeholder="Select token to pay with" />
                     </SelectTrigger>
                   <SelectContent>
-                    {balances.map((balance) => {
-                      const isNative = balance.assetType === "native"
-                      const displayName = isNative ? "Test Pi" : balance.assetCode
-                      const value = isNative ? "native" : (balance.assetIssuer ? `${balance.assetCode}:${balance.assetIssuer}` : balance.assetCode)
-                      const amount = Number(balance.amount).toLocaleString(undefined, { maximumFractionDigits: 6 })
-                      return (
-                        <SelectItem key={value} value={value}>
-                          <div className="flex items-center justify-between w-full">
-                            <span>{displayName}</span>
-                            <span className="text-xs text-muted-foreground ml-2">{amount}</span>
-                          </div>
-                        </SelectItem>
-                      )
-                    })}
+                    {balances
+                      .filter((balance) => {
+                        // Filter out balances that would result in empty value
+                        if (balance.assetType === "native") return true
+                        return balance.assetCode && balance.assetCode.trim() !== ""
+                      })
+                      .map((balance) => {
+                        const isNative = balance.assetType === "native"
+                        const displayName = isNative ? "Test Pi" : balance.assetCode
+                        const value = isNative ? "native" : (balance.assetIssuer ? `${balance.assetCode}:${balance.assetIssuer}` : balance.assetCode || "unknown")
+                        const amount = Number(balance.amount).toLocaleString(undefined, { maximumFractionDigits: 6 })
+                        return (
+                          <SelectItem key={value} value={value}>
+                            <div className="flex items-center justify-between w-full">
+                              <span>{displayName}</span>
+                              <span className="text-xs text-muted-foreground ml-2">{amount}</span>
+                            </div>
+                          </SelectItem>
+                        )
+                      })}
                   </SelectContent>
                   </Select>
                 </div>

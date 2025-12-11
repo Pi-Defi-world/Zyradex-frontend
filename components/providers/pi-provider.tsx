@@ -64,15 +64,15 @@ export function PiProvider({ children }: { children: ReactNode }) {
     }
 
     if (!window.Pi) {
-      throw new Error("Pi SDK not available. Please open this app in Pi Browser.")
+      throw new Error("Pi SDK not available.")
     }
 
     setIsLoading(true)
     try {
-      window.Pi.init({ version: "2.0" })
+      window.Pi.init({ version: "2.0", sandbox: true })
 
       const onIncompletePaymentFound = (payment: any) => {
-        console.log("⚠️ Incomplete payment found:", payment)
+        console.log("Incomplete payment found:", payment)
       }
 
       const auth = await window.Pi.authenticate(["username", "payments", "wallet_address"], onIncompletePaymentFound)
@@ -132,7 +132,7 @@ export function PiProvider({ children }: { children: ReactNode }) {
   }
 
   const clearAuth = () => {
-    console.log("🧹 Clearing all authentication data...")
+    console.log("Clearing all authentication data...")
     setUser(null)
     setAccessToken(null)
     setAuthResult(null)
@@ -155,11 +155,11 @@ export function PiProvider({ children }: { children: ReactNode }) {
     }
 
     if (typeof window === "undefined" || !window.Pi) {
-      throw new Error("Pi SDK not available. Please open in Pi Browser.")
+      throw new Error("Pi SDK not available.")
     }
 
     try {
-      window.Pi.init({ version: "2.0"})
+      window.Pi.init({ version: "2.0", sandbox: true })
 
       return new Promise((resolve, reject) => {
         const callbacks = {

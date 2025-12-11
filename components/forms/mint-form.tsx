@@ -14,7 +14,6 @@ import { usePi } from "@/components/providers/pi-provider"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { useAccountBalances } from "@/hooks/useAccountData"
 import { getMintFee } from "@/lib/api/tokens"
-import { AuthErrorDisplay } from "@/components/auth-error-display"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -162,7 +161,6 @@ export function MintForm() {
 
   return (
     <>
-    <AuthErrorDisplay error={error} />
     <form onSubmit={handleMintClick} className="space-y-4">
       <div className="space-y-3">
         <div className="relative">

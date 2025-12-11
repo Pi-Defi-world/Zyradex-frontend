@@ -12,7 +12,6 @@ import { useAccountBalances } from "@/hooks/useAccountData"
 import { useAvailableTokens } from "@/hooks/useAvailableTokens"
 import { useCheckTrustline } from "@/hooks/useCheckTrustline"
 import { TrustlineDialog } from "@/components/trustlines/trustline-dialog"
-import { AuthErrorDisplay } from "@/components/auth-error-display"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -90,8 +89,6 @@ export default function TrustlinesPage() {
   return (
     <div className="min-h-screen premium-gradient pt-16 pb-20">
       <div className="container mx-auto px-4 py-8 space-y-6 max-w-4xl">
-        <AuthErrorDisplay error={tokensError} />
-
         <Card className="relative overflow-hidden border border-border/50 bg-card shadow-xl rounded-2xl">
           <CardHeader>
             <CardTitle className="text-2xl font-bold">Manage Token List</CardTitle>

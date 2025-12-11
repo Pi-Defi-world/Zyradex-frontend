@@ -9,7 +9,6 @@ import { useUserOffers, useCancelOffer } from "@/hooks/useTrade"
 import { useAccountBalances } from "@/hooks/useAccountData"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { AuthErrorDisplay } from "@/components/auth-error-display"
 
 interface ActiveOffersProps {
   account: string
@@ -75,7 +74,6 @@ export function ActiveOffers({ account }: ActiveOffersProps) {
           <CardDescription>Your open trade offers on the order book</CardDescription>
         </CardHeader>
         <CardContent>
-          <AuthErrorDisplay error={error} />
           {isLoading ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin mr-2" />

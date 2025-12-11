@@ -14,7 +14,6 @@ import { useToast } from "@/hooks/use-toast"
 import { usePoolsForPair, useSwapQuote, useExecuteSwap } from "@/hooks/useSwapData"
 import { useAccountBalances } from "@/hooks/useAccountData"
 import { listLiquidityPools } from "@/lib/api/liquidity"
-import { AuthErrorDisplay } from "@/components/auth-error-display"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -376,7 +375,6 @@ export function SwapCard() {
     <Card className="relative overflow-hidden border border-border/50 bg-card shadow-xl rounded-2xl">
       <div className="relative">
         <CardContent className="p-6">
-          <AuthErrorDisplay error={poolsError || quoteError} />
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-foreground">Swap</h2>
@@ -404,20 +402,31 @@ export function SwapCard() {
                     <SelectValue placeholder="Select" />
               </SelectTrigger>
               <SelectContent>
-                {balances.map((balance) => {
-                  const isNative = balance.assetType === "native"
-                  const displayName = isNative ? "Test Pi" : balance.assetCode
-                  const value = isNative ? "native" : (balance.assetIssuer ? `${balance.assetCode}:${balance.assetIssuer}` : balance.assetCode)
-                  const amount = Number(balance.amount).toLocaleString(undefined, { maximumFractionDigits: 6 })
-                  return (
-                    <SelectItem key={value} value={value}>
-                      <div className="flex items-center justify-between w-full">
-                            <span className="font-medium">{displayName}</span>
-                        <span className="text-xs text-muted-foreground ml-2">{amount}</span>
-                      </div>
-                    </SelectItem>
-                  )
-                })}
+                {balances
+                  .filter((balance) => {
+                    // Filter out balances that would result in empty value
+                    if (balance.assetType === "native") return true
+                    return balance.assetCode && balance.assetCode.trim() !== ""
+                  })
+                  .map((balance) => {
+                    const isNative = balance.assetType === "native"
+                    const displayName = isNative ? "Test Pi" : balance.assetCode
+                    let value = isNative ? "native" : (balance.assetIssuer ? `${balance.assetCode}:${balance.assetIssuer}` : balance.assetCode || "unknown")
+                    // Ensure value is never empty
+                    if (!value || value.trim() === "") {
+                      value = "unknown"
+                    }
+                    const amount = Number(balance.amount).toLocaleString(undefined, { maximumFractionDigits: 6 })
+                    return (
+                      <SelectItem key={value} value={value}>
+                        <div className="flex items-center justify-between w-full">
+                              <span className="font-medium">{displayName}</span>
+                          <span className="text-xs text-muted-foreground ml-2">{amount}</span>
+                        </div>
+                      </SelectItem>
+                    )
+                  })
+                  .filter((item) => item.props.value && item.props.value.trim() !== "")}
               </SelectContent>
             </Select>
               </div>
@@ -473,15 +482,19 @@ export function SwapCard() {
                       </SelectTrigger>
                       <SelectContent>
                       {pairedTokens.length > 0 ? (
-                        pairedTokens.map((token) => {
-                          const isNative = token === "native"
-                          const displayName = isNative ? "Test Pi" : (token.includes(":") ? token.split(":")[0] : token)
-                          return (
-                            <SelectItem key={token} value={token}>
-                              {displayName}
-                            </SelectItem>
-                          )
-                        })
+                        pairedTokens
+                          .filter((token) => token && typeof token === "string" && token.trim() !== "")
+                          .map((token) => {
+                            // Ensure token value is never empty
+                            const safeToken = token && token.trim() !== "" ? token : "unknown"
+                            const isNative = safeToken === "native"
+                            const displayName = isNative ? "Test Pi" : (safeToken.includes(":") ? safeToken.split(":")[0] : safeToken)
+                            return (
+                              <SelectItem key={safeToken} value={safeToken}>
+                                {displayName}
+                              </SelectItem>
+                            )
+                          })
                       ) : (
                         <div className="p-2 text-sm text-muted-foreground text-center">
                           No pairs found

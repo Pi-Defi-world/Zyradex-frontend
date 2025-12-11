@@ -204,26 +204,32 @@ export function SendForm({ publicKey }: SendFormProps) {
                 <SelectValue placeholder="Select token to send" />
               </SelectTrigger>
               <SelectContent>
-                {balances.map((balance) => {
-                  const isNative = balance.assetType === "native"
-                  const displayName = isNative ? "Test Pi" : balance.assetCode
-                  const value = isNative
-                    ? "native"
-                    : balance.assetIssuer
-                    ? `${balance.assetCode}:${balance.assetIssuer}`
-                    : balance.assetCode
-                  const amount = Number(balance.amount).toLocaleString(undefined, {
-                    maximumFractionDigits: 6,
+                {balances
+                  .filter((balance) => {
+                    // Filter out balances that would result in empty value
+                    if (balance.assetType === "native") return true
+                    return balance.assetCode && balance.assetCode.trim() !== ""
                   })
-                  return (
-                    <SelectItem key={value} value={value}>
-                      <div className="flex items-center justify-between w-full">
-                        <span>{displayName}</span>
-                        <span className="text-xs text-muted-foreground ml-2">{amount}</span>
-                      </div>
-                    </SelectItem>
-                  )
-                })}
+                  .map((balance) => {
+                    const isNative = balance.assetType === "native"
+                    const displayName = isNative ? "Test Pi" : balance.assetCode
+                    const value = isNative
+                      ? "native"
+                      : balance.assetIssuer
+                      ? `${balance.assetCode}:${balance.assetIssuer}`
+                      : balance.assetCode || "unknown"
+                    const amount = Number(balance.amount).toLocaleString(undefined, {
+                      maximumFractionDigits: 6,
+                    })
+                    return (
+                      <SelectItem key={value} value={value}>
+                        <div className="flex items-center justify-between w-full">
+                          <span>{displayName}</span>
+                          <span className="text-xs text-muted-foreground ml-2">{amount}</span>
+                        </div>
+                      </SelectItem>
+                    )
+                  })}
               </SelectContent>
             </Select>
           </div>

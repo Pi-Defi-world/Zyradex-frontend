@@ -15,7 +15,6 @@ import { useUserProfile } from "@/hooks/useUserProfile"
 import { useTokenPrice } from "@/hooks/useTokenPrice"
 import { usePiPrice } from "@/hooks/usePiPrice"
 import { ReceiveModal } from "@/components/receive-modal"
-import { AuthErrorDisplay } from "@/components/auth-error-display"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -141,8 +140,6 @@ export default function TokenDetailPage({ params }: { params: { code: string } }
   return (
     <div className="min-h-screen premium-gradient pt-16 pb-20">
       <div className="container mx-auto px-4 py-8 space-y-6 max-w-4xl">
-        <AuthErrorDisplay error={balancesError || operationsError} />
-
         {/* Back Button */}
         <Button
           variant="ghost"

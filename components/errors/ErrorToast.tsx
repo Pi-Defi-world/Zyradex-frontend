@@ -33,13 +33,6 @@ export function showErrorToast(
 
   const actions = []
 
-  if (error.canRetry && onRetry) {
-    actions.push({
-      label: 'Retry',
-      onClick: onRetry,
-    })
-  }
-
   if (error.status === 401) {
     actions.push({
       label: 'Refresh',
@@ -65,7 +58,7 @@ export function showErrorToast(
       </div>
     ),
     variant: 'destructive',
-    duration: error.status === 429 && error.retryAfter ? error.retryAfter * 1000 : 5000,
+    duration: 5000,
     action: actions.length > 0 ? (
       <div className="flex gap-2">
         {actions.map((action, idx) => (

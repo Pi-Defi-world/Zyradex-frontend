@@ -14,7 +14,6 @@ import { usePiPrice } from "@/hooks/usePiPrice"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { useTokenPrices } from "@/hooks/useTokenPrice"
 import { ReceiveModal } from "@/components/receive-modal"
-import { AuthErrorDisplay } from "@/components/auth-error-display"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -53,7 +52,7 @@ export default function HomePage() {
     ? (profile?.public_key || user?.wallet_address || localWallet || undefined) 
     : undefined
   const { balances, totalBalance: nativeBalanceOnly, isLoading: balancesLoading, error: balancesError } = useAccountBalances(publicKey)
-  const { tokens, isLoading: tokensLoading, error: tokensError, retry: retryTokens } = useTokenRegistry()
+  const { tokens, isLoading: tokensLoading, error: tokensError } = useTokenRegistry()
   const { getPrice, isLoading: pricesLoading } = useTokenPrices(
     balances.map(b => ({ 
       assetCode: b.assetCode, 
@@ -125,8 +124,6 @@ export default function HomePage() {
   return (
     <div className="min-h-screen premium-gradient pt-16 pb-20">
       <div className="container mx-auto px-4 py-8 space-y-6 max-w-3xl">
-        <AuthErrorDisplay error={balancesError || tokensError} onRetry={retryTokens} />
-        
         {/* Wallet Header Card */}
         <Card className="relative overflow-hidden border border-border/50 bg-card shadow-xl rounded-2xl">
           <CardContent className="p-6">

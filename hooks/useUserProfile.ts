@@ -108,52 +108,8 @@ export const useUserProfile = (): UseUserProfileReturn => {
         const errorMessage = signInError?.message?.toLowerCase() || ""
         const statusCode = (signInError as any)?.status || signInError?.response?.status
         
-        // Handle Pi Network API errors (500) - these are often temporary
-        if (statusCode === 500 || errorMessage.includes("pi network api")) {
-          console.log(" Pi Network API error detected, may be temporary. Retrying once...")
-          // Wait a bit before retry
-          await new Promise(resolve => setTimeout(resolve, 2000))
-          
-          try {
-            // Retry with the same token (it might be a temporary Pi API issue)
-            const retryResult = await signIn(payload)
-            backendUser = retryResult.user
-            token = retryResult.token
-            console.log(" Retry successful after Pi API error")
-          } catch (retryError: any) {
-            // If retry also fails, throw with clearer message
-            const enhancedError = new Error("Pi Network API is currently unavailable. This is usually temporary. Please try again in a few moments.")
-            ;(enhancedError as any).status = 503
-            ;(enhancedError as any).isPiApiError = true
-            throw enhancedError
-          }
-        }
-        // If signin fails with "Invalid access token", clear auth and retry with fresh token
-        else if (errorMessage.includes("invalid") || errorMessage.includes("access token") || errorMessage.includes("expired")) {
-          console.log("Access token invalid, getting fresh token...")
-          // Clear the old auth result and get a fresh token
-          const freshSession = await authenticate()
-          if (!freshSession?.accessToken) {
-            throw new Error("Failed to get fresh access token")
-          }
-          
-          // Retry signin with fresh token
-          const retryPayload = {
-            authResult: {
-              accessToken: freshSession.accessToken,
-              user: {
-                username: freshSession.user?.username || piUser?.username || "",
-                uid: freshSession.user?.uid || piUser?.uid || "",
-              },
-            },
-          }
-          const retryResult = await signIn(retryPayload)
-          backendUser = retryResult.user
-          token = retryResult.token
-        } else {
-          // Re-throw other errors
-          throw signInError
-        }
+        // Re-throw errors directly without retry logic
+        throw signInError
       }
 
       if (isTokenExpired(token)) {

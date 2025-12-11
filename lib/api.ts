@@ -56,229 +56,6 @@ export const setAuthToken = (token?: string | null) => {
 
 export const clearAuthToken = () => setAuthToken(undefined)
 
-/**
- * Attempt to refresh the authentication token
- * Returns the new token if successful, null if refresh is not possible
- */
-let isRefreshing = false
-let refreshPromise: Promise<string | null> | null = null
-
-const attemptTokenRefresh = async (): Promise<string | null> => {
-  // If already refreshing, wait for that to complete
-  if (isRefreshing && refreshPromise) {
-    return refreshPromise
-  }
-
-  // Check if we're in a browser environment
-  if (typeof window === "undefined") {
-    return null
-  }
-
-  // Check if Pi SDK is available - this is the primary source of truth
-  if (!window.Pi) {
-    console.log("🔄 Pi SDK not available, cannot refresh auth")
-    return null
-  }
-
-  isRefreshing = true
-  refreshPromise = (async () => {
-      try {
-        // PRIMARY APPROACH: Get fresh token from Pi SDK
-        // If SDK has a valid session, authenticate() will return immediately without showing consent
-        // This is the source of truth - trust the SDK's session state
-        let piAccessToken: string | null = null
-        let piUser: any = null
-        
-        try {
-          window.Pi.init({ version: "2.0" })
-          
-          const onIncompletePaymentFound = (payment: any) => {
-            // Silent - don't show toasts for incomplete payments during refresh
-          }
-          
-          // Call authenticate() - if SDK has valid session, this returns immediately
-          // If session expired, it will show consent screen
-          const freshAuth = await window.Pi.authenticate(["username", "payments", "wallet_address"], onIncompletePaymentFound)
-          
-          if (freshAuth?.accessToken) {
-            piAccessToken = freshAuth.accessToken
-            piUser = freshAuth.user
-            
-            // Update stored credentials with fresh token from SDK
-            localStorage.setItem("pi_access_token", piAccessToken)
-            localStorage.setItem("pi_user", JSON.stringify(piUser))
-          }
-        } catch (piAuthError: any) {
-          // Fall through to try stored token as fallback
-          // Don't show error here - we'll try stored token first
-        }
-      
-      // FALLBACK: If SDK didn't provide token, try stored token from localStorage
-      if (!piAccessToken) {
-        const storedToken = localStorage.getItem("pi_access_token")
-        const storedUserStr = localStorage.getItem("pi_user")
-        
-        if (storedToken && storedUserStr) {
-          try {
-            piUser = JSON.parse(storedUserStr)
-            piAccessToken = storedToken
-            console.log("🔄 Using stored Pi access token as fallback")
-          } catch {
-            console.error("🔄 Failed to parse stored Pi user data")
-            return null
-          }
-        } else {
-          console.log("🔄 No stored Pi credentials available")
-          return null
-        }
-      }
-      
-      if (!piAccessToken || !piUser) {
-        console.log("🔄 Unable to get Pi access token from SDK or storage")
-        return null
-      }
-
-      // Create a clean axios instance for signin to avoid including expired token
-      const signInClient = axios.create({
-        baseURL: `${API_BASE_URL.replace(/\/$/, "")}/v1`,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        timeout: REQUEST_TIMEOUT,
-      })
-      
-      const payload = {
-        authResult: {
-          accessToken: piAccessToken,
-          user: {
-            username: piUser.username || "",
-            uid: piUser.uid || "",
-          },
-        },
-      }
-      
-      let result
-      try {
-        result = await signInClient.post<{ user: any; token: string }>("/users/signin", payload).then(res => res.data)
-      } catch (signInErr: any) {
-        const statusCode = signInErr?.response?.status || signInErr?.status
-        const errorMessage = signInErr?.response?.data?.message || signInErr?.message || ""
-        
-        // Handle Pi Network API errors (temporary issues)
-        if (statusCode === 500 && (errorMessage.toLowerCase().includes("pi network") || errorMessage.toLowerCase().includes("pi api"))) {
-          console.log("⚠️ Pi Network API error during token refresh - this is temporary")
-          // Return null to indicate refresh failed, but don't clear auth data
-          // The user might still be authenticated, just Pi API is down
-          return null
-        }
-        
-        // If token is invalid/expired and we used stored token, try SDK one more time
-        const isInvalidToken = statusCode === 401 || 
-                              statusCode === 403 ||
-                              errorMessage.toLowerCase().includes("invalid access token") ||
-                              errorMessage.toLowerCase().includes("expired access token") ||
-                              errorMessage.toLowerCase().includes("invalid or expired")
-        
-        if (isInvalidToken && piAccessToken === localStorage.getItem("pi_access_token")) {
-          // We used stored token and it failed - try SDK one more time
-          console.log("🔄 Stored token invalid, attempting one more time with Pi SDK...")
-          try {
-            window.Pi.init({ version: "2.0" })
-            const onIncompletePaymentFound = (payment: any) => {
-              console.log("⚠️ Incomplete payment found during retry:", payment)
-            }
-            
-            const retryAuth = await window.Pi.authenticate(["username", "payments", "wallet_address"], onIncompletePaymentFound)
-            
-            if (retryAuth?.accessToken) {
-              // Update and retry with fresh SDK token
-              localStorage.setItem("pi_access_token", retryAuth.accessToken)
-              localStorage.setItem("pi_user", JSON.stringify(retryAuth.user))
-              
-              const retryPayload = {
-                authResult: {
-                  accessToken: retryAuth.accessToken,
-                  user: {
-                    username: retryAuth.user?.username || "",
-                    uid: retryAuth.user?.uid || "",
-                  },
-                },
-              }
-              
-              result = await signInClient.post<{ user: any; token: string }>("/users/signin", retryPayload).then(res => res.data)
-              console.log("✅ Successfully refreshed with retry from Pi SDK")
-            } else {
-              throw signInErr
-            }
-          } catch (retryError) {
-            console.error("🔄 Retry with Pi SDK also failed")
-            throw signInErr
-          }
-        } else {
-          // Re-throw other errors
-          throw signInErr
-        }
-      }
-      
-      const newToken = result.token
-
-      // Validate token is not expired
-      try {
-        const jwtDecode = (await import("jwt-decode")).jwtDecode
-        const claims = jwtDecode<{ exp?: number }>(newToken)
-        if (claims.exp && claims.exp * 1000 < Date.now()) {
-          console.error("🔄 Received expired token from refresh")
-          return null
-        }
-      } catch {
-        // If we can't decode, assume it's valid and let the backend validate
-      }
-
-      // Update token in storage and axios client
-      setAuthToken(newToken)
-      
-      // Update profile in localStorage
-      if (typeof window !== "undefined") {
-        localStorage.setItem("dex_user_profile", JSON.stringify(result.user))
-      }
-
-      console.log("✅ Successfully refreshed authentication token")
-      return newToken
-    } catch (error: any) {
-      console.error("🔄 Failed to refresh token:", error)
-      
-      // Check if it's a Pi API error (temporary issue)
-      const statusCode = error?.response?.status || error?.status
-      const errorMessage = error?.response?.data?.message || error?.message || ""
-      const isPiApiError = statusCode === 500 && (
-        errorMessage.toLowerCase().includes("pi network api") || 
-        errorMessage.toLowerCase().includes("pi api")
-      )
-      
-      // Don't clear auth data for Pi API errors - they're temporary
-      if (!isPiApiError) {
-        // If refresh fails, clear all auth data
-        clearAuthToken()
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("dex_user_token")
-          localStorage.removeItem("dex_user_profile")
-          localStorage.removeItem("pi_access_token")
-          localStorage.removeItem("pi_user")
-        }
-      } else {
-        console.log("⚠️ Pi Network API error during refresh - not clearing auth data (temporary issue)")
-      }
-      
-      return null
-    } finally {
-      isRefreshing = false
-      refreshPromise = null
-    }
-  })()
-
-  return refreshPromise
-}
-
 export interface ApiError {
   message: string
   status?: number
@@ -287,51 +64,15 @@ export interface ApiError {
   suggestion?: string
   operationError?: string
   reason?: string
-  retryAfter?: number
   requestId?: string
-  canRetry?: boolean
 }
 
 /**
- * Determine if an error is retryable
- */
-const isRetryableError = (error: AxiosError): boolean => {
-  // Network errors are retryable
-  if (!error.response) {
-    return true
-  }
-
-  const status = error.response.status
-
-  // 5xx errors are retryable (server errors)
-  if (status >= 500 && status < 600) {
-    return true
-  }
-
-  // 408 Request Timeout is retryable
-  if (status === 408) {
-    return true
-  }
-
-  // 429 Rate Limit - retryable after delay
-  if (status === 429) {
-    return true
-  }
-
-  // 503 Service Unavailable is retryable
-  if (status === 503) {
-    return true
-  }
-
-  return false
-}
-
-/**
- * Enhanced error conversion with retry logic support
+ * Enhanced error conversion
  */
 export const toApiError = (error: unknown): ApiError => {
   if (!error) {
-    return { message: "Unknown error occurred", canRetry: false }
+    return { message: "Unknown error occurred" }
   }
 
   if ((error as AxiosError).isAxiosError) {
@@ -343,7 +84,6 @@ export const toApiError = (error: unknown): ApiError => {
       reason?: string
       details?: unknown
       code?: string
-      retryAfter?: number
       requestId?: string
     }>
     
@@ -357,9 +97,6 @@ export const toApiError = (error: unknown): ApiError => {
       (typeof errorData?.error === 'string' ? errorData.error : null) ||
       axiosError.message || 
       "Request failed"
-
-    // Determine if error is retryable
-    const canRetry = isRetryableError(axiosError)
 
     // If message is still generic, try to provide more context
     if (message === "Request failed" || message === "Network Error") {
@@ -387,8 +124,7 @@ export const toApiError = (error: unknown): ApiError => {
       } else if (status === 403) {
         message = errorData?.message || "Access denied. You don't have permission for this action."
       } else if (status === 429) {
-        const retryAfter = errorData?.retryAfter || 60
-        message = errorData?.message || `Too many requests. Please wait ${retryAfter} seconds before trying again.`
+        message = errorData?.message || `Too many requests. Please wait before trying again.`
       } else if (status === 503) {
         message = errorData?.message || "Service temporarily unavailable. Please try again in a few moments."
       }
@@ -405,11 +141,6 @@ export const toApiError = (error: unknown): ApiError => {
     if (!suggestion) {
       if (isPiApiError) {
         suggestion = "This is a temporary issue with Pi Network's API, not your account. Please wait a moment and try again."
-      } else if (canRetry && status !== 429) {
-        suggestion = "This error may be temporary. Please try again."
-      } else if (status === 429) {
-        const retryAfter = errorData?.retryAfter || 60
-        suggestion = `Please wait ${retryAfter} seconds before trying again.`
       } else if (status === 401) {
         suggestion = "Please refresh the page and sign in again."
       } else if (status === 500 || status === 503) {
@@ -418,9 +149,7 @@ export const toApiError = (error: unknown): ApiError => {
     }
 
     // For Pi API errors, treat as 503 (service unavailable) rather than 500 (server error)
-    // This prevents clearing auth data and indicates it's temporary
     const finalStatus = (status === 500 && isPiApiError) ? 503 : status
-    const finalCanRetry = isPiApiError ? true : canRetry
 
     return {
       message,
@@ -430,9 +159,7 @@ export const toApiError = (error: unknown): ApiError => {
       suggestion,
       operationError: errorData?.operationError,
       reason: errorData?.reason,
-      retryAfter: errorData?.retryAfter,
       requestId: errorData?.requestId,
-      canRetry: finalCanRetry,
     }
   }
 
@@ -446,7 +173,6 @@ export const toApiError = (error: unknown): ApiError => {
     return { 
       message,
       status: isPiApiError ? 503 : undefined,
-      canRetry: isPiApiError,
       suggestion: isPiApiError 
         ? "This is a temporary issue with Pi Network's API, not your account. Please wait a moment and try again."
         : undefined
@@ -454,172 +180,21 @@ export const toApiError = (error: unknown): ApiError => {
   }
 
   if (typeof error === "string") {
-    return { message: error, canRetry: false }
+    return { message: error }
   }
 
   // Try to stringify the error object to get some information
   try {
     const errorStr = JSON.stringify(error)
     if (errorStr !== "{}") {
-      return { message: `Error: ${errorStr}`, canRetry: false }
+      return { message: `Error: ${errorStr}` }
     }
   } catch {
     // Ignore JSON stringify errors
   }
 
   return { 
-    message: "An unexpected error occurred. Please try again.",
-    canRetry: false
+    message: "An unexpected error occurred. Please try again."
   }
 }
-
-/**
- * Retry interceptor for transient errors
- */
-let retryCount = 0
-const MAX_RETRIES = 3
-
-axiosClient.interceptors.response.use(
-  (response) => {
-    retryCount = 0 // Reset on success
-    return response
-  },
-  async (error: AxiosError) => {
-    const config = error.config as InternalAxiosRequestConfig & { 
-      _retry?: boolean
-      _authRetry?: boolean
-    }
-
-    // Handle 401 Unauthorized errors - attempt token refresh
-    if (error.response?.status === 401 && !config._authRetry) {
-      // Don't attempt refresh on signin endpoint to avoid infinite loops
-      if (config.url?.includes("/users/signin")) {
-        return Promise.reject(error)
-      }
-
-      const errorData = error.response?.data as { expired?: boolean; code?: string; message?: string } | undefined
-      const isExpired = errorData?.expired === true || errorData?.code === "TOKEN_EXPIRED"
-      const isInvalidToken = errorData?.code === "INVALID_TOKEN"
-      
-      // Attempt refresh for expired tokens, and also for invalid tokens
-      // (invalid tokens might be stale/expired tokens that weren't properly marked)
-      // Only skip refresh if it's a clear non-expiration issue like USER_NOT_FOUND
-      const shouldAttemptRefresh = isExpired || isInvalidToken || !errorData?.code || errorData?.code === "AUTH_ERROR"
-      
-      if (shouldAttemptRefresh) {
-        // Log for debugging (even if console not visible)
-        console.log(`🔒 Token issue detected (${errorData?.code || 'unknown'}), attempting refresh...`)
-        console.log(`🔒 Original request: ${config.method?.toUpperCase()} ${config.url}`)
-        
-        // Show user-friendly notification about refresh attempt
-        if (typeof window !== "undefined") {
-          // Dispatch event to show refresh attempt notification
-          window.dispatchEvent(new CustomEvent("auth:refreshing", {
-            detail: { 
-              message: "Refreshing your session...",
-              code: errorData?.code || 'unknown'
-            }
-          }))
-        }
-        
-        config._authRetry = true
-
-        try {
-          const newToken = await attemptTokenRefresh()
-          
-          if (newToken) {
-            // Retry the original request with the new token
-            console.log("✅ Token refresh successful, retrying original request...")
-            
-            // Show success notification
-            if (typeof window !== "undefined") {
-              window.dispatchEvent(new CustomEvent("auth:refreshed", {
-                detail: { 
-                  message: "Session refreshed successfully"
-                }
-              }))
-            }
-            
-            config.headers.Authorization = `Bearer ${newToken}`
-            const retryResponse = await axiosClient(config)
-            console.log("✅ Original request succeeded after token refresh")
-            return retryResponse
-          } else {
-            // Refresh failed - clear auth and reject
-            console.error("❌ Token refresh failed - no new token received")
-            
-            // Dispatch a custom event that components can listen to
-            if (typeof window !== "undefined") {
-              window.dispatchEvent(new CustomEvent("auth:expired", {
-                detail: { 
-                  message: "Unable to refresh session. Please sign in again.",
-                  error: toApiError(error),
-                  code: errorData?.code
-                }
-              }))
-            }
-            
-            return Promise.reject(error)
-          }
-        } catch (refreshError: any) {
-          console.error("❌ Error during token refresh:", refreshError)
-          console.error("❌ Refresh error details:", {
-            message: refreshError?.message,
-            response: refreshError?.response?.data,
-            status: refreshError?.response?.status
-          })
-          
-          // Show error notification
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(new CustomEvent("auth:refresh-failed", {
-              detail: { 
-                message: refreshError?.message || "Failed to refresh session",
-                error: toApiError(refreshError)
-              }
-            }))
-          }
-          
-          return Promise.reject(error)
-        }
-      } else {
-        // Specific error that shouldn't trigger refresh (e.g., USER_NOT_FOUND)
-        console.log(`🔒 Authentication error (${errorData?.code}): ${errorData?.message || 'Unknown error'}`)
-        
-        if (typeof window !== "undefined") {
-          const errorData = error.response?.data as { message?: string } | undefined
-          window.dispatchEvent(new CustomEvent("auth:expired", {
-            detail: { 
-              message: errorData?.message || "Authentication failed. Please sign in again.",
-              error: toApiError(error)
-            }
-          }))
-        }
-        
-        return Promise.reject(error)
-      }
-    }
-
-    // Don't retry if already retried or not a retryable error
-    if (config._retry || !isRetryableError(error) || retryCount >= MAX_RETRIES) {
-      retryCount = 0
-      return Promise.reject(error)
-    }
-
-    // Don't retry on rate limit errors (429) - user should wait
-    if (error.response?.status === 429) {
-      retryCount = 0
-      return Promise.reject(error)
-    }
-
-    retryCount++
-    config._retry = true
-
-    // Exponential backoff: 1s, 2s, 4s
-    const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 4000)
-    
-    await new Promise(resolve => setTimeout(resolve, delay))
-
-    return axiosClient(config)
-  }
-)
 
