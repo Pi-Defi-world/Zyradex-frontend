@@ -1,6 +1,7 @@
 import { axiosClient, toApiError } from "../api"
 import type { ILiquidityPool } from "../types"
 import { registerPair } from "./pairs"
+import { cachedRequest, createRequestKey } from "./request-cache"
 
 export interface AssetRef {
   code: string
@@ -156,22 +157,44 @@ export const withdrawLiquidity = async (payload: WithdrawLiquidityPayload) => {
   }
 }
 
-export const listLiquidityPools = async (params: ListLiquidityPoolsParams = {}) => {
-  try {
-    const { data } = await axiosClient.get<ListLiquidityPoolsResponse>("/liquidity-pools", { params })
-    return data
-  } catch (error) {
-    throw toApiError(error)
-  }
+export const listLiquidityPools = async (params: ListLiquidityPoolsParams = {}, options?: { skipCache?: boolean }) => {
+  const cacheKey = createRequestKey("/liquidity-pools", params)
+  
+  return cachedRequest(
+    cacheKey,
+    async () => {
+      try {
+        const { data } = await axiosClient.get<ListLiquidityPoolsResponse>("/liquidity-pools", { params })
+        return data
+      } catch (error) {
+        throw toApiError(error)
+      }
+    },
+    {
+      ttl: 2 * 60 * 1000, // 2 minutes - pools change moderately
+      skipCache: options?.skipCache,
+    }
+  )
 }
 
-export const getLiquidityPoolById = async (poolId: string) => {
-  try {
-    const { data } = await axiosClient.get<ILiquidityPool>(`/liquidity-pools/${poolId}`)
-    return data
-  } catch (error) {
-    throw toApiError(error)
-  }
+export const getLiquidityPoolById = async (poolId: string, options?: { skipCache?: boolean }) => {
+  const cacheKey = createRequestKey(`/liquidity-pools/${poolId}`, {})
+  
+  return cachedRequest(
+    cacheKey,
+    async () => {
+      try {
+        const { data } = await axiosClient.get<ILiquidityPool>(`/liquidity-pools/${poolId}`)
+        return data
+      } catch (error) {
+        throw toApiError(error)
+      }
+    },
+    {
+      ttl: 1 * 60 * 1000, // 1 minute - pool details change more frequently
+      skipCache: options?.skipCache,
+    }
+  )
 }
 
 export const getLiquidityReward = async (params: LiquidityRewardParams) => {
@@ -205,13 +228,24 @@ export const getUserTokens = async (publicKey: string) => {
   }
 }
 
-export const getPlatformPools = async () => {
-  try {
-    const { data } = await axiosClient.get<GetPlatformPoolsResponse>("/liquidity-pools/platform-pools")
-    return data
-  } catch (error) {
-    throw toApiError(error)
-  }
+export const getPlatformPools = async (options?: { skipCache?: boolean }) => {
+  const cacheKey = createRequestKey("/liquidity-pools/platform-pools", {})
+  
+  return cachedRequest(
+    cacheKey,
+    async () => {
+      try {
+        const { data } = await axiosClient.get<GetPlatformPoolsResponse>("/liquidity-pools/platform-pools")
+        return data
+      } catch (error) {
+        throw toApiError(error)
+      }
+    },
+    {
+      ttl: 2 * 60 * 1000, // 2 minutes
+      skipCache: options?.skipCache,
+    }
+  )
 }
 
 export interface QuoteAddLiquidityParams {

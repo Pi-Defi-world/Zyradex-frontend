@@ -1,5 +1,6 @@
 import { axiosClient, toApiError } from "../api"
 import type { ILiquidityPool } from "../types"
+import { cachedRequest, createRequestKey } from "./request-cache"
 
 export interface SwapQuoteParams {
   poolId: string
@@ -98,13 +99,24 @@ export const swapToken = async (payload: SwapTokenPayload) => {
   }
 }
 
-export const getPoolsForPair = async (params: PoolsForPairParams) => {
-  try {
-    const { data } = await axiosClient.get<PoolsForPairResponse>("/swap/pools-for-pair", { params })
-    return data
-  } catch (error) {
-    throw toApiError(error)
-  }
+export const getPoolsForPair = async (params: PoolsForPairParams, options?: { skipCache?: boolean }) => {
+  const cacheKey = createRequestKey("/swap/pools-for-pair", params)
+  
+  return cachedRequest(
+    cacheKey,
+    async () => {
+      try {
+        const { data } = await axiosClient.get<PoolsForPairResponse>("/swap/pools-for-pair", { params })
+        return data
+      } catch (error) {
+        throw toApiError(error)
+      }
+    },
+    {
+      ttl: 5 * 60 * 1000, // 5 minutes cache
+      skipCache: options?.skipCache,
+    }
+  )
 }
 
 export const distributeFees = async (payload: DistributeFeesPayload) => {

@@ -1,4 +1,5 @@
 import { axiosClient, toApiError } from "../api"
+import { cachedRequest, createRequestKey } from "./request-cache"
 
 export interface CreateWalletResponse {
   publicKey: string
@@ -82,14 +83,35 @@ export const createWallet = async () => {
 }
 
 export const getAccountBalances = async (publicKey: string, refresh?: boolean) => {
-  try {
-    const { data } = await axiosClient.get<AccountBalancesResponse>(`/account/balance/${publicKey}`, {
-      params: refresh ? { refresh: 'true' } : undefined
-    })
-    return data
-  } catch (error) {
-    throw toApiError(error)
+  // Don't cache if refresh is explicitly requested
+  if (refresh) {
+    try {
+      const { data } = await axiosClient.get<AccountBalancesResponse>(`/account/balance/${publicKey}`, {
+        params: { refresh: 'true' }
+      })
+      return data
+    } catch (error) {
+      throw toApiError(error)
+    }
   }
+
+  const cacheKey = createRequestKey(`/account/balance/${publicKey}`, {})
+  
+  return cachedRequest(
+    cacheKey,
+    async () => {
+      try {
+        const { data } = await axiosClient.get<AccountBalancesResponse>(`/account/balance/${publicKey}`)
+        return data
+      } catch (error) {
+        throw toApiError(error)
+      }
+    },
+    {
+      ttl: 30 * 1000, // 30 seconds - balances change frequently but don't need real-time
+      skipCache: false,
+    }
+  )
 }
 
 export const getAccountOperations = async (params: AccountOperationsParams) => {

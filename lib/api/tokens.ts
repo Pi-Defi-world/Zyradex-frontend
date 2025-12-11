@@ -1,4 +1,5 @@
 import { axiosClient, toApiError } from "../api"
+import { cachedRequest, createRequestKey } from "./request-cache"
 
 export interface TokenRecord {
   _id: string
@@ -71,13 +72,24 @@ export const getMintFee = async () => {
   }
 }
 
-export const fetchTokens = async () => {
-  try {
-    const { data } = await axiosClient.get<FetchTokensResponse>("/tokens")
-    return data
-  } catch (error) {
-    throw toApiError(error)
-  }
+export const fetchTokens = async (options?: { skipCache?: boolean }) => {
+  const cacheKey = createRequestKey("/tokens", {})
+  
+  return cachedRequest(
+    cacheKey,
+    async () => {
+      try {
+        const { data } = await axiosClient.get<FetchTokensResponse>("/tokens")
+        return data
+      } catch (error) {
+        throw toApiError(error)
+      }
+    },
+    {
+      ttl: 10 * 60 * 1000, // 10 minutes - tokens rarely change
+      skipCache: options?.skipCache,
+    }
+  )
 }
 
 export const establishTrustline = async (payload: EstablishTrustlinePayload) => {

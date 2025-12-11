@@ -1,4 +1,5 @@
 import { axiosClient, toApiError } from "../api"
+import { cachedRequest, createRequestKey } from "./request-cache"
 
 export interface OrderBookEntry {
   price: number
@@ -50,15 +51,26 @@ export interface UserOffersResponse {
   offers: UserOffer[]
 }
 
-export const getOrderBook = async (base: string, counter: string) => {
-  try {
-    const { data } = await axiosClient.get<OrderBookResponse>("/market/orderbook", {
-      params: { base, counter },
-    })
-    return data
-  } catch (error) {
-    throw toApiError(error)
-  }
+export const getOrderBook = async (base: string, counter: string, options?: { skipCache?: boolean }) => {
+  const cacheKey = createRequestKey("/market/orderbook", { base, counter })
+  
+  return cachedRequest(
+    cacheKey,
+    async () => {
+      try {
+        const { data } = await axiosClient.get<OrderBookResponse>("/market/orderbook", {
+          params: { base, counter },
+        })
+        return data
+      } catch (error) {
+        throw toApiError(error)
+      }
+    },
+    {
+      ttl: 30 * 1000, // 30 seconds - market data changes frequently
+      skipCache: options?.skipCache,
+    }
+  )
 }
 
 export const getOffersByAccount = async (account: string) => {

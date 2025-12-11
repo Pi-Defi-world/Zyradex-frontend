@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, useRef } from "react"
 import { getPoolsForPair, quoteSwap } from "@/lib/api/swap"
 import type { ApiError } from "@/lib/api"
 
@@ -14,31 +14,46 @@ export const useTokenPrice = (tokenCode: string, tokenIssuer?: string, enabled: 
   const [priceInPi, setPriceInPi] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<ApiError | null>(null)
+  const lastFetchRef = useRef<string | null>(null)
+  const lastPriceRef = useRef<number | null>(null)
+
+  // Create a stable key for this token
+  const tokenKey = useMemo(() => {
+    if (!tokenCode || tokenCode === "native") return null
+    return tokenIssuer ? `${tokenCode}:${tokenIssuer}` : tokenCode
+  }, [tokenCode, tokenIssuer])
 
   useEffect(() => {
-    if (!enabled || !tokenCode || tokenCode === "native") {
+    if (!enabled || !tokenKey) {
       setPriceInPi(null)
       setIsLoading(false)
       setError(null)
+      lastFetchRef.current = null
+      return
+    }
+
+    // Skip if we just fetched this token (prevent re-render loops)
+    if (lastFetchRef.current === tokenKey && lastPriceRef.current !== null) {
       return
     }
 
     let cancelled = false
     setIsLoading(true)
     setError(null)
+    lastFetchRef.current = tokenKey
 
     const fetchPrice = async () => {
       try {
-        // Find pools between this token and native Pi
-        const tokenDescriptor = tokenIssuer ? `${tokenCode}:${tokenIssuer}` : tokenCode
+        // Find pools between this token and native Pi (uses cache internally)
         const poolsResponse = await getPoolsForPair({
-          tokenA: tokenDescriptor,
+          tokenA: tokenKey,
           tokenB: "native",
         })
 
         if (cancelled) return
 
         if (!poolsResponse.success || poolsResponse.pools.length === 0) {
+          lastPriceRef.current = null
           setPriceInPi(null)
           setIsLoading(false)
           return
@@ -49,7 +64,7 @@ export const useTokenPrice = (tokenCode: string, tokenIssuer?: string, enabled: 
         try {
           const quote = await quoteSwap({
             poolId: pool.id,
-            from: tokenDescriptor,
+            from: tokenKey,
             to: "native",
             amount: "1",
             slippagePercent: 1,
@@ -59,19 +74,24 @@ export const useTokenPrice = (tokenCode: string, tokenIssuer?: string, enabled: 
 
           if (quote.success && quote.expectedOutput) {
             const price = parseFloat(quote.expectedOutput)
-            setPriceInPi(isNaN(price) ? null : price)
+            const finalPrice = isNaN(price) ? null : price
+            lastPriceRef.current = finalPrice
+            setPriceInPi(finalPrice)
           } else {
+            lastPriceRef.current = null
             setPriceInPi(null)
           }
         } catch (quoteError) {
           // If quote fails, token has no price
           if (!cancelled) {
+            lastPriceRef.current = null
             setPriceInPi(null)
           }
         }
       } catch (err: any) {
         if (!cancelled) {
           setError(err)
+          lastPriceRef.current = null
           setPriceInPi(null)
         }
       } finally {
@@ -86,7 +106,7 @@ export const useTokenPrice = (tokenCode: string, tokenIssuer?: string, enabled: 
     return () => {
       cancelled = true
     }
-  }, [tokenCode, tokenIssuer, enabled])
+  }, [tokenKey, enabled])
 
   return {
     tokenCode,
@@ -100,11 +120,27 @@ export const useTokenPrice = (tokenCode: string, tokenIssuer?: string, enabled: 
 export const useTokenPrices = (balances: Array<{ assetCode?: string; assetIssuer?: string; assetType?: string }>) => {
   const [prices, setPrices] = useState<Map<string, number | null>>(new Map())
   const [loadingTokens, setLoadingTokens] = useState<Set<string>>(new Set())
+  const lastBalancesRef = useRef<string>("")
+
+  // Create a stable key from balances to prevent unnecessary refetches
+  const balancesKey = useMemo(() => {
+    return balances
+      .filter(b => b.assetCode)
+      .map(b => `${b.assetCode}:${b.assetIssuer || ""}:${b.assetType || ""}`)
+      .sort()
+      .join("|")
+  }, [balances])
 
   useEffect(() => {
+    // Skip if balances haven't actually changed
+    if (lastBalancesRef.current === balancesKey) {
+      return
+    }
+
     // Debounce to avoid too many API calls
     const timeoutId = setTimeout(() => {
       const fetchPrices = async () => {
+        lastBalancesRef.current = balancesKey
         const priceMap = new Map<string, number | null>()
         const loadingSet = new Set<string>()
 
@@ -131,6 +167,7 @@ export const useTokenPrices = (balances: Array<{ assetCode?: string; assetIssuer
                   ? `${balance.assetCode}:${balance.assetIssuer}` 
                   : balance.assetCode!
 
+                // Use cached request (deduplicates and caches automatically)
                 const poolsResponse = await getPoolsForPair({
                   tokenA: tokenDescriptor,
                   tokenB: "native",
@@ -167,9 +204,9 @@ export const useTokenPrices = (balances: Array<{ assetCode?: string; assetIssuer
             })
           )
 
-          // Add delay between batches to avoid rate limiting
+          // Add delay between batches to avoid rate limiting (reduced since we have caching)
           if (i + batchSize < tokensToFetch.length) {
-            await new Promise((resolve) => setTimeout(resolve, 500))
+            await new Promise((resolve) => setTimeout(resolve, 300))
           }
         }
 
@@ -183,10 +220,10 @@ export const useTokenPrices = (balances: Array<{ assetCode?: string; assetIssuer
       if (balances.length > 0) {
         fetchPrices()
       }
-    }, 500) // Debounce by 500ms
+    }, 300) // Reduced debounce since we have caching
 
     return () => clearTimeout(timeoutId)
-  }, [balances])
+  }, [balancesKey, balances.length])
 
   const getPrice = (assetCode?: string, assetIssuer?: string, assetType?: string): number | null => {
     if (assetType === "native") return 1

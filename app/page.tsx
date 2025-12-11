@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowDown, TrendingUp, ArrowRightLeft, Loader2, Copy, Wallet, Plus, ArrowUpRight, ChevronRight } from "lucide-react"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { ArrowDown, TrendingUp, ArrowRightLeft, Loader2, Copy, Wallet, Plus, ArrowUpRight } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { usePi } from "@/components/providers/pi-provider"
-import { useAccountBalances } from "@/hooks/useAccountData"
+import { useAccountBalances, useAccountTransactions } from "@/hooks/useAccountData"
+import { formatDistanceToNow } from "date-fns"
 import { useTokenRegistry } from "@/hooks/useTokenRegistry"
 import { usePiPrice } from "@/hooks/usePiPrice"
 import { useUserProfile } from "@/hooks/useUserProfile"
@@ -27,6 +28,7 @@ export default function HomePage() {
   const { profile } = useUserProfile()
   const [localWallet, setLocalWallet] = useState<string | null>(null)
   const [receiveModalOpen, setReceiveModalOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState("tokens")
   const { price: piPrice, isLoading: priceLoading } = usePiPrice()
 
   useEffect(() => {
@@ -60,6 +62,10 @@ export default function HomePage() {
       assetType: b.assetType 
     }))
   )
+  const { transactions, isLoading: transactionsLoading } = useAccountTransactions(publicKey, {
+    limit: 20,
+    order: "desc",
+  })
 
   // Calculate total balance: native Pi + tokens with pools (valued in Pi)
   const totalBalance = useMemo(() => {
@@ -121,179 +127,238 @@ export default function HomePage() {
     }
   }
 
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString)
+      return formatDistanceToNow(date, { addSuffix: true })
+    } catch {
+      return dateString
+    }
+  }
+
+  const getTransactionType = (tx: any) => {
+    if (tx.operationCount === 0) return "Unknown"
+    if (tx.operationCount === 1) return "Transaction"
+    return `${tx.operationCount} Operations`
+  }
+
   return (
     <div className="min-h-screen premium-gradient pt-16 pb-20">
-      <div className="container mx-auto px-4 py-8 space-y-6 max-w-3xl">
-        {/* Wallet Header Card */}
-        <Card className="relative overflow-hidden border border-border/50 bg-card shadow-xl rounded-2xl">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground font-medium">Wallet</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-foreground">{truncatedKey || "No wallet connected"}</span>
-                  {publicKey && (
-                    <button
-                      onClick={handleCopy}
-                      className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-muted"
-                      title="Copy public key"
-                    >
-                      <Copy className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Total Balance - Large Display */}
-            <div className="text-center space-y-2 mb-8">
-              <p className="text-sm text-muted-foreground font-medium">Total Balance</p>
-              <div className="space-y-1">
-                {balancesLoading || pricesLoading ? (
-                  <div className="flex items-center justify-center">
-                    <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
-                  </div>
-                ) : (
-                  <>
-                    <h1 className="text-5xl font-bold text-foreground tracking-tight">
-                      {totalBalance.toLocaleString(undefined, { maximumFractionDigits: 4 })} Pi
-                    </h1>
-                    {usdBalance !== null && piPrice && (
-                      <p className="text-lg text-muted-foreground">
-                        ${usdBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                      </p>
-                    )}
-                    {priceLoading && usdBalance === null && piPrice === null && (
-                      <p className="text-sm text-muted-foreground">Loading price...</p>
-                    )}
-                    {!priceLoading && piPrice === null && totalBalance > 0 && (
-                      <p className="text-sm text-muted-foreground">Price unavailable</p>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Action Buttons - Wallet Style */}
-            <div className="grid grid-cols-4 gap-3 mb-6">
-              <Button
-                variant="outline"
-                className="h-16 flex flex-col items-center justify-center gap-1 rounded-xl border-2 hover:border-primary/50 hover:bg-muted/50 transition-all"
-                onClick={() => setReceiveModalOpen(true)}
-              >
-                <ArrowDown className="h-5 w-5" />
-                <span className="text-xs font-medium">Receive</span>
-              </Button>
-              <Button
-                variant="outline"
-                className="h-16 flex flex-col items-center justify-center gap-1 rounded-xl border-2 hover:border-primary/50 hover:bg-muted/50 transition-all"
-                onClick={handleSend}
-              >
-                <ArrowUpRight className="h-5 w-5" />
-                <span className="text-xs font-medium">Send</span>
-              </Button>
-              <Button
-                variant="outline"
-                className="h-16 flex flex-col items-center justify-center gap-1 rounded-xl border-2 hover:border-primary/50 hover:bg-muted/50 transition-all"
-                onClick={handleSwap}
-              >
-                <ArrowRightLeft className="h-5 w-5" />
-                <span className="text-xs font-medium">Swap</span>
-              </Button>
-              <Button
-                variant="outline"
-                className="h-16 flex flex-col items-center justify-center gap-1 rounded-xl border-2 hover:border-primary/50 hover:bg-muted/50 transition-all"
-                onClick={handleTrade}
-              >
-                <TrendingUp className="h-5 w-5" />
-                <span className="text-xs font-medium">Trade</span>
-              </Button>
-            </div>
-
-          </CardContent>
-        </Card>
-
-        {/* Tokens List Card */}
-        <Card className="relative overflow-hidden border border-border/50 bg-card shadow-xl rounded-2xl">
-          <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Wallet className="h-5 w-5 text-muted-foreground" />
-                <CardTitle className="text-xl font-bold">Tokens</CardTitle>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="h-9 rounded-full" 
-                onClick={handleManageTokens}
-              >
-                <Plus className="h-4 w-4 mr-1.5" />
-                Manage token list
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {balancesLoading ? (
-                <div className="flex items-center justify-center py-12 text-muted-foreground text-sm">
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Loading balances...
-                </div>
-              ) : balances.length === 0 ? (
-                <div className="text-sm text-muted-foreground py-12 text-center border-2 border-dashed border-border rounded-xl bg-muted/20">
-                  {publicKey ? "No balances found" : "Connect a wallet to view your holdings"}
-                </div>
-              ) : (
-                balances.map((balance, index) => {
-                  const isNative = balance.assetType === "native"
-                  const displayName = isNative ? "Test Pi" : balance.assetCode
-                  const amount = Number(balance.amount)
-                  const priceInPi = getPrice(balance.assetCode, balance.assetIssuer || undefined, balance.assetType)
-                  const valueInPi = priceInPi !== null ? amount * priceInPi : null
-                  const usdValue = piPrice && (isNative || valueInPi !== null) 
-                    ? (isNative ? amount : valueInPi!) * piPrice 
-                    : null
-
-                  return (
-                    <button
-                      key={`${balance.asset}-${index}`}
-                      onClick={() => handleTokenClick(balance)}
-                      className="w-full flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border/50 hover:bg-muted/60 hover:border-border transition-all cursor-pointer group"
-                    >
-                      <div className="flex-1 min-w-0 text-left">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="font-bold text-lg text-foreground truncate">{displayName}</p>
-                          {valueInPi !== null && !isNative && (
-                            <span className="text-xs text-muted-foreground">
-                              ≈ {valueInPi.toLocaleString(undefined, { maximumFractionDigits: 4 })} Pi
-                            </span>
-                          )}
-                        </div>
-                        {!isNative && balance.assetIssuer && (
-                          <p className="text-xs text-muted-foreground truncate font-mono">
-                            {balance.assetIssuer.slice(0, 8)}...{balance.assetIssuer.slice(-6)}
-                          </p>
-                        )}
-                        {priceInPi === null && !isNative && (
-                          <p className="text-xs text-muted-foreground mt-1">No pool available</p>
-                        )}
-                      </div>
-                      <div className="text-right ml-4 shrink-0">
-                        <p className="font-bold text-lg text-foreground">
-                          {amount.toLocaleString(undefined, { maximumFractionDigits: 6 })}
-                        </p>
-                        {usdValue !== null && (
-                          <p className="text-xs text-muted-foreground">
-                            ${usdValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                          </p>
-                        )}
-                        <ChevronRight className="h-4 w-4 text-muted-foreground ml-auto mt-1 group-hover:text-foreground transition-colors" />
-                      </div>
-                    </button>
-                  )
-                })
+      <div className="container mx-auto px-4 py-6 space-y-4 max-w-3xl">
+        {/* Wallet Header - Compact Mobile Design */}
+        <div className="space-y-4">
+          {/* Wallet Address */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground font-medium">Wallet</span>
+              <span className="text-sm font-medium text-foreground">{truncatedKey || "No wallet connected"}</span>
+              {publicKey && (
+                <button
+                  onClick={handleCopy}
+                  className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-muted"
+                  title="Copy public key"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                </button>
               )}
             </div>
+          </div>
+
+          {/* Balance Display - Centered, Pi Primary */}
+          <div className="space-y-1 text-center">
+            {balancesLoading || pricesLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <>
+                <h1 className="text-4xl font-bold text-foreground tracking-tight">
+                  {totalBalance.toLocaleString(undefined, { maximumFractionDigits: 4 })} Pi
+                </h1>
+                {usdBalance !== null && piPrice && (
+                  <p className="text-sm text-muted-foreground">
+                    ${usdBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  </p>
+                )}
+                {priceLoading && usdBalance === null && piPrice === null && (
+                  <p className="text-sm text-muted-foreground">Loading price...</p>
+                )}
+                {!priceLoading && piPrice === null && totalBalance > 0 && (
+                  <p className="text-sm text-muted-foreground">Price unavailable</p>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Action Buttons - Wallet Style Compact */}
+          <div className="grid grid-cols-4 gap-1.5">
+            <Button
+              variant="outline"
+              className="h-10 flex flex-col items-center justify-center gap-0.5 rounded-lg border hover:border-primary/50 hover:bg-muted/50 transition-all py-1 px-2"
+              onClick={() => setReceiveModalOpen(true)}
+            >
+              <ArrowDown className="h-3.5 w-3.5" />
+              <span className="text-[10px] font-medium leading-tight">Receive</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-10 flex flex-col items-center justify-center gap-0.5 rounded-lg border hover:border-primary/50 hover:bg-muted/50 transition-all py-1 px-2"
+              onClick={handleSend}
+            >
+              <ArrowUpRight className="h-3.5 w-3.5" />
+              <span className="text-[10px] font-medium leading-tight">Send</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-10 flex flex-col items-center justify-center gap-0.5 rounded-lg border hover:border-primary/50 hover:bg-muted/50 transition-all py-1 px-2"
+              onClick={handleSwap}
+            >
+              <ArrowRightLeft className="h-3.5 w-3.5" />
+              <span className="text-[10px] font-medium leading-tight">Swap</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-10 flex flex-col items-center justify-center gap-0.5 rounded-lg border hover:border-primary/50 hover:bg-muted/50 transition-all py-1 px-2"
+              onClick={handleTrade}
+            >
+              <TrendingUp className="h-3.5 w-3.5" />
+              <span className="text-[10px] font-medium leading-tight">Trade</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* Tokens List with Tabs */}
+        <Card className="relative overflow-hidden border border-border/50 bg-card shadow-xl rounded-2xl">
+          <CardContent className="p-4">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <div className="flex items-center justify-between mb-4">
+                <TabsList className="w-fit">
+                  <TabsTrigger value="tokens">Tokens</TabsTrigger>
+                  <TabsTrigger value="history">History</TabsTrigger>
+                </TabsList>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-7 w-7" 
+                  onClick={handleManageTokens}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+
+              <TabsContent value="tokens" className="mt-0">
+                <div className="space-y-2">
+                  {balancesLoading ? (
+                    <div className="flex items-center justify-center py-12 text-muted-foreground text-sm">
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Loading balances...
+                    </div>
+                  ) : balances.length === 0 ? (
+                    <div className="text-sm text-muted-foreground py-12 text-center border-2 border-dashed border-border rounded-xl bg-muted/20">
+                      {publicKey ? "No balances found" : "Connect a wallet to view your holdings"}
+                    </div>
+                  ) : (
+                    balances.map((balance, index) => {
+                      const isNative = balance.assetType === "native"
+                      const displayName = isNative ? "Test Pi" : balance.assetCode
+                      const amount = Number(balance.amount)
+                      const priceInPi = getPrice(balance.assetCode, balance.assetIssuer || undefined, balance.assetType)
+                      const valueInPi = priceInPi !== null ? amount * priceInPi : null
+                      const usdValue = piPrice && (isNative || valueInPi !== null) 
+                        ? (isNative ? amount : valueInPi!) * piPrice 
+                        : null
+
+                      return (
+                        <button
+                          key={`${balance.asset}-${index}`}
+                          onClick={() => handleTokenClick(balance)}
+                          className="w-full flex items-center justify-between p-3 rounded-lg bg-muted/20 hover:bg-muted/40 transition-all cursor-pointer"
+                        >
+                          <div className="flex-1 min-w-0 text-left">
+                            <p className="font-semibold text-base text-foreground truncate">{displayName}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {amount.toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                              {!isNative && balance.assetCode && ` ${balance.assetCode}`}
+                              {isNative && " Test Pi"}
+                            </p>
+                          </div>
+                          <div className="text-right ml-4 shrink-0">
+                            {usdValue !== null ? (
+                              <>
+                                <p className="font-semibold text-base text-foreground">
+                                  ${usdValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                                </p>
+                                {valueInPi !== null && !isNative && (
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                    ≈ {valueInPi.toLocaleString(undefined, { maximumFractionDigits: 4 })} Pi
+                                  </p>
+                                )}
+                              </>
+                            ) : (
+                              <p className="font-semibold text-base text-foreground">
+                                {amount.toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                              </p>
+                            )}
+                          </div>
+                        </button>
+                      )
+                    })
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="history" className="mt-0">
+                <div className="space-y-2">
+                  {transactionsLoading ? (
+                    <div className="flex items-center justify-center py-12 text-muted-foreground text-sm">
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Loading transactions...
+                    </div>
+                  ) : !publicKey ? (
+                    <div className="text-sm text-muted-foreground py-12 text-center border-2 border-dashed border-border rounded-xl bg-muted/20">
+                      Connect a wallet to view transaction history
+                    </div>
+                  ) : transactions.length === 0 ? (
+                    <div className="text-sm text-muted-foreground py-12 text-center border-2 border-dashed border-border rounded-xl bg-muted/20">
+                      No transactions found
+                    </div>
+                  ) : (
+                    transactions.map((tx) => (
+                      <div
+                        key={tx.id}
+                        className="flex items-center justify-between gap-3 p-3 rounded-xl bg-muted/30 border border-border/50 hover:bg-muted/60 hover:border-border transition-all"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm font-medium text-foreground">
+                              {getTransactionType(tx)}
+                            </span>
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded-full ${
+                                tx.successful
+                                  ? "bg-green-500/20 text-green-700 dark:text-green-400"
+                                  : "bg-red-500/20 text-red-700 dark:text-red-400"
+                              }`}
+                            >
+                              {tx.successful ? "Success" : "Failed"}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {formatDate(tx.createdAt)}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-xs text-muted-foreground">Fee</p>
+                          <p className="text-sm font-semibold text-foreground">
+                            {tx.fee ? (Number(tx.fee) / 10000000).toFixed(7) : "0"} Pi
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
 
