@@ -34,3 +34,16 @@ export const signIn = async (payload: SignInPayload) => {
     throw toApiError(error)
   }
 }
+
+export interface GetCurrentUserResponse {
+  user: AdminUser
+}
+
+export const getCurrentUser = async (): Promise<GetCurrentUserResponse> => {
+  try {
+    const { data } = await axiosClient.get<GetCurrentUserResponse>("/users/me")
+    return data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}

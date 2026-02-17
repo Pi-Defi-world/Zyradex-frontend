@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { useTokenRegistry } from "@/hooks/useTokenRegistry"
 import { useLiquidityPools } from "@/hooks/useLiquidityData"
-import { usePi } from "@/components/providers/pi-provider"
+import { useAdminAuth } from "@/hooks/useAdminAuth"
 import { useAccountBalances } from "@/hooks/useAccountData"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
@@ -29,11 +29,12 @@ export default function LandingPage() {
   const [disclaimerOpen, setDisclaimerOpen] = useState(false)
   const { toast } = useToast()
   const router = useRouter()
-  const { user, isAuthenticated } = usePi()
+  const { adminUser } = useAdminAuth()
+  const publicKey = adminUser?.public_key?.trim() ?? undefined
 
   const { tokens, isLoading: tokensLoading } = useTokenRegistry()
   const { pools, isLoading: poolsLoading } = useLiquidityPools({ limit: 20 })
-  const { balances } = useAccountBalances(user?.wallet_address ?? undefined)
+  const { balances } = useAccountBalances(publicKey)
 
   const tokenSummaries = useMemo(() => tokens.map(buildTokenSummary), [tokens])
   const trendingTokens = tokenSummaries.slice(0, 6)
@@ -60,10 +61,10 @@ export default function LandingPage() {
   }, [])
 
   const handleMintClick = () => {
-    if (!isAuthenticated) {
+    if (!adminUser) {
       toast({
         title: "Authentication Required",
-        description: "Please connect your Pi wallet using the navbar to mint tokens.",
+        description: "Please connect with Pi using the navbar to mint tokens.",
         variant: "destructive",
       })
     } else {

@@ -1,4 +1,5 @@
 import { axiosClient, toApiError } from "../api"
+import type { AdminUser } from "./auth"
 
 export interface ImportAccountPayload {
   mnemonic?: string
@@ -66,6 +67,19 @@ export interface PaginatedOperations {
     nextCursor: string | null
     hasMore: boolean
     order: "asc" | "desc"
+  }
+}
+
+export interface LinkWalletResponse {
+  user: AdminUser
+}
+
+export const linkWallet = async (publicKey: string): Promise<LinkWalletResponse> => {
+  try {
+    const { data } = await axiosClient.post<LinkWalletResponse>("/account/link-wallet", { publicKey })
+    return data
+  } catch (error) {
+    throw toApiError(error)
   }
 }
 

@@ -24,6 +24,7 @@ import {
   Wallet,
 } from "lucide-react"
 import { usePi } from "@/components/providers/pi-provider"
+import { useAdminAuth } from "@/hooks/useAdminAuth"
 import { CollectWallet } from "@/components/collect-wallet"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -35,11 +36,6 @@ import { useTokenRegistry } from "@/hooks/useTokenRegistry"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 
-const getStoredWallet = () => {
-  if (typeof window === "undefined") return null
-  return localStorage.getItem("bingepi-wallet-address")
-}
-
 const formatDate = (value?: Date | string) => {
   if (!value) return "Unknown"
   const date = value instanceof Date ? value : new Date(value)
@@ -47,18 +43,15 @@ const formatDate = (value?: Date | string) => {
 }
 
 const ProfilePage: React.FC = () => {
-  const { user, isAuthenticated, authenticate, signOut } = usePi()
+  const { user: piUser, authenticate, signOut: piSignOut } = usePi()
+  const { adminUser, token, signIn: backendSignIn, signOut: backendSignOut, isLoading: backendLoading } = useAdminAuth()
   const { toast } = useToast()
   const [showCollectWallet, setShowCollectWallet] = useState(false)
-  const [storedWalletAddress, setStoredWalletAddress] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
-  useEffect(() => {
-    setStoredWalletAddress(getStoredWallet())
-  }, [])
-
-  const walletForData = storedWalletAddress || user?.wallet_address || undefined
+  const walletForData = adminUser?.public_key?.trim() || undefined
   const { balances, totalBalance, isLoading: balancesLoading } = useAccountBalances(walletForData)
+  const isLoggedIn = Boolean(token && adminUser)
   const { tokens } = useTokenRegistry()
 
   const stats = useMemo(
@@ -77,24 +70,26 @@ const ProfilePage: React.FC = () => {
     }
   }
 
-  const handleWalletCollected = (walletAddress: string) => {
-    setStoredWalletAddress(walletAddress)
-  }
-
   const handlePiConnect = async () => {
     setIsLoading(true)
     try {
       await authenticate()
+      await backendSignIn()
     } catch (error) {
-      console.error("Pi authentication failed:", error)
+      console.error("Auth failed:", error)
       toast({
         title: "Authentication Failed",
-        description: "Please try again or enter your wallet address manually",
+        description: "Please try again or link a wallet from this page",
         variant: "destructive",
       })
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleSignOut = () => {
+    backendSignOut()
+    piSignOut()
   }
 
   const mainNavItems = [
@@ -118,9 +113,9 @@ const ProfilePage: React.FC = () => {
       <div className="max-w-md mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-xl sm:text-2xl font-bold text-foreground">Profile</h1>
-          {!isAuthenticated && (
-            <Button size="sm" onClick={handlePiConnect} disabled={isLoading}>
-              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plug className="mr-2 h-4 w-4" />}
+          {!isLoggedIn && (
+            <Button size="sm" onClick={handlePiConnect} disabled={isLoading || backendLoading}>
+              {isLoading || backendLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plug className="mr-2 h-4 w-4" />}
               Connect Pi
             </Button>
           )}
@@ -138,15 +133,15 @@ const ProfilePage: React.FC = () => {
             <div className="flex items-center gap-4">
               <Avatar className="h-16 w-16">
                 <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
-                  {(user?.username || "Guest").slice(0, 2).toUpperCase()}
+                  {(adminUser?.username ?? piUser?.username ?? "Guest").slice(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
                 <div className="font-semibold text-lg text-foreground truncate">
-                  {isLoading ? "Authenticating..." : user?.username ? `@${user.username}` : "Unauthenticated"}
+                  {isLoading || backendLoading ? "Authenticating…" : adminUser?.username ? `@${adminUser.username}` : "Unauthenticated"}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Member since {formatDate(user?.authenticated_at)}
+                  {adminUser?.username ? "Backend account linked" : "Connect Pi to link your account"}
                 </div>
               </div>
             </div>
@@ -174,7 +169,7 @@ const ProfilePage: React.FC = () => {
             <p className="text-sm text-muted-foreground">
               {walletForData
                 ? "This address is used to load balances and swap history."
-                : "Connect or enter a wallet address to unlock portfolio insights."}
+                : "Connect or import a wallet to unlock portfolio insights."}
             </p>
             {walletForData ? (
               <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
@@ -188,7 +183,7 @@ const ProfilePage: React.FC = () => {
                   <Button variant="outline" size="sm" onClick={handleCopyWalletAddress}>
                     <Copy className="h-4 w-4" />
                   </Button>
-                  <Button variant="destructive" size="sm" onClick={signOut}>
+                  <Button variant="destructive" size="sm" onClick={handleSignOut}>
                     <LogOut className="h-4 w-4 mr-2" />
                     Disconnect
                   </Button>
@@ -198,7 +193,7 @@ const ProfilePage: React.FC = () => {
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  Connect your Pi wallet to access balances, swaps, and token management.
+                  Link a wallet by importing with mnemonic/secret or by pasting your Stellar public key.
                 </AlertDescription>
               </Alert>
             )}
@@ -209,7 +204,7 @@ const ProfilePage: React.FC = () => {
                 className="w-full btn-gradient-primary"
               >
                 <Wallet className="mr-2 h-4 w-4" />
-                Enter Wallet Address
+                Connect / Import Wallet
               </Button>
             </div>
           </CardContent>
@@ -275,10 +270,10 @@ const ProfilePage: React.FC = () => {
           ))}
         </div>
 
-        {isAuthenticated && (
+        {isLoggedIn && (
           <div>
             <button
-              onClick={signOut}
+              onClick={handleSignOut}
               className="w-full flex items-center justify-between p-4 bg-card rounded-xl hover:bg-muted/50 transition-colors border border-border/30 shadow-sm text-destructive"
             >
               <div className="flex items-center space-x-3 min-w-0 flex-1">
@@ -293,7 +288,7 @@ const ProfilePage: React.FC = () => {
         )}
       </div>
 
-      <CollectWallet open={showCollectWallet} onOpenChange={setShowCollectWallet} onWalletCollected={handleWalletCollected} />
+      <CollectWallet open={showCollectWallet} onOpenChange={setShowCollectWallet} />
     </div>
   )
 }

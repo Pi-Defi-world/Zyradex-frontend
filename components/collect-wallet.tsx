@@ -4,11 +4,13 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Wallet, Copy, Check, AlertCircle } from "lucide-react"
+import { Wallet, Check, AlertCircle, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { useAdminAuth } from "@/hooks/useAdminAuth"
+import { importAccount, linkWallet } from "@/lib/api/account"
+import { toApiError } from "@/lib/api"
 
 interface CollectWalletProps {
   open: boolean
@@ -16,127 +18,155 @@ interface CollectWalletProps {
   onWalletCollected?: (walletAddress: string) => void
 }
 
+const STELLAR_PUBKEY_REGEX = /^G[A-Z0-9]{55}$/
+
 export function CollectWallet({ open, onOpenChange, onWalletCollected }: CollectWalletProps) {
+  const { adminUser, token, refreshUser } = useAdminAuth()
+  const { toast } = useToast()
+  const [mode, setMode] = useState<"paste" | "import">("paste")
   const [walletAddress, setWalletAddress] = useState("")
+  const [mnemonic, setMnemonic] = useState("")
+  const [secret, setSecret] = useState("")
   const [isValidating, setIsValidating] = useState(false)
   const [isValid, setIsValid] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const [existingWallet, setExistingWallet] = useState<string | null>(null)
+  const [linking, setLinking] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [pendingWalletAddress, setPendingWalletAddress] = useState("")
-  const { toast } = useToast()
 
-  // Sample Pi wallet address for demonstration
-  const sampleWalletAddress = "GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+  const existingWallet = adminUser?.public_key?.trim() || null
 
-  // Check for existing wallet on component mount
-  useEffect(() => {
-    const storedWallet = localStorage.getItem('bingepi-wallet-address')
-    if (storedWallet) {
-      setExistingWallet(storedWallet)
-      setWalletAddress(storedWallet)
-      setIsValid(true) // Assume existing wallet is valid
-    }
-  }, [])
-
-  // Check for existing wallet when dialog opens
   useEffect(() => {
     if (open) {
-      const storedWallet = localStorage.getItem('bingepi-wallet-address')
-      if (storedWallet) {
-        setExistingWallet(storedWallet)
-        setWalletAddress(storedWallet)
-        setIsValid(true)
-      } else {
-        setExistingWallet(null)
-        setWalletAddress("")
-        setIsValid(false)
-      }
+      setWalletAddress(existingWallet ?? "")
+      setIsValid(!!existingWallet && STELLAR_PUBKEY_REGEX.test(existingWallet))
+      setMnemonic("")
+      setSecret("")
     }
-  }, [open])
+  }, [open, existingWallet])
 
-  const validateWalletAddress = (address: string) => {
-    // Basic validation for Pi wallet address format
-    // Pi addresses typically start with 'G' and are 56 characters long
-    const piAddressRegex = /^G[A-Z0-9]{55}$/
-    return piAddressRegex.test(address)
-  }
+  const validateAddress = (address: string) => STELLAR_PUBKEY_REGEX.test(address)
 
   const handleAddressChange = (value: string) => {
     setWalletAddress(value)
     if (value.length > 0) {
       setIsValidating(true)
-      // Simulate validation delay
       setTimeout(() => {
-        const valid = validateWalletAddress(value)
-        setIsValid(valid)
+        setIsValid(validateAddress(value))
         setIsValidating(false)
-      }, 500)
+      }, 300)
     } else {
       setIsValid(false)
       setIsValidating(false)
     }
   }
 
-  const handleCopySample = () => {
-    navigator.clipboard.writeText(sampleWalletAddress)
-    setCopied(true)
-    toast({
-      title: "Copied!",
-      description: "Sample wallet address copied to clipboard",
-    })
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  const handleSubmit = () => {
-    if (isValid && walletAddress) {
-      // If there's an existing wallet and the new address is different, show confirmation
-      if (existingWallet && walletAddress !== existingWallet) {
-        setPendingWalletAddress(walletAddress)
-        setShowConfirmDialog(true)
-      } else {
-        // Direct submit for new wallet or same wallet
-        submitWallet(walletAddress)
-      }
+  const handleLinkPublicKey = async (publicKey: string) => {
+    if (!token) {
+      toast({
+        title: "Sign in required",
+        description: "Connect with Pi first, then link your wallet.",
+        variant: "destructive",
+      })
+      return
+    }
+    setLinking(true)
+    try {
+      await linkWallet(publicKey)
+      await refreshUser()
+      onWalletCollected?.(publicKey)
+      onOpenChange(false)
+      toast({
+        title: existingWallet ? "Wallet updated" : "Wallet linked",
+        description: "Your wallet is now linked to your account.",
+      })
+      setWalletAddress("")
+      setIsValid(false)
+    } catch (err) {
+      const apiError = toApiError(err)
+      toast({
+        title: "Could not link wallet",
+        description: apiError.message,
+        variant: "destructive",
+      })
+    } finally {
+      setLinking(false)
     }
   }
 
-  const submitWallet = (address: string) => {
-    // Store wallet address in localStorage
-    localStorage.setItem('bingepi-wallet-address', address)
-    
-    const isUpdate = existingWallet !== null
-    toast({
-      title: isUpdate ? "Wallet Updated!" : "Wallet Connected!",
-      description: isUpdate 
-        ? "Your Pi wallet address has been updated successfully" 
-        : "Your Pi wallet address has been saved successfully",
-    })
-    
-    onWalletCollected?.(address)
-    onOpenChange(false)
-    
-    // Reset form
-    setWalletAddress("")
-    setIsValid(false)
-    setExistingWallet(address)
+  const handleImportAndLink = async () => {
+    if (!token) {
+      toast({
+        title: "Sign in required",
+        description: "Connect with Pi first, then import your wallet.",
+        variant: "destructive",
+      })
+      return
+    }
+    const hasMnemonic = mnemonic.trim().length > 0
+    const hasSecret = secret.trim().length > 0
+    if (!hasMnemonic && !hasSecret) {
+      toast({
+        title: "Enter mnemonic or secret",
+        description: "Provide either a 12/24-word mnemonic or your Stellar secret key.",
+        variant: "destructive",
+      })
+      return
+    }
+    if (hasMnemonic && hasSecret) {
+      toast({
+        title: "Use one method",
+        description: "Enter either mnemonic or secret key, not both.",
+        variant: "destructive",
+      })
+      return
+    }
+    setLinking(true)
+    try {
+      const payload = hasMnemonic ? { mnemonic: mnemonic.trim() } : { secret: secret.trim() }
+      const { publicKey } = await importAccount(payload)
+      await linkWallet(publicKey)
+      await refreshUser()
+      onWalletCollected?.(publicKey)
+      onOpenChange(false)
+      toast({
+        title: "Wallet imported and linked",
+        description: "Your wallet is now linked. Never share your secret key.",
+      })
+      setMnemonic("")
+      setSecret("")
+    } catch (err) {
+      const apiError = toApiError(err)
+      toast({
+        title: "Import failed",
+        description: apiError.message,
+        variant: "destructive",
+      })
+    } finally {
+      setLinking(false)
+    }
+  }
+
+  const handleSubmitPaste = () => {
+    if (!isValid || !walletAddress) return
+    if (existingWallet && walletAddress !== existingWallet) {
+      setPendingWalletAddress(walletAddress)
+      setShowConfirmDialog(true)
+    } else {
+      handleLinkPublicKey(walletAddress)
+    }
   }
 
   const handleConfirmUpdate = () => {
-    submitWallet(pendingWalletAddress)
-    setShowConfirmDialog(false)
-    setPendingWalletAddress("")
-  }
-
-  const handleCancelUpdate = () => {
+    handleLinkPublicKey(pendingWalletAddress)
     setShowConfirmDialog(false)
     setPendingWalletAddress("")
   }
 
   const handleClose = () => {
     onOpenChange(false)
-    // Reset form when closing
     setWalletAddress("")
+    setMnemonic("")
+    setSecret("")
     setIsValid(false)
   }
 
@@ -146,155 +176,162 @@ export function CollectWallet({ open, onOpenChange, onWalletCollected }: Collect
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Wallet className="h-5 w-5" />
-            {existingWallet ? "Update Pi Wallet" : "Connect Pi Wallet"}
+            {existingWallet ? "Update wallet" : "Connect / Import wallet"}
           </DialogTitle>
           <DialogDescription>
-            {existingWallet 
-              ? "Update your Pi Network wallet address"
-              : "Enter your Pi Network wallet address to connect and access all features"
-            }
+            Link a Stellar (Pi) wallet by pasting your public key or importing with mnemonic/secret.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <Alert>
+        {!token && (
+          <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              Make sure you're entering your correct Pi wallet address. This will be used for all transactions.
+              Connect with Pi in the navbar first, then return here to link a wallet.
             </AlertDescription>
           </Alert>
+        )}
 
-          <div className="space-y-2">
-            <Label htmlFor="wallet-address">Pi Wallet Address</Label>
-            <div className="relative">
-              <Input
-                id="wallet-address"
-                placeholder="Enter your Pi wallet address..."
-                value={walletAddress}
-                onChange={(e) => handleAddressChange(e.target.value)}
-                className={`pr-10 ${
-                  walletAddress.length > 0 
-                    ? isValid 
-                      ? 'border-green-500 focus:border-green-500' 
-                      : 'border-red-500 focus:border-red-500'
-                    : ''
-                }`}
-              />
-              {isValidating && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent" />
-                </div>
-              )}
-              {!isValidating && walletAddress.length > 0 && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  {isValid ? (
-                    <Check className="h-4 w-4 text-green-500" />
-                  ) : (
-                    <AlertCircle className="h-4 w-4 text-red-500" />
-                  )}
-                </div>
+        <div className="flex gap-1 p-1 bg-muted rounded-lg">
+          <button
+            type="button"
+            onClick={() => setMode("paste")}
+            className={`flex-1 py-1.5 rounded text-sm font-medium ${mode === "paste" ? "bg-background shadow" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            Paste address
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("import")}
+            className={`flex-1 py-1.5 rounded text-sm font-medium ${mode === "import" ? "bg-background shadow" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            Import wallet
+          </button>
+        </div>
+
+        {mode === "paste" && (
+          <div className="space-y-4">
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Enter your Stellar public key (starts with G, 56 characters). Never paste your secret key here.
+              </AlertDescription>
+            </Alert>
+            <div className="space-y-2">
+              <Label htmlFor="wallet-address">Public key</Label>
+              <div className="relative">
+                <Input
+                  id="wallet-address"
+                  placeholder="G..."
+                  value={walletAddress}
+                  onChange={(e) => handleAddressChange(e.target.value)}
+                  className={`pr-10 ${walletAddress.length > 0 ? (isValid ? "border-green-500" : "border-red-500") : ""}`}
+                />
+                {isValidating && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  </div>
+                )}
+                {!isValidating && walletAddress.length > 0 && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    {isValid ? <Check className="h-4 w-4 text-green-500" /> : <AlertCircle className="h-4 w-4 text-red-500" />}
+                  </div>
+                )}
+              </div>
+              {walletAddress.length > 0 && !isValid && !isValidating && (
+                <p className="text-sm text-red-500">Enter a valid Stellar public key (G + 55 characters)</p>
               )}
             </div>
-            {walletAddress.length > 0 && !isValid && !isValidating && (
-              <p className="text-sm text-red-500">
-                Please enter a valid Pi wallet address (starts with 'G' and is 56 characters long)
-              </p>
-            )}
-            {isValid && (
-              <p className="text-sm text-green-500">
-                ✓ Valid Pi wallet address
-              </p>
-            )}
-          </div>
-
-          <div className="bg-muted/50 rounded-lg p-3">
-            <div className="flex items-center justify-between mb-2">
-              <Label className="text-sm font-medium">Sample Format</Label>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleCopySample}
-                className="h-8 px-2"
-              >
-                {copied ? (
-                  <Check className="h-3 w-3 text-green-500" />
-                ) : (
-                  <Copy className="h-3 w-3" />
-                )}
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" onClick={handleClose} className="flex-1" disabled={linking}>
+                Cancel
+              </Button>
+              <Button onClick={handleSubmitPaste} disabled={!isValid || isValidating || linking || !token} className="flex-1">
+                {linking ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                {existingWallet ? "Update" : "Link wallet"}
               </Button>
             </div>
-            <code className="text-xs text-muted-foreground break-all">
-              {sampleWalletAddress}
-            </code>
           </div>
+        )}
 
-          <div className="flex gap-3 pt-2">
-            <Button
-              variant="outline"
-              onClick={handleClose}
-              className="flex-1"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={!isValid || isValidating}
-              className="flex-1"
-            >
-              {isValidating ? "Validating..." : existingWallet ? "Update Wallet" : "Connect Wallet"}
-            </Button>
+        {mode === "import" && (
+          <div className="space-y-4">
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Your secret key and mnemonic stay on your device and are never sent after import. We only link the public key to your account.
+              </AlertDescription>
+            </Alert>
+            <div className="space-y-2">
+              <Label htmlFor="mnemonic">Mnemonic (12 or 24 words)</Label>
+              <Input
+                id="mnemonic"
+                placeholder="word1 word2 ..."
+                value={mnemonic}
+                onChange={(e) => setMnemonic(e.target.value)}
+                className="font-mono text-sm"
+                type="password"
+                autoComplete="off"
+              />
+            </div>
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <span className="relative bg-background px-2 text-xs text-muted-foreground">or</span>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="secret">Secret key</Label>
+              <Input
+                id="secret"
+                placeholder="S..."
+                value={secret}
+                onChange={(e) => setSecret(e.target.value)}
+                className="font-mono text-sm"
+                type="password"
+                autoComplete="off"
+              />
+            </div>
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" onClick={handleClose} className="flex-1" disabled={linking}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleImportAndLink}
+                disabled={linking || (!mnemonic.trim() && !secret.trim()) || !token}
+                className="flex-1"
+              >
+                {linking ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Import and link
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </DialogContent>
 
-      {/* Confirmation Dialog */}
       <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-orange-500" />
-              Are you sure?
+              Replace wallet?
             </DialogTitle>
             <DialogDescription>
-              You're about to update your wallet address. This will replace your current wallet address.
+              This will replace your current linked wallet address.
             </DialogDescription>
           </DialogHeader>
-
           <div className="space-y-4">
             <div className="bg-muted/50 rounded-lg p-3">
-              <Label className="text-sm font-medium text-muted-foreground">Current Address</Label>
-              <code className="text-xs text-foreground break-all block mt-1">
-                {existingWallet}
-              </code>
+              <Label className="text-sm text-muted-foreground">New address</Label>
+              <code className="text-xs break-all block mt-1">{pendingWalletAddress}</code>
             </div>
-
-            <div className="bg-muted/50 rounded-lg p-3">
-              <Label className="text-sm font-medium text-muted-foreground">New Address</Label>
-              <code className="text-xs text-foreground break-all block mt-1">
-                {pendingWalletAddress}
-              </code>
-            </div>
-
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                Make sure this is the correct wallet address. This action cannot be undone.
-              </AlertDescription>
-            </Alert>
-
             <div className="flex gap-3 pt-2">
-              <Button
-                variant="outline"
-                onClick={handleCancelUpdate}
-                className="flex-1"
-              >
+              <Button variant="outline" onClick={() => { setShowConfirmDialog(false); setPendingWalletAddress("") }} className="flex-1">
                 Cancel
               </Button>
-              <Button
-                onClick={handleConfirmUpdate}
-                className="flex-1"
-              >
-                Update Wallet
+              <Button onClick={handleConfirmUpdate} disabled={linking} className="flex-1">
+                {linking ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Update
               </Button>
             </div>
           </div>

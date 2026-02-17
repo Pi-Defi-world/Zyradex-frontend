@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { jwtDecode } from "jwt-decode"
 import { usePi } from "@/components/providers/pi-provider"
-import { signIn, type AdminUser } from "@/lib/api/auth"
+import { signIn, getCurrentUser, type AdminUser } from "@/lib/api/auth"
 import { setAuthToken, clearAuthToken, toApiError, type ApiError } from "@/lib/api"
 
 const ADMIN_TOKEN_KEY = "dex_admin_token"
@@ -17,7 +17,7 @@ const isTokenExpired = (token: string) => {
     if (!claims.exp) return false
     return claims.exp * 1000 < Date.now()
   } catch {
-    return false
+    return true
   }
 }
 
@@ -29,6 +29,7 @@ interface UseAdminAuthReturn {
   error: ApiError | null
   signIn: () => Promise<AdminUser | undefined>
   signOut: () => void
+  refreshUser: () => Promise<AdminUser | undefined>
 }
 
 export const useAdminAuth = (): UseAdminAuthReturn => {
@@ -77,6 +78,22 @@ export const useAdminAuth = (): UseAdminAuthReturn => {
       handleSignOut()
     }
   }, [piAuthenticated, handleSignOut])
+
+  const refreshUser = useCallback(async () => {
+    const t = token ?? (typeof window !== "undefined" ? localStorage.getItem(ADMIN_TOKEN_KEY) : null)
+    if (!t || isTokenExpired(t)) return undefined
+    try {
+      setAuthToken(t)
+      const { user } = await getCurrentUser()
+      setAdminUser(user)
+      if (typeof window !== "undefined") {
+        localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user))
+      }
+      return user
+    } catch {
+      return undefined
+    }
+  }, [token])
 
   const handleSignIn = useCallback(async () => {
     setIsLoading(true)
@@ -137,5 +154,6 @@ export const useAdminAuth = (): UseAdminAuthReturn => {
     error,
     signIn: handleSignIn,
     signOut: handleSignOut,
+    refreshUser,
   }
 }

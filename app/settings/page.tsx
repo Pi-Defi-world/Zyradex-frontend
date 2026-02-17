@@ -10,39 +10,31 @@ import { Copy, LogOut, Wallet, Bell, Shield, User, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
-import { usePi } from "@/components/providers/pi-provider"
 import { useAccountBalances } from "@/hooks/useAccountData"
 import { useAdminAuth } from "@/hooks/useAdminAuth"
 import { Badge } from "@/components/ui/badge"
 
-const getStoredWallet = () => {
-  if (typeof window === "undefined") return null
-  return localStorage.getItem("bingepi-wallet-address")
-}
-
 export default function SettingsPage() {
   const { toast } = useToast()
-  const { user, signOut } = usePi()
-  const [walletAddress, setWalletAddress] = useState<string | null>(null)
-  const [notifications, setNotifications] = useState(true)
-  const [twoFactor, setTwoFactor] = useState(false)
-  const [email, setEmail] = useState("")
-  const [username, setUsername] = useState("")
   const {
-    isAdmin,
     adminUser,
+    isAdmin,
     isLoading: adminLoading,
     error: adminError,
     signIn: signInAdmin,
     signOut: signOutAdmin,
   } = useAdminAuth()
+  const [notifications, setNotifications] = useState(true)
+  const [twoFactor, setTwoFactor] = useState(false)
+  const [email, setEmail] = useState("")
+  const [username, setUsername] = useState(adminUser?.username ?? "")
+
+  const walletAddress = adminUser?.public_key?.trim() || null
+  const { balances, totalBalance, isLoading } = useAccountBalances(walletAddress || undefined)
 
   useEffect(() => {
-    setWalletAddress(getStoredWallet() || user?.wallet_address || null)
-    setUsername(user?.username ?? "")
-  }, [user])
-
-  const { balances, totalBalance, isLoading } = useAccountBalances(walletAddress || undefined)
+    setUsername(adminUser?.username ?? "")
+  }, [adminUser?.username])
 
   const summary = useMemo(
     () => ({
@@ -59,8 +51,8 @@ export default function SettingsPage() {
   }
 
   const handleDisconnect = () => {
-    signOut()
-    toast({ title: "Wallet Disconnected", description: "You have been signed out." })
+    signOutAdmin()
+    toast({ title: "Signed out", description: "You have been signed out." })
   }
 
   return (
@@ -78,11 +70,11 @@ export default function SettingsPage() {
             <div className="flex items-center gap-4">
               <Avatar className="h-16 w-16">
                 <AvatarFallback className="text-2xl bg-primary text-primary-foreground">
-                  {(user?.username || "Guest").slice(0, 2).toUpperCase()}
+                  {(adminUser?.username ?? "Guest").slice(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <div>
-                <h3 className="font-semibold text-lg">{user?.username ? `@${user.username}` : "Guest"}</h3>
+                <h3 className="font-semibold text-lg">{adminUser?.username ? `@${adminUser.username}` : "Guest"}</h3>
                 <p className="text-sm text-muted-foreground">
                   Tracking {isLoading ? "..." : summary.assets} assets · Total {isLoading ? "..." : summary.total}
                 </p>
@@ -139,7 +131,7 @@ export default function SettingsPage() {
               </div>
             ) : (
               <div className="text-sm text-muted-foreground">
-                No wallet connected. Add one from your profile page to enable full functionality.
+                No wallet linked. Connect or import a wallet from your profile page to enable full functionality.
               </div>
             )}
           </CardContent>

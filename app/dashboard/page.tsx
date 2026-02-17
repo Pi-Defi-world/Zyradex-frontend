@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo } from "react"
 import Link from "next/link"
 import { Wallet, Activity, Coins, TrendingUp, Droplets } from "lucide-react"
 
@@ -10,14 +10,9 @@ import { ActivityChart, type ActivityPoint } from "@/components/activity-chart"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { usePi } from "@/components/providers/pi-provider"
+import { useAdminAuth } from "@/hooks/useAdminAuth"
 import { useAccountBalances, useAccountOperations } from "@/hooks/useAccountData"
 import { useTokenRegistry } from "@/hooks/useTokenRegistry"
-
-const getStoredWallet = () => {
-  if (typeof window === "undefined") return null
-  return localStorage.getItem("bingepi-wallet-address")
-}
 
 const formatBalanceCard = (asset: {
   assetCode: string
@@ -60,14 +55,8 @@ const buildActivitySeries = (operations: ReturnType<typeof useAccountOperations>
 }
 
 export default function DashboardPage() {
-  const { user, isAuthenticated } = usePi()
-  const [localWallet, setLocalWallet] = useState<string | null>(null)
-
-  useEffect(() => {
-    setLocalWallet(getStoredWallet())
-  }, [])
-
-  const publicKey = user?.wallet_address || localWallet || undefined
+  const { adminUser } = useAdminAuth()
+  const publicKey = adminUser?.public_key?.trim() || undefined
 
   const {
     balances,
@@ -180,7 +169,7 @@ export default function DashboardPage() {
               <CardHeader>
                 <CardTitle>Connect a wallet to get started</CardTitle>
                 <CardDescription>
-                  Authenticate with Pi Browser or enter a wallet address from your profile to load balances and activity.
+                  Connect with Pi and link a wallet from your profile to load balances and activity.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -192,10 +181,16 @@ export default function DashboardPage() {
           ) : (
             <Card>
               <CardHeader>
-                <CardTitle>Token Balances</CardTitle>
-                <CardDescription>Your connected wallet balances</CardDescription>
+                <CardTitle>Wallet</CardTitle>
+                <CardDescription className="font-mono text-xs break-all">
+                  {publicKey}
+                </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-1">Token Balances</h3>
+                  <p className="text-xs text-muted-foreground">Your connected wallet balances</p>
+                </div>
                 {balancesError ? (
                   <p className="text-destructive text-sm">{balancesError.message}</p>
                 ) : (
