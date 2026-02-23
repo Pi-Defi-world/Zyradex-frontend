@@ -13,8 +13,8 @@ import Script from 'next/script'
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "Bingepi - Build DeFi on Pi Network",
-  description: "Mint tokens, create liquidity pools, and manage assets on Pi Network",
+  title: "Bingepi - Financial platform on Pi Network",
+  description: "Savings, investments, and borrowing on Pi Network. Mint tokens, trade, and manage assets.",
   generator: "Solie, Junman, RichAdams, ",
 }
 

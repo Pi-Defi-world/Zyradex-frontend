@@ -2,7 +2,7 @@
 
 import { useMemo } from "react"
 import Link from "next/link"
-import { Wallet, Activity, Coins, TrendingUp, Droplets } from "lucide-react"
+import { Wallet, Activity, Coins, TrendingUp, Droplets, PiggyBank, CreditCard, AlertTriangle } from "lucide-react"
 
 import { TokenCard, type TokenSummary } from "@/components/token-card"
 import { TransactionHistory } from "@/components/transaction-history"
@@ -13,6 +13,9 @@ import { Button } from "@/components/ui/button"
 import { useAdminAuth } from "@/hooks/useAdminAuth"
 import { useAccountBalances, useAccountOperations } from "@/hooks/useAccountData"
 import { useTokenRegistry } from "@/hooks/useTokenRegistry"
+import { useLaunches } from "@/hooks/useLaunchpadData"
+import { useSavingsPositions } from "@/hooks/useSavingsData"
+import { useLendingPositions } from "@/hooks/useLendingData"
 
 const formatBalanceCard = (asset: {
   assetCode: string
@@ -57,6 +60,7 @@ const buildActivitySeries = (operations: ReturnType<typeof useAccountOperations>
 export default function DashboardPage() {
   const { adminUser } = useAdminAuth()
   const publicKey = adminUser?.public_key?.trim() || undefined
+  const userId = adminUser?.id ?? undefined
 
   const {
     balances,
@@ -71,6 +75,9 @@ export default function DashboardPage() {
     error: operationsError,
   } = useAccountOperations(publicKey, { limit: 50 })
   const { tokens: mintedTokens, isLoading: tokensLoading, error: tokensError } = useTokenRegistry()
+  const { launches } = useLaunches({ limit: 10 })
+  const { positions: savingsPositions } = useSavingsPositions(userId)
+  const { supplyPositions, borrowPositions } = useLendingPositions(userId)
 
   const balanceCards = useMemo<TokenSummary[]>(
     () => balances.map((balance) => formatBalanceCard(balance)),
@@ -90,6 +97,19 @@ export default function DashboardPage() {
   )
 
   const activitySeries = useMemo(() => buildActivitySeries(operations), [operations])
+
+  const openLaunchesCount = useMemo(() => launches.filter((l) => l.status === "participation_open" || l.status === "tge_open").length, [launches])
+  const lockedSavingsCount = useMemo(() => savingsPositions.filter((p) => p.status === "locked").length, [savingsPositions])
+  const nextUnlock = useMemo(() => {
+    const locked = savingsPositions.filter((p) => p.status === "locked")
+    if (!locked.length) return null
+    const dates = locked.map((p) => new Date(p.unlockedAt).getTime())
+    return new Date(Math.min(...dates)).toLocaleDateString()
+  }, [savingsPositions])
+  const borrowsAtRisk = useMemo(
+    () => borrowPositions.filter((b) => b.healthFactor != null && parseFloat(b.healthFactor) < 1),
+    [borrowPositions]
+  )
 
   const stats = [
     {
@@ -147,7 +167,25 @@ export default function DashboardPage() {
               <CardDescription>Perform common tasks</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+                <Link href="/invest">
+                  <Button className="w-full h-20 text-lg bg-transparent" size="lg" variant="outline">
+                    <TrendingUp className="mr-2 h-5 w-5" />
+                    Invest
+                  </Button>
+                </Link>
+                <Link href="/savings">
+                  <Button className="w-full h-20 text-lg bg-transparent" size="lg" variant="outline">
+                    <PiggyBank className="mr-2 h-5 w-5" />
+                    Savings
+                  </Button>
+                </Link>
+                <Link href="/lending">
+                  <Button className="w-full h-20 text-lg bg-transparent" size="lg" variant="outline">
+                    <CreditCard className="mr-2 h-5 w-5" />
+                    Borrow
+                  </Button>
+                </Link>
                 <Link href="/mint">
                   <Button className="w-full h-20 text-lg btn-gradient-primary" size="lg">
                     <Coins className="mr-2 h-5 w-5" />
@@ -157,8 +195,65 @@ export default function DashboardPage() {
                 <Link href="/liquidity">
                   <Button className="w-full h-20 text-lg bg-transparent" size="lg" variant="outline">
                     <Droplets className="mr-2 h-5 w-5" />
-                    Manage Liquidity
+                    Liquidity
                   </Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Products & positions</CardTitle>
+              <CardDescription>Investments, savings, and lending at a glance</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-3">
+                <Link href="/invest">
+                  <Card className="border-border hover:border-primary/30 transition-colors">
+                    <CardContent className="pt-4">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="h-5 w-5 text-muted-foreground" />
+                        <span className="font-medium">Invest</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {openLaunchesCount} open launch{openLaunchesCount !== 1 ? "es" : ""}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </Link>
+                <Link href="/savings">
+                  <Card className="border-border hover:border-primary/30 transition-colors">
+                    <CardContent className="pt-4">
+                      <div className="flex items-center gap-2">
+                        <PiggyBank className="h-5 w-5 text-muted-foreground" />
+                        <span className="font-medium">Savings</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {lockedSavingsCount} locked position{lockedSavingsCount !== 1 ? "s" : ""}
+                        {nextUnlock && ` · Next unlock ${nextUnlock}`}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </Link>
+                <Link href="/lending">
+                  <Card className="border-border hover:border-primary/30 transition-colors">
+                    <CardContent className="pt-4">
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="h-5 w-5 text-muted-foreground" />
+                        <span className="font-medium">Borrow & lend</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {supplyPositions.length} supply · {borrowPositions.length} borrow
+                        {borrowsAtRisk.length > 0 && (
+                          <span className="text-amber-600 flex items-center gap-1 mt-1">
+                            <AlertTriangle className="h-3 w-3" />
+                            {borrowsAtRisk.length} at risk
+                          </span>
+                        )}
+                      </p>
+                    </CardContent>
+                  </Card>
                 </Link>
               </div>
             </CardContent>
