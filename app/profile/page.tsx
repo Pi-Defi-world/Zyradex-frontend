@@ -32,7 +32,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useCreateWallet } from "@/hooks/useAccountData"
+import { useCreateWallet, useChangeWallet } from "@/hooks/useAccountData"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import {
   Dialog,
@@ -41,6 +41,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Checkbox } from "@/components/ui/checkbox"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -55,8 +56,12 @@ const ProfilePage: React.FC = () => {
   const [storedWalletAddress, setStoredWalletAddress] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const { createWallet, isLoading: creatingWallet, error: createWalletError } = useCreateWallet()
+  const { changeWallet, isLoading: changingWallet, error: changeWalletError } = useChangeWallet()
   const [newWalletSecret, setNewWalletSecret] = useState<string | null>(null)
   const [showSecretDialog, setShowSecretDialog] = useState(false)
+  const [successReplaceWarning, setSuccessReplaceWarning] = useState<string | null>(null)
+  const [showChangeWalletWarning, setShowChangeWalletWarning] = useState(false)
+  const [changeWalletConfirm, setChangeWalletConfirm] = useState(false)
 
   useEffect(() => {
     // Only set wallet address if user is authenticated
@@ -99,7 +104,7 @@ const ProfilePage: React.FC = () => {
     }
   }, [profile?.public_key, user?.wallet_address, isAuthenticated, profile])
 
-  const { balances, totalBalance, isLoading: balancesLoading } = useAccountBalances(storedWalletAddress ?? user?.wallet_address ?? undefined)
+  const { balances, totalBalance, isLoading: balancesLoading, refresh: refreshBalances } = useAccountBalances(storedWalletAddress ?? user?.wallet_address ?? undefined)
 
   const stats = useMemo(
     () => [
@@ -159,6 +164,7 @@ const ProfilePage: React.FC = () => {
       
       // Store the secret seed to show to user
       setNewWalletSecret(response.secret)
+      setSuccessReplaceWarning(response.replacedPreviousWallet ? (response.warning ?? null) : null)
       handleWalletPersist(response.publicKey)
       refreshProfile().catch(() => undefined)
       
@@ -172,6 +178,52 @@ const ProfilePage: React.FC = () => {
     } catch (err) {
       const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Wallet creation failed"
       toast({ title: "Creation failed", description: message, variant: "destructive" })
+    }
+  }
+
+  const handleChangeWalletClick = () => {
+    setChangeWalletConfirm(false)
+    setShowChangeWalletWarning(true)
+  }
+
+  const handleChangeWalletConfirm = async () => {
+    if (!changeWalletConfirm || !isAuthenticated) return
+    try {
+      const response = await changeWallet()
+      setShowChangeWalletWarning(false)
+      setChangeWalletConfirm(false)
+      setNewWalletSecret(response.secret)
+      setSuccessReplaceWarning(response.replacedPreviousWallet ? (response.warning ?? null) : null)
+      handleWalletPersist(response.publicKey)
+      refreshProfile().catch(() => undefined)
+      refreshBalances()
+      setShowSecretDialog(true)
+      toast({
+        title: response.replacedPreviousWallet ? "Wallet replaced" : "Wallet created",
+        description: "Save your new secret seed securely.",
+      })
+    } catch (err: unknown) {
+      const apiError = err && typeof err === "object" && "code" in err ? (err as { code?: string; message?: string }) : null
+      const code = apiError?.code
+      if (code === "NO_WALLET_TO_REPLACE") {
+        setShowChangeWalletWarning(false)
+        setChangeWalletConfirm(false)
+        refreshProfile().catch(() => undefined)
+        toast({
+          title: "No wallet to replace",
+          description: "Use Create wallet below to set up your first wallet.",
+          variant: "destructive",
+        })
+      } else if (code === "CONFIRM_REQUIRED") {
+        toast({
+          title: "Confirmation required",
+          description: "Please confirm that you understand the warning before replacing your wallet.",
+          variant: "destructive",
+        })
+      } else {
+        const message = apiError && "message" in apiError ? (apiError as { message: string }).message : "Failed to replace wallet"
+        toast({ title: "Change wallet failed", description: message, variant: "destructive" })
+      }
     }
   }
 
@@ -383,11 +435,36 @@ const ProfilePage: React.FC = () => {
               </div>
             </Link>
           ))}
+          <button
+            type="button"
+            onClick={handleChangeWalletClick}
+            disabled={changingWallet || !isAuthenticated}
+            className="block w-full text-left"
+          >
+            <div className="bg-card rounded-xl p-4 hover:bg-muted/50 transition-colors border border-border/30 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3 min-w-0 flex-1">
+                  <Shield className="h-5 w-5 text-muted-foreground shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-sm text-foreground truncate">Change wallet</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">Replace your wallet or set up a new one</div>
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 ml-2" />
+              </div>
+            </div>
+          </button>
         </div>
 
       </div>
 
-      <Dialog open={showSecretDialog} onOpenChange={setShowSecretDialog}>
+      <Dialog open={showSecretDialog} onOpenChange={(open) => {
+        setShowSecretDialog(open)
+        if (!open) {
+          setNewWalletSecret(null)
+          setSuccessReplaceWarning(null)
+        }
+      }}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Save Your Secret Seed</DialogTitle>
@@ -396,6 +473,13 @@ const ProfilePage: React.FC = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-4">
+            {successReplaceWarning && (
+              <Alert variant="destructive">
+                <AlertDescription className="text-sm break-words">
+                  {successReplaceWarning}
+                </AlertDescription>
+              </Alert>
+            )}
             <Alert variant="destructive">
               <AlertDescription className="text-sm break-words">
                 <strong>IMPORTANT:</strong> Save this secret seed in a secure location. We don't store it, 
@@ -424,11 +508,72 @@ const ProfilePage: React.FC = () => {
               onClick={() => {
                 setShowSecretDialog(false)
                 setNewWalletSecret(null)
+                setSuccessReplaceWarning(null)
               }}
               className="w-full"
             >
               I've Saved My Secret Seed
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showChangeWalletWarning} onOpenChange={(open) => {
+        setShowChangeWalletWarning(open)
+        if (!open) setChangeWalletConfirm(false)
+      }}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Changing your wallet</DialogTitle>
+            <DialogDescription>
+              Your current wallet will be replaced. The old wallet address will no longer be linked to this account.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <Alert variant="destructive">
+              <AlertDescription className="text-sm break-words space-y-2">
+                <ul className="list-disc list-inside space-y-1">
+                  <li>Any funds in the old wallet are <strong>not</strong> automatically moved to the new one.</li>
+                  <li>You will need to save the <strong>new</strong> secret key securely; the old one will no longer be used for this account.</li>
+                </ul>
+                <p className="mt-2">Are you sure you want to replace your wallet?</p>
+              </AlertDescription>
+            </Alert>
+            {changeWalletError && (
+              <Alert variant="destructive">
+                <AlertDescription className="text-sm break-words">{changeWalletError.message}</AlertDescription>
+              </Alert>
+            )}
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="confirm-replace"
+                checked={changeWalletConfirm}
+                onCheckedChange={(checked) => setChangeWalletConfirm(checked === true)}
+              />
+              <label
+                htmlFor="confirm-replace"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+              >
+                I understand, replace my wallet
+              </label>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => { setShowChangeWalletWarning(false); setChangeWalletConfirm(false) }}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1"
+                disabled={!changeWalletConfirm || changingWallet}
+                onClick={handleChangeWalletConfirm}
+              >
+                {changingWallet ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Replace my wallet
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

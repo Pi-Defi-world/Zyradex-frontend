@@ -125,17 +125,10 @@ export function Navbar({ isConnected = false, onConnect }: NavbarProps) {
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-6">
             <Link href="/" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Home</Link>
-<<<<<<< HEAD
-            <Link href="/swap" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Swap</Link>
-            <Link href="/mint" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">LaunchPad</Link>
-=======
             <Link href="/invest" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Invest</Link>
             <Link href="/savings" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Savings</Link>
             <Link href="/lending" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Borrow</Link>
             <Link href="/swap" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Trade</Link>
->>>>>>> 19b2581 (PIRC20 Launchpad Integration)
-            <Link href="/liquidity" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Liquidity</Link>
-            <Link href="/mint" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Mint</Link>
             <Link href="/profile" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Profile</Link>
           </div>
 

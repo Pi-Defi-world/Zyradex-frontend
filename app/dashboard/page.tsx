@@ -10,7 +10,7 @@ import { ActivityChart, type ActivityPoint } from "@/components/activity-chart"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { useAdminAuth } from "@/hooks/useAdminAuth"
+import { useCurrentUser } from "@/hooks/useCurrentUser"
 import { useAccountBalances, useAccountOperations } from "@/hooks/useAccountData"
 import { useTokenRegistry } from "@/hooks/useTokenRegistry"
 import { useLaunches } from "@/hooks/useLaunchpadData"
@@ -58,9 +58,9 @@ const buildActivitySeries = (operations: ReturnType<typeof useAccountOperations>
 }
 
 export default function DashboardPage() {
-  const { adminUser } = useAdminAuth()
-  const publicKey = adminUser?.public_key?.trim() || undefined
-  const userId = adminUser?.id ?? undefined
+  const { user } = useCurrentUser()
+  const publicKey = user?.public_key?.trim() || undefined
+  const userId = user?.id ?? undefined
 
   const {
     balances,

@@ -22,7 +22,7 @@ import {
   AlertTriangle,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { useAdminAuth } from "@/hooks/useAdminAuth"
+import { useCurrentUser } from "@/hooks/useCurrentUser"
 import {
   useLendingPools,
   useLendingPositions,
@@ -248,8 +248,9 @@ function BorrowPositionRow({
 
 export default function LendingPage() {
   const { toast } = useToast()
-  const { adminUser } = useAdminAuth()
-  const userId = adminUser?.id ?? ""
+  const { user } = useCurrentUser()
+  const userId = user?.id ?? ""
+  const [refreshKey, setRefreshKey] = useState(0)
 
   const { pools, error: poolsError, isLoading: poolsLoading } = useLendingPools()
   const { supplyPositions, borrowPositions, error: positionsError, isLoading: positionsLoading } =
@@ -258,7 +259,6 @@ export default function LendingPage() {
   const { platformFeePublicKey } = useFeeDestination()
   const [creditScoreInput, setCreditScoreInput] = useState("")
   const { setCreditScore, isLoading: setScoreLoading } = useSetCreditScore()
-  const [refreshKey, setRefreshKey] = useState(0)
 
   const handleSupply = async () => {
     toast({ title: "Supply recorded" })

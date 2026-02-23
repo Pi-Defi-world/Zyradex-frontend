@@ -10,6 +10,9 @@ export interface CreateWalletResponse {
     accountCreated: boolean
     amount: string
   }
+  replacedPreviousWallet?: boolean
+  previousPublicKey?: string
+  warning?: string
 }
 
 export interface AccountBalanceEntry {
@@ -76,6 +79,17 @@ export interface PaginatedOperations {
 export const createWallet = async () => {
   try {
     const { data } = await axiosClient.post<CreateWalletResponse>("/account/create-wallet")
+    return data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}
+
+export const changeWallet = async () => {
+  try {
+    const { data } = await axiosClient.post<CreateWalletResponse>("/account/change-wallet", {
+      confirmReplace: true,
+    })
     return data
   } catch (error) {
     throw toApiError(error)

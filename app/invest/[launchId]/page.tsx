@@ -41,7 +41,7 @@ import {
   useDividendHolders,
   useRecordDividendClaim,
 } from "@/hooks/useDividendData"
-import { useAdminAuth } from "@/hooks/useAdminAuth"
+import { useCurrentUser } from "@/hooks/useCurrentUser"
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "Draft",
@@ -56,8 +56,8 @@ export default function InvestLaunchDetailPage() {
   const router = useRouter()
   const launchId = typeof params.launchId === "string" ? params.launchId : undefined
   const { toast } = useToast()
-  const { adminUser } = useAdminAuth()
-  const userId = adminUser?.id ?? undefined
+  const { user } = useCurrentUser()
+  const userId = user?.id ?? undefined
 
   const { launch, error: launchError, isLoading: launchLoading } = useLaunch(launchId)
   const { piPower, isLoading: piPowerLoading } = useMyPiPower(launchId, userId)

@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Loader2, PiggyBank } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { useAdminAuth } from "@/hooks/useAdminAuth"
+import { useCurrentUser } from "@/hooks/useCurrentUser"
 import {
   useSavingsProducts,
   useSavingsPositions,
@@ -132,8 +132,8 @@ function PositionRow({
 
 export default function SavingsPage() {
   const { toast } = useToast()
-  const { adminUser } = useAdminAuth()
-  const userId = adminUser?.id ?? ""
+  const { user } = useCurrentUser()
+  const userId = user?.id ?? ""
 
   const { products, error: productsError, isLoading: productsLoading } = useSavingsProducts()
   const { positions, error: positionsError, isLoading: positionsLoading } = useSavingsPositions(
