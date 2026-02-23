@@ -1,10 +1,11 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Moon, Sun, Wallet, Home, Coins, Droplets, User, ArrowRightLeft } from "lucide-react"
+import { Moon, Sun, Wallet, Home, Coins, Droplets, User, ArrowRightLeft, TrendingUp, PiggyBank, CreditCard } from "lucide-react"
 import { useTheme } from "next-themes"
 import Link from "next/link"
 import { usePi } from "@/components/providers/pi-provider"
+import { useAdminAuth } from "@/hooks/useAdminAuth"
 import { useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
 
@@ -39,9 +40,10 @@ function MobileBottomNav() {
 
   const navItems = [
     { href: "/", icon: Home, label: "Home" },
-    { href: "/mint", icon: Coins, label: "LaunchPad" },
-    { href: "/swap", icon: ArrowRightLeft, label: "Swap"},
-    { href: "/liquidity", icon: Droplets, label: "Liquidity" },
+    { href: "/invest", icon: TrendingUp, label: "Invest" },
+    { href: "/savings", icon: PiggyBank, label: "Savings" },
+    { href: "/lending", icon: CreditCard, label: "Borrow" },
+    { href: "/swap", icon: ArrowRightLeft, label: "Trade" },
     { href: "/profile", icon: User, label: "Profile" },
   ]
 
@@ -83,35 +85,39 @@ function MobileBottomNav() {
 
 export function Navbar({ isConnected = false, onConnect }: NavbarProps) {
   const { theme, setTheme } = useTheme()
-  const { user, isAuthenticated, authenticate, signOut } = usePi()
+  const { user: piUser, authenticate: piAuthenticate, signOut: piSignOut } = usePi()
+  const { adminUser, token, signIn: backendSignIn, signOut: backendSignOut, isLoading: authLoading } = useAdminAuth()
   const [mounted, setMounted] = useState(false)
-  const [authLoading, setAuthLoading] = useState(false)
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  const handlePiAuth = async () => {
-    if (typeof window === 'undefined') {
-      alert('Window not available. Please refresh the page.')
+  const handleConnect = async () => {
+    if (typeof window === "undefined") {
+      alert("Window not available. Please refresh the page.")
       return
     }
-
     if (!window.Pi) {
-      alert('Pi SDK not available. Please open this app in Pi Browser.')
+      alert("Pi SDK not available. Please open this app in Pi Browser.")
       return
     }
-
-    setAuthLoading(true)
     try {
-      await authenticate()
+      await piAuthenticate()
+      await backendSignIn()
     } catch (error) {
-      console.error('Pi authentication failed:', error)
-      alert(error instanceof Error ? error.message : 'Authentication failed')
-    } finally {
-      setAuthLoading(false)
+      console.error("Auth failed:", error)
+      alert(error instanceof Error ? error.message : "Authentication failed")
     }
   }
+
+  const handleSignOut = () => {
+    backendSignOut()
+    piSignOut()
+  }
+
+  const hasWallet = Boolean(adminUser?.public_key && adminUser.public_key.trim() !== "")
+  const isLoggedIn = Boolean(token && adminUser)
 
   return (
     <>
@@ -124,9 +130,10 @@ export function Navbar({ isConnected = false, onConnect }: NavbarProps) {
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-6">
             <Link href="/" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Home</Link>
-            <Link href="/swap" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Swap</Link>
-            <Link href="/mint" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">LaunchPad</Link>
-            <Link href="/liquidity" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Liquidity</Link>
+            <Link href="/invest" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Invest</Link>
+            <Link href="/savings" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Savings</Link>
+            <Link href="/lending" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Borrow</Link>
+            <Link href="/swap" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Trade</Link>
             <Link href="/profile" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Profile</Link>
           </div>
 
@@ -141,35 +148,25 @@ export function Navbar({ isConnected = false, onConnect }: NavbarProps) {
                 <Wallet className="h-4 w-4" />
                 <span className="text-xs sm:text-sm">Loading...</span>
               </Button>
-            ) : isAuthenticated ? (
+            ) : isLoggedIn ? (
               <div className="flex items-center gap-2">
                 <Button variant="outline" className="gap-2 bg-transparent">
                   <Wallet className="h-4 w-4" />
                   <span className="text-xs sm:text-sm max-w-[120px] truncate">
-                    {user?.username || 'Connected'}
+                    {hasWallet && adminUser?.public_key
+                  ? `${adminUser.public_key.slice(0, 6)}…${adminUser.public_key.slice(-4)}`
+                  : adminUser?.username ?? piUser?.username ?? "Connected"}
                   </span>
                 </Button>
-                <Button 
-                  onClick={signOut}
-                  variant="ghost" 
-                  size="sm"
-                  className="text-xs px-2"
-                >
+                <Button onClick={handleSignOut} variant="ghost" size="sm" className="text-xs px-2">
                   <span className="hidden sm:inline">Logout</span>
                   <span className="sm:hidden">×</span>
                 </Button>
               </div>
             ) : (
-              <Button 
-                onClick={handlePiAuth} 
-                disabled={authLoading}
-                size="sm" 
-                className="gap-2 btn-gradient-primary"
-              >
+              <Button onClick={handleConnect} disabled={authLoading} size="sm" className="gap-2 btn-gradient-primary">
                 <Wallet className="h-4 w-4" />
-                <span className="text-xs sm:text-sm">
-                  {authLoading ? 'Connecting...' : 'Connect Pi'}
-                </span>
+                <span className="text-xs sm:text-sm">{authLoading ? "Connecting…" : "Connect Pi"}</span>
               </Button>
             )}
           </div>

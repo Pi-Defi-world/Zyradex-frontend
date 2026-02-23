@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   createWallet as createWalletRequest,
+  changeWallet as changeWalletRequest,
   getAccountBalances,
   getAccountOperations,
   getAccountTransactions,
@@ -49,6 +50,35 @@ export const useCreateWallet = () => {
     error,
     isLoading,
     createWallet,
+  }
+}
+
+export const useChangeWallet = () => {
+  const [data, setData] = useState<CreateWalletResponse | null>(null)
+  const [error, setError] = useState<ApiError | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+
+  const changeWallet = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const response = await changeWalletRequest()
+      setData(response)
+      return response
+    } catch (err) {
+      const apiError = toApiError(err)
+      setError(apiError)
+      throw apiError
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  return {
+    data,
+    error,
+    isLoading,
+    changeWallet,
   }
 }
 
