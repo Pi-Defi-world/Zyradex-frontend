@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { SwapCard } from "@/components/swap/swap-card"
 import { PriceChart, type PricePoint } from "@/components/swap/price-chart"
 import { RecentSwaps } from "@/components/swap/recent-swaps"
