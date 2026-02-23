@@ -1,4 +1,4 @@
- import { axiosClient, toApiError } from "../api"
+import { axiosClient, toApiError } from "../api"
 
 export interface TokenAsset {
   code: string
