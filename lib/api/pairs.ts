@@ -1,4 +1,5 @@
 import { axiosClient, toApiError } from "../api"
+import { cachedRequest, createRequestKey } from "./request-cache"
 
 export interface PairRecord {
   _id: string
@@ -15,6 +16,7 @@ export interface RegisterPairPayload {
   baseToken: string
   quoteToken: string
   poolId: string
+  source: "internal" | "external"
 }
 
 export interface RegisterPairResponse {
@@ -60,13 +62,24 @@ export const verifyPair = async (payload: VerifyPairPayload) => {
   }
 }
 
-export const listPairs = async () => {
-  try {
-    const { data } = await axiosClient.get<ListPairsResponse>("/pairs")
-    return data
-  } catch (error) {
-    throw toApiError(error)
-  }
+export const listPairs = async (options?: { skipCache?: boolean }) => {
+  const cacheKey = createRequestKey("/pairs", {})
+  
+  return cachedRequest(
+    cacheKey,
+    async () => {
+      try {
+        const { data } = await axiosClient.get<ListPairsResponse>("/pairs")
+        return data
+      } catch (error) {
+        throw toApiError(error)
+      }
+    },
+    {
+      ttl: 5 * 60 * 1000, // 5 minutes - pairs rarely change
+      skipCache: options?.skipCache,
+    }
+  )
 }
 
 export const deletePair = async (poolId: string) => {

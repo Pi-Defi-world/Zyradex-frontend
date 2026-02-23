@@ -1,11 +1,16 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { SwapCard } from "@/components/swap/swap-card"
 import { PriceChart, type PricePoint } from "@/components/swap/price-chart"
 import { RecentSwaps } from "@/components/swap/recent-swaps"
 import { useAccountOperations } from "@/hooks/useAccountData"
-import { useAdminAuth } from "@/hooks/useAdminAuth"
+import { usePi } from "@/components/providers/pi-provider"
+
+const getStoredWallet = () => {
+  if (typeof window === "undefined") return null
+  return localStorage.getItem("zyradex-wallet-address")
+}
 
 const computePriceSeries = (operations: ReturnType<typeof useAccountOperations>["operations"]): PricePoint[] => {
   const series = new Map<string, number>()
@@ -25,9 +30,15 @@ const computePriceSeries = (operations: ReturnType<typeof useAccountOperations>[
 }
 
 export default function SwapPage() {
-  const { adminUser } = useAdminAuth()
-  const publicKey = adminUser?.public_key?.trim() || undefined
-  const { operations, isLoading } = useAccountOperations(publicKey, { limit: 40 })
+  const { user } = usePi()
+  const [localWallet, setLocalWallet] = useState<string | null>(null)
+
+  useEffect(() => {
+    setLocalWallet(getStoredWallet())
+  }, [])
+
+  const publicKey = user?.wallet_address || localWallet || undefined
+  const { operations, isLoading, error: operationsError } = useAccountOperations(publicKey, { limit: 40 })
 
   const chartSeries = useMemo(() => computePriceSeries(operations), [operations])
 
@@ -45,7 +56,7 @@ export default function SwapPage() {
 
         <div className="lg:hidden space-y-6">
           <SwapCard />
-          <PriceChart series={chartSeries} isLoading={isLoading} />
+          {/* <PriceChart series={chartSeries} isLoading={isLoading} /> */}
         </div>
 
         <div className="mt-6">

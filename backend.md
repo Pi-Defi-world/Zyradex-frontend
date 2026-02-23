@@ -259,3 +259,73 @@ Create a buy offer
 POST
 /v1/trade/cancel
 Cancel a trade offer
+
+---
+
+## Launchpad (Pi Launchpad)
+
+Base path: `/v1/launchpad`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | /launches | Create launch (projectId, projectAppUrl, tokenAsset, T_available, etc.) |
+| GET | /launches | List launches (query: limit, status) |
+| GET | /launches/:launchId | Get single launch |
+| PATCH | /launches/:launchId/status | Transition launch status (body: { status }) |
+| GET | /launches/:launchId/pi-power | Get PiPower for user (query: userId) |
+| POST | /launches/:launchId/commit | Commit Pi (body: { committedPi, userId? }) |
+| POST | /launches/:launchId/engagement | Record engagement event (body: { userId?, eventType, payload? }) |
+| POST | /launches/:launchId/close-window | Close participation window |
+| POST | /launches/:launchId/run-allocation | Run allocation (Design 1) |
+| POST | /launches/:launchId/escrow | Create escrow wallet |
+| POST | /launches/:launchId/execute-tge | Execute TGE (body: { escrowSecret }) |
+| POST | /launches/:launchId/dividend-rounds | Create dividend round (body: { recordAt?, totalPayoutAmount }) |
+
+---
+
+## Dividend rounds
+
+Base path: `/v1/dividend-rounds`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | /:roundId/snapshot | Run holder snapshot (Stellar Horizon); creates holder records with payout amounts (0.6% fee applied) |
+| GET | /:roundId | Get round details |
+| GET | /:roundId/holders | List holders (query: limit, cursor) |
+| POST | /:roundId/claim | Record claim (body: { publicKey, txHash }) |
+
+---
+
+## Savings
+
+Base path: `/v1/savings`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /products | List savings products (query: asset?) |
+| POST | /products | Create product (body: asset, termDays, apy, minAmount?, active?) |
+| POST | /deposit | Create position (body: productId, amount, userId; auth or body) |
+| GET | /positions | List user positions (query: userId; auth or query) (query: status?) |
+| POST | /positions/:positionId/withdraw | Withdraw (0.6% fee on interest portion) |
+
+---
+
+## Lending
+
+Base path: `/v1/lending`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /pools | List lending pools (query: active?) |
+| POST | /pools | Create pool (body: asset, supplyRate, borrowRate, collateralFactor, collateralAssets?) |
+| GET | /pools/:poolId | Get pool |
+| POST | /pools/:poolId/supply | Supply (body: amount, userId?); 0.6% fee on deposit |
+| POST | /pools/:poolId/withdraw | Withdraw (body: amount, userId?) |
+| POST | /pools/:poolId/borrow | Borrow (body: collateralAsset, collateralAmount, borrowAmount, userId?); 0.6% origination fee; rate from env (small/big business) + credit discount |
+| GET | /positions | Get user positions (query: userId); returns supply and borrow with accrued interest and totalDebt |
+| POST | /positions/:borrowPositionId/repay | Repay (body: amount) |
+| POST | /positions/:borrowPositionId/liquidate | Liquidate (body: repayAmount, userId?) |
+| GET | /prices | Get asset prices in Pi (query: assets, comma-separated) |
+| GET | /credit-score | Get credit score (query: userId; required) |
+| POST | /credit-score | Set credit score (body: userId, score 0–100) |
+| GET | /fee-destination | Get platform fee public key (where 0.6% fees are sent) |

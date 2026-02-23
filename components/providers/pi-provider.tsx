@@ -1,3 +1,4 @@
+// @ts-nocheck
 "use client"
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
@@ -44,14 +45,15 @@ export function PiProvider({ children }: { children: ReactNode }) {
     if (savedToken && savedUser) {
       try {
         const userData: PiUser = JSON.parse(savedUser)
-        setUser(userData)
-        setAccessToken(savedToken)
-        setAuthResult({ accessToken: savedToken, user: userData })
-        setIsAuthenticated(true)
+        console.log("Found saved authentication, but requiring re-authentication for security")
+        localStorage.removeItem("pi_access_token")
+        localStorage.removeItem("pi_user")
+        localStorage.removeItem("zyradex-wallet-address")
       } catch (error) {
         console.error("Error restoring saved authentication:", error)
         localStorage.removeItem("pi_access_token")
         localStorage.removeItem("pi_user")
+        localStorage.removeItem("zyradex-wallet-address")
       }
     }
   }, [])
@@ -62,18 +64,22 @@ export function PiProvider({ children }: { children: ReactNode }) {
     }
 
     if (!window.Pi) {
-      throw new Error("Pi SDK not available. Please open this app in Pi Browser.")
+      throw new Error("Pi SDK not available.")
     }
 
     setIsLoading(true)
     try {
-      window.Pi.init({ version: "2.0", sandbox: true })
+      window.Pi.init({ version: "2.0" })
 
       const onIncompletePaymentFound = (payment: any) => {
-        console.log("⚠️ Incomplete payment found:", payment)
+        console.log("Incomplete payment found:", payment)
       }
 
       const auth = await window.Pi.authenticate(["username", "payments", "wallet_address"], onIncompletePaymentFound)
+
+      if (!auth?.accessToken) {
+        throw new Error("No access token received from Pi SDK")
+      }
 
       const userData: PiUser = auth.user
       const result: PiAuthResult = {
@@ -94,6 +100,15 @@ export function PiProvider({ children }: { children: ReactNode }) {
       return result
     } catch (error) {
       console.error("Pi Network authentication failed:", error)
+      // Clear any stale auth data on error
+      setUser(null)
+      setAccessToken(null)
+      setAuthResult(null)
+      setIsAuthenticated(false)
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("pi_access_token")
+        localStorage.removeItem("pi_user")
+      }
       throw error
     } finally {
       setIsLoading(false)
@@ -109,11 +124,15 @@ export function PiProvider({ children }: { children: ReactNode }) {
     if (typeof window !== "undefined") {
       localStorage.removeItem("pi_access_token")
       localStorage.removeItem("pi_user")
+      localStorage.removeItem("zyradex-wallet-address")
+      localStorage.removeItem("bingepi-wallet-address")
+      localStorage.removeItem("dex_user_token")
+      localStorage.removeItem("dex_user_profile")
     }
   }
 
   const clearAuth = () => {
-    console.log("🧹 Clearing all authentication data...")
+    console.log("Clearing all authentication data...")
     setUser(null)
     setAccessToken(null)
     setAuthResult(null)
@@ -123,6 +142,10 @@ export function PiProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem("pi_access_token")
       localStorage.removeItem("pi_user")
       localStorage.removeItem("pi_has_authenticated")
+      localStorage.removeItem("zyradex-wallet-address")
+      localStorage.removeItem("bingepi-wallet-address")
+      localStorage.removeItem("dex_user_token")
+      localStorage.removeItem("dex_user_profile")
     }
   }
 
@@ -132,12 +155,12 @@ export function PiProvider({ children }: { children: ReactNode }) {
     }
 
     if (typeof window === "undefined" || !window.Pi) {
-      throw new Error("Pi SDK not available. Please open in Pi Browser.")
+      throw new Error("Pi SDK not available.")
     }
 
     try {
-      window.Pi.init({ version: "2.0", sandbox: true })
-
+      window.Pi.init({ version: "2.0" })
+ 
       return new Promise((resolve, reject) => {
         const callbacks = {
           onReadyForServerApproval: async (paymentId: string) => {

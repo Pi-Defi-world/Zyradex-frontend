@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -10,11 +10,21 @@ import { useToast } from "@/hooks/use-toast"
 import { useLogger } from "@/hooks/use-logger"
 import { Loader2 } from "lucide-react"
 import { useTrustline } from "@/hooks/useTokenRegistry"
+import { usePi } from "@/components/providers/pi-provider"
+import { useUserProfile } from "@/hooks/useUserProfile"
+
+const getStoredWallet = () => {
+  if (typeof window === "undefined") return null
+  return localStorage.getItem("zyradex-wallet-address")
+}
 
 export function TrustlineForm() {
   const { toast } = useToast()
   const { addLog } = useLogger()
+  const { user } = usePi()
+  const { profile } = useUserProfile()
   const { establishTrustline, isLoading, error } = useTrustline()
+
   const [formData, setFormData] = useState({
     userSecret: "",
     assetCode: "",
@@ -25,10 +35,19 @@ export function TrustlineForm() {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
 
+    if (!formData.userSecret.trim()) {
+      toast({ 
+        title: "Secret seed required", 
+        description: "Please enter your secret seed to sign the transaction.",
+        variant: "destructive" 
+      })
+      return
+    }
+
     try {
       addLog("info", `Establishing trustline for ${formData.assetCode}`)
       await establishTrustline({
-        userSecret: formData.userSecret,
+        userSecret: formData.userSecret.trim(),
         assetCode: formData.assetCode,
         issuer: formData.issuer,
         limit: formData.limit,
@@ -44,18 +63,20 @@ export function TrustlineForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="userSecret">User Secret</Label>
-        <Input
-          id="userSecret"
-          type="password"
-          placeholder="S..."
-          value={formData.userSecret}
-          onChange={(event) => setFormData({ ...formData, userSecret: event.target.value })}
-          required
-        />
-      </div>
+    <>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="userSecret">Secret Seed (Required)</Label>
+          <Input
+            id="userSecret"
+            type="password"
+            placeholder="Enter your secret seed (starts with S...)"
+            value={formData.userSecret}
+            onChange={(event) => setFormData({ ...formData, userSecret: event.target.value })}
+            required
+          />
+          <p className="text-sm text-muted-foreground">Enter your secret seed to sign this transaction. We don't store your secret seed.</p>
+        </div>
 
       <div className="space-y-2">
         <Label htmlFor="trustAssetCode">Asset Code</Label>
@@ -92,10 +113,12 @@ export function TrustlineForm() {
 
       {error && <p className="text-sm text-destructive">{error.message}</p>}
 
-      <Button type="submit" className="w-full" disabled={isLoading}>
-        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        {isLoading ? "Establishing..." : "Establish Trustline"}
-      </Button>
-    </form>
+        <Button type="submit" className="w-full" disabled={isLoading}>
+          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {isLoading ? "Establishing..." : "Establish Trustline"}
+        </Button>
+      </form>
+
+    </>
   )
 }

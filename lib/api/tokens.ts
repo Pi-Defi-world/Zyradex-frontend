@@ -1,4 +1,5 @@
 import { axiosClient, toApiError } from "../api"
+import { cachedRequest, createRequestKey } from "./request-cache"
 
 export interface TokenRecord {
   _id: string
@@ -33,7 +34,7 @@ export interface TrustlineResponse {
 export interface MintTokenPayload {
   distributorSecret: string
   assetCode: string
-  totalSupply: string | number
+  totalSupply: number
   name: string
   description: string
   homeDomain?: string
@@ -51,13 +52,44 @@ export interface BurnTokenResponse {
   txHash: string
 }
 
-export const fetchTokens = async () => {
+export interface MintFeeResponse {
+  success: boolean
+  fee: {
+    platformFee: string
+    platformFeeStroops: string
+    baseFee: string
+    totalFee: string
+    feeRecipient: string
+  }
+}
+
+export const getMintFee = async () => {
   try {
-    const { data } = await axiosClient.get<FetchTokensResponse>("/tokens")
+    const { data } = await axiosClient.get<MintFeeResponse>("/tokens/mint-fee")
     return data
   } catch (error) {
     throw toApiError(error)
   }
+}
+
+export const fetchTokens = async (options?: { skipCache?: boolean }) => {
+  const cacheKey = createRequestKey("/tokens", {})
+  
+  return cachedRequest(
+    cacheKey,
+    async () => {
+      try {
+        const { data } = await axiosClient.get<FetchTokensResponse>("/tokens")
+        return data
+      } catch (error) {
+        throw toApiError(error)
+      }
+    },
+    {
+      ttl: 10 * 60 * 1000, // 10 minutes - tokens rarely change
+      skipCache: options?.skipCache,
+    }
+  )
 }
 
 export const establishTrustline = async (payload: EstablishTrustlinePayload) => {

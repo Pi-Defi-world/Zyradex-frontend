@@ -1,199 +1,384 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Search, Plus, TrendingUp, Droplets, Loader2, Coins } from "lucide-react"
-import { TokenCard, type TokenSummary } from "@/components/token-card"
-import { LiquidityPoolCard } from "@/components/liquidity-pool-card"
-import { DisclaimerPopup } from "@/components/disclaimer-popup"
-import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
-import { useTokenRegistry } from "@/hooks/useTokenRegistry"
-import { useLiquidityPools } from "@/hooks/useLiquidityData"
-import { useAdminAuth } from "@/hooks/useAdminAuth"
-import { useAccountBalances } from "@/hooks/useAccountData"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { ArrowDown, TrendingUp, ArrowRightLeft, Loader2, Copy, Wallet, Plus, ArrowUpRight } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { usePi } from "@/components/providers/pi-provider"
+import { useAccountBalances, useAccountTransactions } from "@/hooks/useAccountData"
+import { formatDistanceToNow } from "date-fns"
+import { useTokenRegistry } from "@/hooks/useTokenRegistry"
+import { usePiPrice } from "@/hooks/usePiPrice"
+import { useUserProfile } from "@/hooks/useUserProfile"
+import { useTokenPrices } from "@/hooks/useTokenPrice"
+import { ReceiveModal } from "@/components/receive-modal"
 
-const buildTokenSummary = (token: ReturnType<typeof useTokenRegistry>["tokens"][number]): TokenSummary => ({
-  code: token.assetCode,
-  issuer: token.issuer,
-  name: token.name,
-  totalSupply: token.totalSupply,
-  description: token.description,
-})
+const getStoredWallet = () => {
+  if (typeof window === "undefined") return null
+  return localStorage.getItem("zyradex-wallet-address")
+}
 
-export default function LandingPage() {
-  const [searchInput, setSearchInput] = useState("")
-  const [searchType, setSearchType] = useState<"tokens" | "pools">("tokens")
-  const [disclaimerOpen, setDisclaimerOpen] = useState(false)
-  const { toast } = useToast()
+export default function HomePage() {
   const router = useRouter()
-  const { adminUser } = useAdminAuth()
-  const publicKey = adminUser?.public_key?.trim() ?? undefined
-
-  const { tokens, isLoading: tokensLoading } = useTokenRegistry()
-  const { pools, isLoading: poolsLoading } = useLiquidityPools({ limit: 20 })
-  const { balances } = useAccountBalances(publicKey)
-
-  const tokenSummaries = useMemo(() => tokens.map(buildTokenSummary), [tokens])
-  const trendingTokens = tokenSummaries.slice(0, 6)
-
-  const filteredTokens = useMemo(() => {
-    if (!searchInput.trim()) return tokenSummaries
-    const query = searchInput.trim().toUpperCase()
-    return tokenSummaries.filter((token) => token.code.toUpperCase().includes(query))
-  }, [tokenSummaries, searchInput])
-
-  const filteredPools = useMemo(() => {
-    if (!searchInput.trim()) return pools.map((pool) => pool)
-    const query = searchInput.trim().toUpperCase()
-    return pools.filter((pool) =>
-      pool.reserves.some((reserve) => reserve.asset.toUpperCase().includes(query))
-    )
-  }, [pools, searchInput])
+  const { toast } = useToast()
+  const { user, isAuthenticated } = usePi()
+  const { profile } = useUserProfile()
+  const [localWallet, setLocalWallet] = useState<string | null>(null)
+  const [receiveModalOpen, setReceiveModalOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState("tokens")
+  const { price: piPrice, isLoading: priceLoading } = usePiPrice()
 
   useEffect(() => {
-    const disclaimerAccepted = localStorage.getItem("bingepi-disclaimer-accepted")
-    if (!disclaimerAccepted) {
-      setDisclaimerOpen(true)
-    }
-  }, [])
-
-  const handleMintClick = () => {
-    if (!adminUser) {
-      toast({
-        title: "Authentication Required",
-        description: "Please connect with Pi using the navbar to mint tokens.",
-        variant: "destructive",
-      })
+    // Only restore wallet if user is authenticated
+    if (isAuthenticated) {
+      const stored = getStoredWallet()
+      setLocalWallet(stored)
+      // Also sync with profile public_key if available
+      if (profile?.public_key && stored !== profile.public_key) {
+        if (typeof window !== "undefined") {
+          localStorage.setItem("zyradex-wallet-address", profile.public_key)
+        }
+        setLocalWallet(profile.public_key)
+      }
     } else {
-      router.push("/mint")
+      setLocalWallet(null)
+    }
+  }, [isAuthenticated, profile?.public_key])
+
+
+  // Priority: profile.public_key (from DB) > user.wallet_address (from Pi SDK) > localWallet (from localStorage)
+  const publicKey = isAuthenticated 
+    ? (profile?.public_key || user?.wallet_address || localWallet || undefined) 
+    : undefined
+  const { balances, totalBalance: nativeBalanceOnly, isLoading: balancesLoading, error: balancesError } = useAccountBalances(publicKey)
+  const { tokens, isLoading: tokensLoading, error: tokensError } = useTokenRegistry()
+  const { getPrice, isLoading: pricesLoading } = useTokenPrices(
+    balances.map(b => ({ 
+      assetCode: b.assetCode, 
+      assetIssuer: b.assetIssuer || undefined, 
+      assetType: b.assetType 
+    }))
+  )
+  const { transactions, isLoading: transactionsLoading } = useAccountTransactions(publicKey, {
+    limit: 20,
+    order: "desc",
+  })
+
+  // Calculate total balance: native Pi + tokens with pools (valued in Pi)
+  const totalBalance = useMemo(() => {
+    let total = nativeBalanceOnly // Start with native Pi
+    
+    // Add token values in Pi for tokens that have pools
+    balances.forEach((balance) => {
+      if (balance.assetType === "native") return
+      
+      const priceInPi = getPrice(balance.assetCode, balance.assetIssuer || undefined, balance.assetType)
+      if (priceInPi !== null && priceInPi !== undefined) {
+        const tokenAmount = Number(balance.amount) || 0
+        total += tokenAmount * priceInPi
+      }
+    })
+    
+    return total
+  }, [nativeBalanceOnly, balances, getPrice])
+
+  // Calculate USD equivalent
+  const usdBalance = useMemo(() => {
+    if (!piPrice || !totalBalance || piPrice <= 0) return null
+    const calculated = totalBalance * piPrice
+    return isNaN(calculated) || !isFinite(calculated) ? null : calculated
+  }, [piPrice, totalBalance])
+
+  // Format native balance (Test Pi)
+  const nativeBalance = useMemo(() => {
+    const native = balances.find((b) => b.assetType === "native")
+    return native ? Number(native.amount) : 0
+  }, [balances])
+
+  const handleTrade = () => router.push("/trade")
+  const handleSwap = () => router.push("/swap")
+  const handleManageTokens = () => router.push("/trustlines")
+  const handleSend = () => router.push("/send")
+  const handleCopy = async () => {
+    const key = publicKey || ""
+    try {
+      await navigator.clipboard.writeText(key)
+      toast({ title: "Copied", description: "Public key copied to clipboard" })
+    } catch {
+      toast({ title: "Copy failed", description: key, variant: "destructive" })
     }
   }
 
-  const handleDisclaimerClose = () => {
-    localStorage.setItem("bingepi-disclaimer-accepted", "true")
-    setDisclaimerOpen(false)
+  const truncatedKey = useMemo(() => {
+    if (!publicKey) return ""
+    return `${publicKey.slice(0, 6)}...${publicKey.slice(-6)}`
+  }, [publicKey])
+
+
+  const handleTokenClick = (balance: any) => {
+    if (balance.assetType === "native") {
+      router.push("/token/native")
+    } else if (balance.assetCode) {
+      const tokenCode = balance.assetCode
+      router.push(`/token/${encodeURIComponent(tokenCode)}${balance.assetIssuer ? `?issuer=${encodeURIComponent(balance.assetIssuer)}` : ''}`)
+    }
   }
 
-  const handleSearchTypeChange = (type: "tokens" | "pools") => {
-    setSearchType(type)
-    setSearchInput("")
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString)
+      return formatDistanceToNow(date, { addSuffix: true })
+    } catch {
+      return dateString
+    }
+  }
+
+  const getTransactionType = (tx: any) => {
+    if (tx.operationCount === 0) return "Unknown"
+    if (tx.operationCount === 1) return "Transaction"
+    return `${tx.operationCount} Operations`
   }
 
   return (
-    <div className="min-h-screen premium-gradient">
-      <div className="container mx-auto px-4 pt-24 pb-12 space-y-8">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1 space-y-3">
-            <div className="inline-flex items-center gap-1 p-1 bg-muted rounded-lg">
-              <button
-                onClick={() => handleSearchTypeChange("tokens")}
-                className={`flex items-center gap-2 px-3 py-1 rounded-md text-sm font-medium transition-all ${
-                  searchType === "tokens"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Coins className="h-4 w-4" />
-                Tokens
-              </button>
-              <button
-                onClick={() => handleSearchTypeChange("pools")}
-                className={`flex items-center gap-2 px-3 py-1 rounded-md text-sm font-medium transition-all ${
-                  searchType === "pools"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Droplets className="h-4 w-4" />
-                Pools
-              </button>
-            </div>
-
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder={`Search ${searchType === "tokens" ? "tokens by code" : "pools by asset pair"}...`}
-                className="pl-10 bg-card border-border"
-                value={searchInput}
-                onChange={(event) => setSearchInput(event.target.value)}
-              />
+    <div className="min-h-screen premium-gradient pt-16 pb-20">
+      <div className="container mx-auto px-4 py-6 space-y-4 max-w-3xl">
+        {/* Wallet Header - Compact Mobile Design */}
+        <div className="space-y-4">
+          {/* Wallet Address */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground font-medium">Wallet</span>
+              <span className="text-sm font-medium text-foreground">{truncatedKey || "No wallet connected"}</span>
+              {publicKey && (
+                <button
+                  onClick={handleCopy}
+                  className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-muted"
+                  title="Copy public key"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
           </div>
-          <Button size="sm" className="btn-gradient-primary self-end" onClick={handleMintClick}>
-            <Plus className="mr-2 h-4 w-4" />
-            Mint Token
-          </Button>
+
+          {/* Balance Display - Centered, Pi Primary */}
+          <div className="space-y-1 text-center">
+            {balancesLoading || pricesLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <>
+                <h1 className="text-4xl font-bold text-foreground tracking-tight">
+                  {totalBalance.toLocaleString(undefined, { maximumFractionDigits: 4 })} Pi
+                </h1>
+                {usdBalance !== null && piPrice && (
+                  <p className="text-sm text-muted-foreground">
+                    ${usdBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  </p>
+                )}
+                {priceLoading && usdBalance === null && piPrice === null && (
+                  <p className="text-sm text-muted-foreground">Loading price...</p>
+                )}
+                {!priceLoading && piPrice === null && totalBalance > 0 && (
+                  <p className="text-sm text-muted-foreground">Price unavailable</p>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Action Buttons - Wallet Style Compact */}
+          <div className="grid grid-cols-4 gap-1.5">
+            <Button
+              variant="outline"
+              className="h-10 flex flex-col items-center justify-center gap-0.5 rounded-lg border hover:border-primary/50 hover:bg-muted/50 transition-all py-1 px-2"
+              onClick={() => setReceiveModalOpen(true)}
+            >
+              <ArrowDown className="h-3.5 w-3.5" />
+              <span className="text-[10px] font-medium leading-tight">Receive</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-10 flex flex-col items-center justify-center gap-0.5 rounded-lg border hover:border-primary/50 hover:bg-muted/50 transition-all py-1 px-2"
+              onClick={handleSend}
+            >
+              <ArrowUpRight className="h-3.5 w-3.5" />
+              <span className="text-[10px] font-medium leading-tight">Send</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-10 flex flex-col items-center justify-center gap-0.5 rounded-lg border hover:border-primary/50 hover:bg-muted/50 transition-all py-1 px-2"
+              onClick={handleSwap}
+            >
+              <ArrowRightLeft className="h-3.5 w-3.5" />
+              <span className="text-[10px] font-medium leading-tight">Swap</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-10 flex flex-col items-center justify-center gap-0.5 rounded-lg border hover:border-primary/50 hover:bg-muted/50 transition-all py-1 px-2"
+              onClick={handleTrade}
+            >
+              <TrendingUp className="h-3.5 w-3.5" />
+              <span className="text-[10px] font-medium leading-tight">Trade</span>
+            </Button>
+          </div>
         </div>
 
-        {!searchInput && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-primary" />
-              <h2 className="text-xl font-bold text-foreground">Trending Now</h2>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {trendingTokens.map((token, index) => (
-                <TokenCard key={`${token.code}-${index}`} token={token} index={index} variant="compact" />
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Tokens List with Tabs */}
+        <Card className="relative overflow-hidden border border-border/50 bg-card shadow-xl rounded-2xl">
+          <CardContent className="p-4">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <div className="flex items-center justify-between mb-4">
+                <TabsList className="w-fit">
+                  <TabsTrigger value="tokens">Tokens</TabsTrigger>
+                  <TabsTrigger value="history">History</TabsTrigger>
+                </TabsList>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-7 w-7" 
+                  onClick={handleManageTokens}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </div>
 
-        {(searchType === "tokens" || !searchInput) && (
-          <Card>
+              <TabsContent value="tokens" className="mt-0">
+                <div className="space-y-2">
+                  {balancesLoading ? (
+                    <div className="flex items-center justify-center py-12 text-muted-foreground text-sm">
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Loading balances...
+                    </div>
+                  ) : balances.length === 0 ? (
+                    <div className="text-sm text-muted-foreground py-12 text-center border-2 border-dashed border-border rounded-xl bg-muted/20">
+                      {publicKey ? "No balances found" : "Connect a wallet to view your holdings"}
+                    </div>
+                  ) : (
+                    balances.map((balance, index) => {
+                      const isNative = balance.assetType === "native"
+                      const displayName = isNative ? "Test Pi" : balance.assetCode
+                      const amount = Number(balance.amount)
+                      const priceInPi = getPrice(balance.assetCode, balance.assetIssuer || undefined, balance.assetType)
+                      const valueInPi = priceInPi !== null ? amount * priceInPi : null
+                      const usdValue = piPrice && (isNative || valueInPi !== null) 
+                        ? (isNative ? amount : valueInPi!) * piPrice 
+                        : null
+
+                      return (
+                        <button
+                          key={`${balance.asset}-${index}`}
+                          onClick={() => handleTokenClick(balance)}
+                          className="w-full flex items-center justify-between p-3 rounded-lg bg-muted/20 hover:bg-muted/40 transition-all cursor-pointer"
+                        >
+                          <div className="flex-1 min-w-0 text-left">
+                            <p className="font-semibold text-base text-foreground truncate">{displayName}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {amount.toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                              {!isNative && balance.assetCode && ` ${balance.assetCode}`}
+                              {isNative && " Test Pi"}
+                            </p>
+                          </div>
+                          <div className="text-right ml-4 shrink-0">
+                            {usdValue !== null ? (
+                              <>
+                                <p className="font-semibold text-base text-foreground">
+                                  ${usdValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                                </p>
+                                {valueInPi !== null && !isNative && (
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                    ≈ {valueInPi.toLocaleString(undefined, { maximumFractionDigits: 4 })} Pi
+                                  </p>
+                                )}
+                              </>
+                            ) : (
+                              <p className="font-semibold text-base text-foreground">
+                                {amount.toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                              </p>
+                            )}
+                          </div>
+                        </button>
+                      )
+                    })
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="history" className="mt-0">
+                <div className="space-y-2">
+                  {transactionsLoading ? (
+                    <div className="flex items-center justify-center py-12 text-muted-foreground text-sm">
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Loading transactions...
+                    </div>
+                  ) : !publicKey ? (
+                    <div className="text-sm text-muted-foreground py-12 text-center border-2 border-dashed border-border rounded-xl bg-muted/20">
+                      Connect a wallet to view transaction history
+                    </div>
+                  ) : transactions.length === 0 ? (
+                    <div className="text-sm text-muted-foreground py-12 text-center border-2 border-dashed border-border rounded-xl bg-muted/20">
+                      No transactions found
+                    </div>
+                  ) : (
+                    transactions.map((tx) => (
+                      <div
+                        key={tx.id}
+                        className="flex items-center justify-between gap-3 p-3 rounded-xl bg-muted/30 border border-border/50 hover:bg-muted/60 hover:border-border transition-all"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm font-medium text-foreground">
+                              {getTransactionType(tx)}
+                            </span>
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded-full ${
+                                tx.successful
+                                  ? "bg-green-500/20 text-green-700 dark:text-green-400"
+                                  : "bg-red-500/20 text-red-700 dark:text-red-400"
+                              }`}
+                            >
+                              {tx.successful ? "Success" : "Failed"}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {formatDate(tx.createdAt)}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-xs text-muted-foreground">Fee</p>
+                          <p className="text-sm font-semibold text-foreground">
+                            {tx.fee ? (Number(tx.fee) / 10000000).toFixed(7) : "0"} Pi
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+
+        {!publicKey && (
+          <Card className="rounded-2xl">
             <CardHeader>
-              <CardTitle>{searchInput ? `Token Results for "${searchInput}"` : "Recent Tokens"}</CardTitle>
-              <CardDescription>Registry of tokens available for trustlines and swaps</CardDescription>
+              <CardTitle>Connect Your Wallet</CardTitle>
+              <CardDescription>Connect a wallet to view your balance and holdings</CardDescription>
             </CardHeader>
             <CardContent>
-              {tokensLoading && !filteredTokens.length ? (
-                <div className="flex items-center justify-center py-12 text-muted-foreground">
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading tokens...
-                </div>
-              ) : (
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredTokens.map((token, index) => (
-                    <TokenCard key={`${token.code}-${index}`} token={token} index={index} />
-                  ))}
-                </div>
-              )}
-              {!tokensLoading && !filteredTokens.length && (
-                <div className="text-sm text-muted-foreground py-6 text-center">No tokens found matching "{searchInput}"</div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {(searchType === "pools" || !searchInput) && (
-          <Card>
-            <CardHeader>
-              <CardTitle>{searchInput ? `Pool Results for "${searchInput}"` : "Liquidity Pools"}</CardTitle>
-              <CardDescription>Explore Pi liquidity pools sourced from Horizon</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {poolsLoading && !filteredPools.length ? (
-                <div className="flex items-center justify-center py-12 text-muted-foreground">
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading pools...
-                </div>
-              ) : (
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredPools.map((pool, index) => (
-                    <LiquidityPoolCard key={pool.id} pool={pool} index={index} />
-                  ))}
-                </div>
-              )}
-              {!poolsLoading && !filteredPools.length && (
-                <div className="text-sm text-muted-foreground py-6 text-center">No liquidity pools found matching "{searchInput}"</div>
-              )}
+              <Button onClick={() => router.push("/profile")} className="w-full h-12 btn-gradient-primary rounded-xl">
+                Go to Profile
+              </Button>
             </CardContent>
           </Card>
         )}
       </div>
 
-      <DisclaimerPopup open={disclaimerOpen} onOpenChange={handleDisclaimerClose} />
+      <ReceiveModal open={receiveModalOpen} onOpenChange={setReceiveModalOpen} />
+
     </div>
   )
 }

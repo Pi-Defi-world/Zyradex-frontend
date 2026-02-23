@@ -90,7 +90,7 @@ export function LiquidityPoolCard({ pool, index = 0 }: LiquidityPoolCardProps) {
             <span className="text-sm text-muted-foreground">TVL</span>
             <span className="text-sm font-semibold text-primary">
               {tvl.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-            </span>
+            </span> 
           </div>
         </div>
 

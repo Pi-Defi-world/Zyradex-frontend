@@ -19,6 +19,7 @@ export interface AdminUser {
   role: "user" | "creator" | "admin"
   verified: boolean
   public_key?: string
+  avatarUrl?: string
 }
 
 export interface SignInResponse {
@@ -35,13 +36,9 @@ export const signIn = async (payload: SignInPayload) => {
   }
 }
 
-export interface GetCurrentUserResponse {
-  user: AdminUser
-}
-
-export const getCurrentUser = async (): Promise<GetCurrentUserResponse> => {
+export const removePublicKey = async () => {
   try {
-    const { data } = await axiosClient.get<GetCurrentUserResponse>("/users/me")
+    const { data } = await axiosClient.delete<{ success: boolean; message: string }>("/users/public-key")
     return data
   } catch (error) {
     throw toApiError(error)

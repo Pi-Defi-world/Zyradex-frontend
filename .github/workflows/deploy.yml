@@ -1,0 +1,63 @@
+name: Sync Source Code to Vercel Repo
+
+on:
+  push:
+    branches:
+      - passkey
+
+jobs:
+  sync-to-vercel:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source repository
+        uses: actions/checkout@v4
+
+      - name: Configure Git
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "GitHub Actions"
+          git config --global --add safe.directory /github/workspace
+
+      - name: Push to destination (Vercel) repo
+        env:
+          DESTINATION_REPO: "https://junman140:${{ secrets.API_TOKEN_GITHUB }}@github.com/junman140/tokenization-fe.git"
+        run: |
+          # Clone the repository
+          git clone "$DESTINATION_REPO" --branch main --single-branch temp_zyra_dex || {
+            echo "⚠️ Failed to clone, trying to initialize..."
+            mkdir -p temp_zyra_dex
+            cd temp_zyra_dex
+            git init
+            git checkout -b main
+            git remote add origin "$DESTINATION_REPO"
+            touch README.md
+            git add README.md
+            git commit -m "Initial commit"
+            git push -u origin main || true
+            cd ..
+            git clone "$DESTINATION_REPO" --branch main --single-branch temp_zyra_dex
+          }
+          
+          # Sync files, ignoring errors from vanished files
+          rsync -av --delete --ignore-errors \
+            --exclude '.git' \
+            --exclude '.github/workflows' \
+            --exclude 'temp_zyra_dex' \
+            --exclude 'node_modules' \
+            ./ temp_zyra_dex/ || true
+          
+          cd temp_zyra_dex
+          
+          # Configure git
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "GitHub Actions"
+
+          if [ -n "$(git status --porcelain)" ]; then
+            git add .
+            git commit -m "Sync source code for Vercel build 🚀 [skip ci]"
+            git push origin main
+            echo "✅ Synced successfully!"
+          else
+            echo "🟢 No changes detected — skipping commit."
+          fi

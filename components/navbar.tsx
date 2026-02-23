@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Moon, Sun, Wallet, Home, Coins, Droplets, User, ArrowRightLeft } from "lucide-react"
+import { Moon, Sun, Wallet, Home, Coins, Droplets, User, ArrowRightLeft, TrendingUp, PiggyBank, CreditCard } from "lucide-react"
 import { useTheme } from "next-themes"
 import Link from "next/link"
 import { usePi } from "@/components/providers/pi-provider"
@@ -40,9 +40,10 @@ function MobileBottomNav() {
 
   const navItems = [
     { href: "/", icon: Home, label: "Home" },
-    { href: "/mint", icon: Coins, label: "Mint" },
-    { href: "/swap", icon: ArrowRightLeft, label: "Swap"},
-    { href: "/liquidity", icon: Droplets, label: "Liquidity" },
+    { href: "/invest", icon: TrendingUp, label: "Invest" },
+    { href: "/savings", icon: PiggyBank, label: "Savings" },
+    { href: "/lending", icon: CreditCard, label: "Borrow" },
+    { href: "/swap", icon: ArrowRightLeft, label: "Trade" },
     { href: "/profile", icon: User, label: "Profile" },
   ]
 
@@ -123,15 +124,16 @@ export function Navbar({ isConnected = false, onConnect }: NavbarProps) {
       <nav className="fixed top-0 w-full z-50 border-b border-border bg-background/95 backdrop-blur-sm">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <span className="font-bold text-xl">BINGEPi</span>
+            <span className="font-bold text-xl">ZyraDex</span>
           </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-6">
             <Link href="/" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Home</Link>
-            <Link href="/swap" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Swap</Link>
-            <Link href="/mint" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Mint</Link>
-            <Link href="/liquidity" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Liquidity</Link>
+            <Link href="/invest" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Invest</Link>
+            <Link href="/savings" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Savings</Link>
+            <Link href="/lending" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Borrow</Link>
+            <Link href="/swap" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Trade</Link>
             <Link href="/profile" className="text-sm font-medium text-foreground/60 hover:text-foreground transition-colors">Profile</Link>
           </div>
 

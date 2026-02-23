@@ -1,14 +1,18 @@
 import { axiosClient, toApiError } from "../api"
-import type { AdminUser } from "./auth"
+import { cachedRequest, createRequestKey } from "./request-cache"
 
-export interface ImportAccountPayload {
-  mnemonic?: string
-  secret?: string
-}
-
-export interface ImportAccountResponse {
+export interface CreateWalletResponse {
   publicKey: string
   secret: string
+  seedResult: {
+    success: boolean
+    transactionHash: string
+    accountCreated: boolean
+    amount: string
+  }
+  replacedPreviousWallet?: boolean
+  previousPublicKey?: string
+  warning?: string
 }
 
 export interface AccountBalanceEntry {
@@ -56,6 +60,8 @@ export interface AccountOperation {
   medThreshold?: string | null
   highThreshold?: string | null
   destination?: string
+  destinationAsset?: string
+  destinationAmount?: string
   details?: unknown
   pagingToken?: string
 }
@@ -70,35 +76,56 @@ export interface PaginatedOperations {
   }
 }
 
-export interface LinkWalletResponse {
-  user: AdminUser
-}
-
-export const linkWallet = async (publicKey: string): Promise<LinkWalletResponse> => {
+export const createWallet = async () => {
   try {
-    const { data } = await axiosClient.post<LinkWalletResponse>("/account/link-wallet", { publicKey })
+    const { data } = await axiosClient.post<CreateWalletResponse>("/account/create-wallet")
     return data
   } catch (error) {
     throw toApiError(error)
   }
 }
 
-export const importAccount = async (payload: ImportAccountPayload) => {
+export const changeWallet = async () => {
   try {
-    const { data } = await axiosClient.post<ImportAccountResponse>("/account/import", payload)
+    const { data } = await axiosClient.post<CreateWalletResponse>("/account/change-wallet", {
+      confirmReplace: true,
+    })
     return data
   } catch (error) {
     throw toApiError(error)
   }
 }
 
-export const getAccountBalances = async (publicKey: string) => {
-  try {
-    const { data } = await axiosClient.get<AccountBalancesResponse>(`/account/balance/${publicKey}`)
-    return data
-  } catch (error) {
-    throw toApiError(error)
+export const getAccountBalances = async (publicKey: string, refresh?: boolean) => {
+  // Don't cache if refresh is explicitly requested
+  if (refresh) {
+    try {
+      const { data } = await axiosClient.get<AccountBalancesResponse>(`/account/balance/${publicKey}`, {
+        params: { refresh: 'true' }
+      })
+      return data
+    } catch (error) {
+      throw toApiError(error)
+    }
   }
+
+  const cacheKey = createRequestKey(`/account/balance/${publicKey}`, {})
+  
+  return cachedRequest(
+    cacheKey,
+    async () => {
+      try {
+        const { data } = await axiosClient.get<AccountBalancesResponse>(`/account/balance/${publicKey}`)
+        return data
+      } catch (error) {
+        throw toApiError(error)
+      }
+    },
+    {
+      ttl: 30 * 1000, // 30 seconds - balances change frequently but don't need real-time
+      skipCache: false,
+    }
+  )
 }
 
 export const getAccountOperations = async (params: AccountOperationsParams) => {
@@ -107,6 +134,83 @@ export const getAccountOperations = async (params: AccountOperationsParams) => {
     const { data } = await axiosClient.get<PaginatedOperations>(`/account/operations/${publicKey}`, {
       params: query,
     })
+    return data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}
+
+export interface AccountTransactionsParams {
+  publicKey: string
+  limit?: number
+  cursor?: string
+  order?: "asc" | "desc"
+  refresh?: boolean
+}
+
+export interface AccountTransaction {
+  id: string
+  hash: string
+  ledger: number
+  createdAt: string
+  sourceAccount: string
+  fee: string
+  feeAccount?: string
+  operationCount: number
+  successful: boolean
+  paging_token?: string
+  memo?: string
+  memoType?: string
+  operations?: Array<{
+    id: string
+    type: string
+    sourceAccount: string
+    createdAt: string
+  }>
+}
+
+export interface PaginatedTransactions {
+  data: AccountTransaction[]
+  pagination: {
+    limit: number
+    nextCursor: string | null
+    hasMore: boolean
+    order: "asc" | "desc"
+  }
+  cached?: boolean
+}
+
+export const getAccountTransactions = async (params: AccountTransactionsParams) => {
+  try {
+    const { publicKey, refresh, ...query } = params
+    const { data } = await axiosClient.get<PaginatedTransactions>(`/account/transactions/${publicKey}`, {
+      params: refresh ? { ...query, refresh: 'true' } : query,
+    })
+    return data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}
+
+export interface SendPaymentPayload {
+  userSecret: string
+  destination: string
+  asset: { code: string; issuer?: string }
+  amount: string
+  memo?: string
+}
+
+export interface SendPaymentResponse {
+  success: boolean
+  transactionHash?: string
+  ledger?: number
+  message?: string
+  receiverNeedsTrustline?: boolean
+}
+
+export const sendPayment = async (payload: SendPaymentPayload) => {
+  try {
+    const { data } = await axiosClient.post<SendPaymentResponse>("/account/send", payload)
     return data
   } catch (error) {
     throw toApiError(error)

@@ -11,7 +11,7 @@ A Next.js 15 application that consumes the Pi DEX backend to offer portfolio tra
 ## Installation
 
 ```bash
-npm install
+pnpm install
 ```
 
 This project relies on the following environment variable:
@@ -24,7 +24,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 ## Development
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 ## Admin Authentication
@@ -37,6 +37,10 @@ Administrative actions (minting tokens, managing fees, etc.) require a backend J
 4. Admin-only hooks automatically attach the bearer token using `setAuthToken`.
 
 To revoke access, use **Sign out of admin** in the same card.
+
+## Account Import
+
+Profile → Account Service allows a user to call `/v1/account/import` by providing either a secret key or mnemonic. The backend responds with the derived public key, which the frontend stores locally (no secrets are persisted). This is the recommended way to register the wallet used across dashboard, swap, and liquidity tools.
 
 ## QA Checklist
 
