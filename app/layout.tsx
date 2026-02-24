@@ -34,7 +34,7 @@ export default function RootLayout({
             
             if (window.Pi) {
               console.log('Pi SDK loaded, initializing...');
-              window.Pi.init({ version: "2.0", sandbox: true });
+              window.Pi.init({ version: "2.0" });
               console.log('Pi SDK initialized successfully');
             } else {
               console.warn('Pi SDK not available - this app requires Pi Browser');
