@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import {
@@ -10,6 +10,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -41,7 +48,9 @@ import {
   useDividendHolders,
   useRecordDividendClaim,
 } from "@/hooks/useDividendData"
-import { useCurrentUser } from "@/hooks/useCurrentUser"
+import { useUserProfile } from "@/hooks/useUserProfile"
+import { usePi } from "@/components/providers/pi-provider"
+import { useBalanceRefresh } from "@/components/providers/balance-refresh-provider"
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "Draft",
@@ -56,8 +65,17 @@ export default function InvestLaunchDetailPage() {
   const router = useRouter()
   const launchId = typeof params.launchId === "string" ? params.launchId : undefined
   const { toast } = useToast()
-  const { user } = useCurrentUser()
-  const userId = user?.id ?? undefined
+  const { profile, isLoading: profileLoading, refresh: refreshProfile } = useUserProfile()
+  const { isAuthenticated } = usePi()
+  const { refreshBalances: refreshBalancesGlobal } = useBalanceRefresh() ?? {}
+  // Support backend returning id, _id (Mongo), or uid
+  const userId = profile?.id ?? (profile as { _id?: string })?._id ?? profile?.uid ?? undefined
+
+  // When Pi is connected but profile not loaded yet, trigger sign-in so profile gets set
+  useEffect(() => {
+    if (!isAuthenticated || profile || profileLoading) return
+    refreshProfile().catch(() => undefined)
+  }, [isAuthenticated, profile, profileLoading, refreshProfile])
 
   const { launch, error: launchError, isLoading: launchLoading } = useLaunch(launchId)
   const { piPower, isLoading: piPowerLoading } = useMyPiPower(launchId, userId)
@@ -69,6 +87,8 @@ export default function InvestLaunchDetailPage() {
   const { transitionStatus, isLoading: transitionLoading } = useLaunchTransitionStatus(launchId ?? "")
 
   const [commitAmount, setCommitAmount] = useState("")
+  const [commitSecret, setCommitSecret] = useState("")
+  const [commitDialogOpen, setCommitDialogOpen] = useState(false)
   const [dividendRoundAmount, setDividendRoundAmount] = useState("")
   const [escrowSecret, setEscrowSecret] = useState("")
   const [newStatus, setNewStatus] = useState("")
@@ -80,15 +100,27 @@ export default function InvestLaunchDetailPage() {
   const { holders } = useDividendHolders(selectedRoundId)
   const { recordClaim, isLoading: claimLoading } = useRecordDividendClaim(selectedRoundId ?? "")
 
-  const handleCommit = async () => {
+  const handleCommitClick = () => {
     if (!launchId || !commitAmount.trim()) {
       toast({ title: "Enter amount", variant: "destructive" })
       return
     }
+    setCommitSecret("")
+    setCommitDialogOpen(true)
+  }
+
+  const handleCommitSubmit = async () => {
+    if (!launchId || !commitAmount.trim() || !commitSecret.trim()) {
+      toast({ title: "Enter amount and secret seed", variant: "destructive" })
+      return
+    }
     try {
-      await commitPi({ committedPi: commitAmount.trim(), userId })
-      toast({ title: "Commit recorded" })
+      await commitPi({ committedPi: commitAmount.trim(), userId, userSecret: commitSecret.trim() })
+      toast({ title: "Commit successful" })
       setCommitAmount("")
+      setCommitDialogOpen(false)
+      setCommitSecret("")
+      refreshBalancesGlobal?.()
     } catch (e) {
       toast({
         title: "Commit failed",
@@ -281,12 +313,41 @@ export default function InvestLaunchDetailPage() {
                   onChange={(e) => setCommitAmount(e.target.value)}
                 />
               </div>
-              <Button onClick={handleCommit} disabled={!canCommit || commitLoading}>
+              <Button onClick={handleCommitClick} disabled={!canCommit || commitLoading}>
                 {commitLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Commit"}
               </Button>
             </CardContent>
           </Card>
         )}
+
+        <Dialog open={commitDialogOpen} onOpenChange={setCommitDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Sign commit</DialogTitle>
+              <DialogDescription>
+                Enter your secret key to sign the Pi payment. Amount: {commitAmount || "—"} Pi
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div className="space-y-2">
+                <Label htmlFor="commit-secret">Secret key</Label>
+                <Input
+                  id="commit-secret"
+                  type="password"
+                  placeholder="S..."
+                  value={commitSecret}
+                  onChange={(e) => setCommitSecret(e.target.value)}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setCommitDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleCommitSubmit} disabled={commitLoading || !commitSecret.trim()}>
+                  {commitLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {isProjectFlow && (
           <Card>

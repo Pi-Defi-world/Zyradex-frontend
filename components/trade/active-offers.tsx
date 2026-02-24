@@ -7,6 +7,7 @@ import { Loader2, X } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useUserOffers, useCancelOffer } from "@/hooks/useTrade"
 import { useAccountBalances } from "@/hooks/useAccountData"
+import { useBalanceRefresh } from "@/components/providers/balance-refresh-provider"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
@@ -19,6 +20,7 @@ export function ActiveOffers({ account }: ActiveOffersProps) {
   const { offers, isLoading, error } = useUserOffers(account)
   const { cancelOffer, isLoading: cancelling } = useCancelOffer()
   const { refresh: refreshBalances } = useAccountBalances(account)
+  const { refreshBalances: refreshBalancesGlobal } = useBalanceRefresh() ?? {}
   const [userSecret, setUserSecret] = useState<string>("")
   const [cancellingOfferId, setCancellingOfferId] = useState<string | null>(null)
 
@@ -47,6 +49,7 @@ export function ActiveOffers({ account }: ActiveOffersProps) {
       
       setTimeout(() => {
         refreshBalances()
+        refreshBalancesGlobal?.()
       }, 2000) // Wait 2 seconds for transaction to be processed
     } catch (err) {
       const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Failed to cancel offer"

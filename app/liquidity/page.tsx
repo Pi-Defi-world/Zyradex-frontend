@@ -34,11 +34,12 @@ import Link from "next/link"
 
 import { useToast } from "@/hooks/use-toast"
 import {
-  useLiquidityPools,
+  useAllLiquidityPools,
   useCreateLiquidityPool,
   useAddLiquidity,
   useWithdrawLiquidity,
 } from "@/hooks/useLiquidityData"
+import { useBalanceRefresh } from "@/components/providers/balance-refresh-provider"
 import { usePi } from "@/components/providers/pi-provider"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { getUserTokens, getPlatformPools, quoteAddLiquidity, type PoolExistsError } from "@/lib/api/liquidity"
@@ -151,10 +152,10 @@ export default function LiquidityPage() {
     }
   }, [walletAddress])
 
-  // Fetch platform pools
+  // Fetch platform pools (skip cache when refreshKey set so post-mutation data is fresh)
   useEffect(() => {
     setLoadingPlatformPools(true)
-    getPlatformPools()
+    getPlatformPools({ skipCache: true })
       .then((data) => {
         setPlatformPools(data.pools)
       })
@@ -167,14 +168,11 @@ export default function LiquidityPage() {
   }, [refreshKey])
 
 
-  const [currentPage, setCurrentPage] = useState(1)
-  const [cursor, setCursor] = useState<string | undefined>(undefined)
-  const pageSize = 10
-  
-  const { pools, isLoading, error, pagination } = useLiquidityPools({ limit: pageSize, cursor }, { refreshKey })
+  const { pools, isLoading, error } = useAllLiquidityPools({ refreshKey })
   const { createLiquidityPool, isLoading: creating } = useCreateLiquidityPool()
   const { addLiquidity, isLoading: adding } = useAddLiquidity()
   const { withdrawLiquidity, isLoading: withdrawing } = useWithdrawLiquidity()
+  const { refreshBalances: refreshBalancesGlobal } = useBalanceRefresh() ?? {}
 
   const [createForm, setCreateForm] = useState<LiquidityFormState>(defaultCreateForm)
   const [depositForm, setDepositForm] = useState<DepositFormState>(defaultDepositForm)
@@ -262,8 +260,7 @@ export default function LiquidityPage() {
       setPoolExistsError(null)
       setRefreshKey(Date.now())
       setCreateForm(defaultCreateForm) // Clear secret
-      setCursor(undefined) // Reset pagination
-      setCurrentPage(1)
+      refreshBalancesGlobal?.()
     } catch (err: any) {
       // Handle pool exists error
       if (err.poolExists && err.poolId) {
@@ -312,8 +309,7 @@ export default function LiquidityPage() {
       resetForms()
       setRefreshKey(Date.now())
       setDepositForm(defaultDepositForm) // Clear secret
-      setCursor(undefined) // Reset pagination
-      setCurrentPage(1)
+      refreshBalancesGlobal?.()
     } catch (err: any) {
       const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Failed to add liquidity"
       const suggestion = err && typeof err === "object" && "suggestion" in err ? (err as any).suggestion : undefined
@@ -361,8 +357,7 @@ export default function LiquidityPage() {
       setWithdrawForm(defaultWithdrawForm) // Clear form
       setWithdrawSecret("") // Clear secret
       setShowWithdrawSecretDialog(false) // Close dialog
-      setCursor(undefined) // Reset pagination
-      setCurrentPage(1)
+      refreshBalancesGlobal?.()
     } catch (err: any) {
       const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Failed to withdraw"
       const suggestion = err && typeof err === "object" && "suggestion" in err ? (err as any).suggestion : undefined
@@ -1065,49 +1060,10 @@ export default function LiquidityPage() {
               ))}
             </div>
             
-            {/* Pagination Controls */}
-            {!isLoading && (pagination?.hasMore || currentPage > 1) && (
-              <div className="flex items-center justify-between pt-4 border-t border-border/50">
-                <div className="text-sm text-muted-foreground">
-                  Page {currentPage}
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setCurrentPage(1)
-                      setCursor(undefined)
-                    }}
-                    disabled={currentPage === 1 || isLoading}
-                  >
-                    First
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setCurrentPage(prev => Math.max(1, prev - 1))
-                      setCursor(undefined) // Reset to first page for simplicity
-                    }}
-                    disabled={currentPage === 1 || isLoading}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      if (pagination?.nextCursor) {
-                        setCursor(pagination.nextCursor)
-                        setCurrentPage(prev => prev + 1)
-                      }
-                    }}
-                    disabled={!pagination?.hasMore || isLoading}
-                  >
-                    Next
-                  </Button>
-                </div>
+            {/* Full list loaded; search filters above */}
+            {!isLoading && displayPools.length > 0 && (
+              <div className="pt-4 border-t border-border/50 text-sm text-muted-foreground">
+                Showing {displayPools.length} pool{displayPools.length !== 1 ? "s" : ""}
               </div>
             )}
           </CardContent>

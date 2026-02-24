@@ -121,7 +121,7 @@ export default function InvestPage() {
             {launches.length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center text-muted-foreground">
-                  No launches found. Check back later or create a launch from the backend.
+                  No launches found. Check back later.
                 </CardContent>
               </Card>
             ) : (

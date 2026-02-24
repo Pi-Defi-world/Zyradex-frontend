@@ -16,6 +16,7 @@ import {
 } from "@/lib/api/account"
 import type { ApiError } from "@/lib/api"
 import { toApiError } from "@/lib/api"
+import { useBalanceRefresh } from "@/components/providers/balance-refresh-provider"
 
 export interface UseAccountOperationsOptions {
   limit?: number
@@ -83,6 +84,7 @@ export const useChangeWallet = () => {
 }
 
 export const useAccountBalances = (publicKey?: string) => {
+  const { balanceRefreshVersion } = useBalanceRefresh() ?? { balanceRefreshVersion: 0 }
   const [data, setData] = useState<AccountBalancesResponse | null>(null)
   const [error, setError] = useState<ApiError | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -103,8 +105,7 @@ export const useAccountBalances = (publicKey?: string) => {
     setIsLoading(true)
     setError(null)
 
- 
-    const shouldRefresh = refreshTrigger > 0
+    const shouldRefresh = refreshTrigger > 0 || balanceRefreshVersion > 0
     getAccountBalances(publicKey, shouldRefresh)
       .then((response) => {
         if (!cancelled) {
@@ -135,7 +136,7 @@ export const useAccountBalances = (publicKey?: string) => {
     return () => {
       cancelled = true
     }
-  }, [publicKey, refreshTrigger])
+  }, [publicKey, refreshTrigger, balanceRefreshVersion])
 
   const balances = data?.balances ?? []
   const totalBalance = useMemo(

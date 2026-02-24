@@ -64,6 +64,7 @@ export interface ListPoolsResponse {
 export interface SupplyPayload {
   amount: string
   userId?: string
+  userSecret: string
 }
 
 export interface WithdrawPayload {
@@ -76,6 +77,7 @@ export interface BorrowPayload {
   collateralAmount: string
   borrowAmount: string
   userId?: string
+  userSecret: string
 }
 
 export interface GetPositionsResponse {
@@ -87,6 +89,10 @@ export interface CreditScoreResponse {
   score: number | null
   canBorrow: boolean
   reason?: string
+  /** Max borrow term in days allowed for this user (credit-based). 98+ with history = max term (e.g. 5y). */
+  maxBorrowTermDays?: number
+  /** True if user has repaid a loan or supplied; needed for max term at 98+. */
+  hasHistory?: boolean
 }
 
 export interface FeeDestinationResponse {
@@ -166,7 +172,7 @@ export const getPositions = async (userId?: string) => {
   }
 }
 
-export const repay = async (borrowPositionId: string, body: { amount: string }) => {
+export const repay = async (borrowPositionId: string, body: { amount: string; userSecret: string }) => {
   try {
     const { data } = await axiosClient.post<{
       position: BorrowPosition
