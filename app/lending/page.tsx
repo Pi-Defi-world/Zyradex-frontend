@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Card,
   CardContent,
@@ -12,6 +12,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import {
   Loader2,
@@ -22,7 +29,8 @@ import {
   AlertTriangle,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { useCurrentUser } from "@/hooks/useCurrentUser"
+import { useUserProfile } from "@/hooks/useUserProfile"
+import { usePi } from "@/components/providers/pi-provider"
 import {
   useLendingPools,
   useLendingPositions,
@@ -34,20 +42,22 @@ import {
   useLendingRepay,
   useSetCreditScore,
 } from "@/hooks/useLendingData"
+import { useBalanceRefresh } from "@/components/providers/balance-refresh-provider"
+import { supply as supplyApi, borrow as borrowApi, repay as repayApi } from "@/lib/api/lending"
 import type { LendingPool, SupplyPosition, BorrowPosition } from "@/lib/api/lending"
 
 function PoolCard({
   pool,
   userId,
-  onSupply,
+  onSupplyClick,
   onWithdraw,
-  onBorrow,
+  onBorrowClick,
 }: {
   pool: LendingPool
   userId: string
-  onSupply: (poolId: string, amount: string) => Promise<void>
+  onSupplyClick: (poolId: string, amount: string) => void
   onWithdraw: (poolId: string, amount: string) => Promise<void>
-  onBorrow: (poolId: string, body: { collateralAsset: { code: string; issuer: string }; collateralAmount: string; borrowAmount: string }) => Promise<void>
+  onBorrowClick: (poolId: string, body: { collateralAsset: { code: string; issuer: string }; collateralAmount: string; borrowAmount: string }) => void
 }) {
   const [supplyAmount, setSupplyAmount] = useState("")
   const [withdrawAmount, setWithdrawAmount] = useState("")
@@ -60,11 +70,9 @@ function PoolCard({
 
   const assetLabel = pool.asset ? `${pool.asset.code}` : "—"
 
-  const handleSupply = async () => {
+  const handleSupplyClick = () => {
     if (!supplyAmount.trim()) return
-    await supply({ amount: supplyAmount.trim(), userId })
-    onSupply(pool._id, supplyAmount.trim())
-    setSupplyAmount("")
+    onSupplyClick(pool._id, supplyAmount.trim())
   }
 
   const handleWithdraw = async () => {
@@ -74,21 +82,13 @@ function PoolCard({
     setWithdrawAmount("")
   }
 
-  const handleBorrow = async () => {
+  const handleBorrowClick = () => {
     if (!borrowAmount.trim() || !collateralAmount.trim()) return
-    await borrow({
-      collateralAsset: pool.collateralAssets?.[0]?.asset ?? pool.asset,
-      collateralAmount: collateralAmount.trim(),
-      borrowAmount: borrowAmount.trim(),
-      userId,
-    })
-    onBorrow(pool._id, {
+    onBorrowClick(pool._id, {
       collateralAsset: pool.collateralAssets?.[0]?.asset ?? pool.asset,
       collateralAmount: collateralAmount.trim(),
       borrowAmount: borrowAmount.trim(),
     })
-    setBorrowAmount("")
-    setCollateralAmount("")
   }
 
   return (
@@ -120,7 +120,7 @@ function PoolCard({
               value={supplyAmount}
               onChange={(e) => setSupplyAmount(e.target.value)}
             />
-            <Button onClick={handleSupply} disabled={!supplyAmount.trim() || supplyLoading} className="w-full">
+            <Button onClick={handleSupplyClick} disabled={!supplyAmount.trim() || supplyLoading} className="w-full">
               {supplyLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Supply"}
             </Button>
           </TabsContent>
@@ -152,7 +152,7 @@ function PoolCard({
               onChange={(e) => setBorrowAmount(e.target.value)}
             />
             <Button
-              onClick={handleBorrow}
+              onClick={handleBorrowClick}
               disabled={!borrowAmount.trim() || !collateralAmount.trim() || borrowLoading}
               className="w-full"
             >
@@ -185,27 +185,20 @@ function SupplyPositionRow({ position }: { position: SupplyPosition }) {
 
 function BorrowPositionRow({
   position,
-  onRepay,
+  onRepayClick,
 }: {
   position: BorrowPosition
-  onRepay: (id: string, amount: string) => Promise<void>
+  onRepayClick: (positionId: string, amount: string) => void
 }) {
   const [repayAmount, setRepayAmount] = useState("")
-  const [loading, setLoading] = useState(false)
   const pool = typeof position.poolId === "object" ? position.poolId : null
   const assetLabel = position.borrowedAsset ? `${position.borrowedAsset.code}` : "—"
   const totalDebt = position.totalDebt ?? position.borrowedAmount
   const healthOk = position.healthFactor && parseFloat(position.healthFactor) >= 1
 
-  const handleRepay = async () => {
+  const handleRepayClick = () => {
     if (!repayAmount.trim()) return
-    setLoading(true)
-    try {
-      await onRepay(position._id, repayAmount.trim())
-      setRepayAmount("")
-    } finally {
-      setLoading(false)
-    }
+    onRepayClick(position._id, repayAmount.trim())
   }
 
   return (
@@ -237,8 +230,8 @@ function BorrowPositionRow({
               onChange={(e) => setRepayAmount(e.target.value)}
             />
           </div>
-          <Button onClick={handleRepay} disabled={!repayAmount.trim() || loading} size="sm">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Repay"}
+          <Button onClick={handleRepayClick} disabled={!repayAmount.trim()} size="sm">
+            Repay
           </Button>
         </div>
       </CardContent>
@@ -248,45 +241,112 @@ function BorrowPositionRow({
 
 export default function LendingPage() {
   const { toast } = useToast()
-  const { user } = useCurrentUser()
-  const userId = user?.id ?? ""
+  const { profile, isLoading: profileLoading, refresh: refreshProfile } = useUserProfile()
+  const { isAuthenticated } = usePi()
+  const { refreshBalances: refreshBalancesGlobal } = useBalanceRefresh() ?? {}
+  const userId = profile?.id ?? (profile as { _id?: string })?._id ?? profile?.uid ?? ""
   const [refreshKey, setRefreshKey] = useState(0)
+
+  const [secretDialogOpen, setSecretDialogOpen] = useState(false)
+  const [secretValue, setSecretValue] = useState("")
+  const [dialogLoading, setDialogLoading] = useState(false)
+  const [pendingSupply, setPendingSupply] = useState<{ poolId: string; amount: string } | null>(null)
+  const [pendingBorrow, setPendingBorrow] = useState<{
+    poolId: string
+    body: { collateralAsset: { code: string; issuer: string }; collateralAmount: string; borrowAmount: string }
+  } | null>(null)
+  const [pendingRepay, setPendingRepay] = useState<{ positionId: string; amount: string } | null>(null)
+
+  useEffect(() => {
+    if (!isAuthenticated || profile || profileLoading) return
+    refreshProfile().catch(() => undefined)
+  }, [isAuthenticated, profile, profileLoading, refreshProfile])
 
   const { pools, error: poolsError, isLoading: poolsLoading } = useLendingPools()
   const { supplyPositions, borrowPositions, error: positionsError, isLoading: positionsLoading } =
     useLendingPositions(userId || undefined, { refreshKey })
-  const { score, canBorrow, error: creditError } = useCreditScore(userId || undefined)
+  const { score, canBorrow, maxBorrowTermDays, hasHistory, reason: creditReason, error: creditError } = useCreditScore(userId || undefined)
   const { platformFeePublicKey } = useFeeDestination()
   const [creditScoreInput, setCreditScoreInput] = useState("")
   const { setCreditScore, isLoading: setScoreLoading } = useSetCreditScore()
 
-  const handleSupply = async () => {
-    toast({ title: "Supply recorded" })
-    setRefreshKey((k) => k + 1)
-  }
-  const handleWithdraw = async () => {
-    toast({ title: "Withdraw recorded" })
-    setRefreshKey((k) => k + 1)
-  }
-  const handleBorrow = async () => {
-    toast({ title: "Borrow recorded" })
-    setRefreshKey((k) => k + 1)
+  const handleSupplyClick = (poolId: string, amount: string) => {
+    setPendingSupply({ poolId, amount })
+    setPendingBorrow(null)
+    setPendingRepay(null)
+    setSecretValue("")
+    setSecretDialogOpen(true)
   }
 
-  const handleRepay = async (borrowPositionId: string, amount: string) => {
-    const { repay } = await import("@/lib/api/lending")
+  const handleBorrowClick = (poolId: string, body: { collateralAsset: { code: string; issuer: string }; collateralAmount: string; borrowAmount: string }) => {
+    setPendingSupply(null)
+    setPendingBorrow({ poolId, body })
+    setPendingRepay(null)
+    setSecretValue("")
+    setSecretDialogOpen(true)
+  }
+
+  const handleRepayClick = (positionId: string, amount: string) => {
+    setPendingSupply(null)
+    setPendingBorrow(null)
+    setPendingRepay({ positionId, amount })
+    setSecretValue("")
+    setSecretDialogOpen(true)
+  }
+
+  const handleSecretSubmit = async () => {
+    if (!secretValue.trim()) {
+      toast({ title: "Enter your secret seed", variant: "destructive" })
+      return
+    }
+    setDialogLoading(true)
     try {
-      await repay(borrowPositionId, { amount })
-      toast({ title: "Repayment recorded" })
-      setRefreshKey((k) => k + 1)
+      if (pendingSupply) {
+        await supplyApi(pendingSupply.poolId, { amount: pendingSupply.amount, userId, userSecret: secretValue.trim() })
+        toast({ title: "Supply successful" })
+        setPendingSupply(null)
+        setSecretDialogOpen(false)
+        setRefreshKey((k) => k + 1)
+        refreshBalancesGlobal?.()
+      } else if (pendingBorrow) {
+        await borrowApi(pendingBorrow.poolId, {
+          ...pendingBorrow.body,
+          userId,
+          userSecret: secretValue.trim(),
+        })
+        toast({ title: "Borrow successful" })
+        setPendingBorrow(null)
+        setSecretDialogOpen(false)
+        setRefreshKey((k) => k + 1)
+        refreshBalancesGlobal?.()
+      } else if (pendingRepay) {
+        await repayApi(pendingRepay.positionId, { amount: pendingRepay.amount, userSecret: secretValue.trim() })
+        toast({ title: "Repayment successful" })
+        setPendingRepay(null)
+        setSecretDialogOpen(false)
+        setRefreshKey((k) => k + 1)
+        refreshBalancesGlobal?.()
+      }
     } catch (e) {
       toast({
-        title: "Repay failed",
+        title: "Transaction failed",
         description: e instanceof Error ? e.message : "Unknown error",
         variant: "destructive",
       })
-      throw e
+    } finally {
+      setDialogLoading(false)
     }
+  }
+
+  const handleSupply = async () => {
+    setRefreshKey((k) => k + 1)
+  }
+  const handleWithdraw = async () => {
+    setRefreshKey((k) => k + 1)
+    refreshBalancesGlobal?.()
+  }
+  const handleBorrow = async () => {
+    setRefreshKey((k) => k + 1)
   }
 
   const handleSetCreditScore = async () => {
@@ -330,6 +390,28 @@ export default function LendingPage() {
           </TabsList>
 
           <TabsContent value="pools" className="space-y-4">
+            {userId && score != null && (
+              <Card className="border-border bg-card/80">
+                <CardContent className="pt-4">
+                  <p className="text-sm font-medium">Your borrowing eligibility</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Credit score: <span className="font-medium text-foreground">{score}%</span>
+                    {maxBorrowTermDays != null && (
+                      <> · Max borrow term: <span className="font-medium text-foreground">{maxBorrowTermDays} days</span></>
+                    )}
+                    {score >= 98 && !hasHistory && (
+                      <span className="block mt-1 text-xs text-muted-foreground">Build history (repay a loan or supply) to unlock max term (5 years).</span>
+                    )}
+                    {score >= 98 && hasHistory && (
+                      <span className="block mt-1 text-xs text-muted-foreground">You have access to max borrow term.</span>
+                    )}
+                    {!canBorrow && creditReason && (
+                      <span className="block mt-1 text-destructive text-sm">{creditReason}</span>
+                    )}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
             {poolsError && (
               <Card className="border-destructive/50 bg-destructive/10">
                 <CardContent className="pt-4">
@@ -359,9 +441,9 @@ export default function LendingPage() {
                           key={pool._id}
                           pool={pool}
                           userId={userId}
-                          onSupply={handleSupply}
+                          onSupplyClick={handleSupplyClick}
                           onWithdraw={handleWithdraw}
-                          onBorrow={handleBorrow}
+                          onBorrowClick={handleBorrowClick}
                         />
                       ))}
                   </div>
@@ -371,26 +453,31 @@ export default function LendingPage() {
           </TabsContent>
 
           <TabsContent value="positions" className="space-y-4">
-            {!userId && (
+            {profileLoading && (
+              <div className="flex justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            )}
+            {!profileLoading && !userId && (
               <Card>
                 <CardContent className="py-6 text-center text-muted-foreground">
                   Connect your wallet to see positions.
                 </CardContent>
               </Card>
             )}
-            {userId && positionsLoading && (
+            {!profileLoading && userId && positionsLoading && (
               <div className="flex justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
             )}
-            {userId && positionsError && (
+            {!profileLoading && userId && positionsError && (
               <Card className="border-destructive/50 bg-destructive/10">
                 <CardContent className="pt-4">
                   <p className="text-sm text-destructive">{positionsError.message}</p>
                 </CardContent>
               </Card>
             )}
-            {userId && !positionsLoading && !positionsError && (
+            {!profileLoading && userId && !positionsLoading && !positionsError && (
               <div className="space-y-3">
                 {supplyPositions.length === 0 && borrowPositions.length === 0 ? (
                   <Card>
@@ -407,7 +494,7 @@ export default function LendingPage() {
                       <BorrowPositionRow
                         key={pos._id}
                         position={pos}
-                        onRepay={handleRepay}
+                        onRepayClick={handleRepayClick}
                       />
                     ))}
                   </>
@@ -424,27 +511,41 @@ export default function LendingPage() {
                   Credit score
                 </CardTitle>
                 <CardDescription>
-                  Score 0–100. Borrow allowed above 30. Higher score can reduce borrow rate.
+                  Score 0–100. Everyone starts at 50%. Repay loans to gain; default (liquidation) loses 25%. Borrow allowed at 19% and above; below 19% cannot borrow. Score 98+ with history (repaid or supplied) unlocks max borrow term.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {!userId && (
+                {profileLoading && (
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                )}
+                {!profileLoading && !userId && (
                   <p className="text-sm text-muted-foreground">Connect wallet to see your score.</p>
                 )}
-                {userId && (
+                {!profileLoading && userId && (
                   <>
                     {creditError && (
                       <p className="text-sm text-destructive">{creditError.message}</p>
                     )}
-                    <div className="flex flex-wrap items-end gap-2">
+                    <div className="space-y-2">
                       <p className="text-sm">
-                        Your score: <strong>{score ?? "—"}</strong>
+                        Your score: <strong>{score ?? "—"}%</strong>
                         {canBorrow !== undefined && (
                           <Badge className="ml-2" variant={canBorrow ? "default" : "destructive"}>
                             {canBorrow ? "Can borrow" : "Cannot borrow"}
                           </Badge>
                         )}
                       </p>
+                      {maxBorrowTermDays != null && (
+                        <p className="text-sm text-muted-foreground">
+                          Max borrow term: <strong>{maxBorrowTermDays} days</strong>
+                          {hasHistory ? " (history built)" : " — build history to unlock max term at 98%+"}
+                        </p>
+                      )}
+                      {creditReason && !canBorrow && (
+                        <p className="text-sm text-destructive">{creditReason}</p>
+                      )}
                     </div>
                     <div className="flex flex-wrap gap-2 items-end">
                       <div className="space-y-1">
@@ -486,6 +587,39 @@ export default function LendingPage() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        <Dialog open={secretDialogOpen} onOpenChange={(open) => { if (!open) { setPendingSupply(null); setPendingBorrow(null); setPendingRepay(null); setSecretDialogOpen(false); } }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirm transaction</DialogTitle>
+              <DialogDescription>
+                Enter your secret seed to sign this transaction. We don&apos;t store your secret.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              {(pendingSupply || pendingBorrow || pendingRepay) && (
+                <p className="text-sm text-muted-foreground">
+                  {pendingSupply && `Supply ${pendingSupply.amount}`}
+                  {pendingBorrow && `Borrow ${pendingBorrow.body.borrowAmount} (collateral: ${pendingBorrow.body.collateralAmount})`}
+                  {pendingRepay && `Repay ${pendingRepay.amount}`}
+                </p>
+              )}
+              <div className="space-y-2">
+                <Label>Secret seed (required)</Label>
+                <Input
+                  type="password"
+                  placeholder="S..."
+                  value={secretValue}
+                  onChange={(e) => setSecretValue(e.target.value)}
+                  disabled={dialogLoading}
+                />
+              </div>
+              <Button className="w-full" onClick={handleSecretSubmit} disabled={dialogLoading || !secretValue.trim()}>
+                {dialogLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )

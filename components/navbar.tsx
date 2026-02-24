@@ -5,7 +5,7 @@ import { Moon, Sun, Wallet, Home, Coins, Droplets, User, ArrowRightLeft, Trendin
 import { useTheme } from "next-themes"
 import Link from "next/link"
 import { usePi } from "@/components/providers/pi-provider"
-import { useAdminAuth } from "@/hooks/useAdminAuth"
+import { useUserProfile } from "@/hooks/useUserProfile"
 import { useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
 
@@ -85,15 +85,15 @@ function MobileBottomNav() {
 
 export function Navbar({ isConnected = false, onConnect }: NavbarProps) {
   const { theme, setTheme } = useTheme()
-  const { user: piUser, authenticate: piAuthenticate, signOut: piSignOut } = usePi()
-  const { adminUser, token, signIn: backendSignIn, signOut: backendSignOut, isLoading: authLoading } = useAdminAuth()
+  const { user, isAuthenticated, authenticate, signOut } = usePi()
+  const { profile, isLoading: profileLoading } = useUserProfile()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  const handleConnect = async () => {
+  const handlePiAuth = async () => {
     if (typeof window === "undefined") {
       alert("Window not available. Please refresh the page.")
       return
@@ -103,21 +103,15 @@ export function Navbar({ isConnected = false, onConnect }: NavbarProps) {
       return
     }
     try {
-      await piAuthenticate()
-      await backendSignIn()
+      await authenticate()
     } catch (error) {
-      console.error("Auth failed:", error)
+      console.error("Pi authentication failed:", error)
       alert(error instanceof Error ? error.message : "Authentication failed")
     }
   }
 
-  const handleSignOut = () => {
-    backendSignOut()
-    piSignOut()
-  }
-
-  const hasWallet = Boolean(adminUser?.public_key && adminUser.public_key.trim() !== "")
-  const isLoggedIn = Boolean(token && adminUser)
+  const hasWallet = Boolean(profile?.public_key && profile.public_key.trim() !== "")
+  const displayName = profile?.username ?? user?.username ?? "Connected"
 
   return (
     <>
@@ -148,25 +142,25 @@ export function Navbar({ isConnected = false, onConnect }: NavbarProps) {
                 <Wallet className="h-4 w-4" />
                 <span className="text-xs sm:text-sm">Loading...</span>
               </Button>
-            ) : isLoggedIn ? (
+            ) : isAuthenticated ? (
               <div className="flex items-center gap-2">
                 <Button variant="outline" className="gap-2 bg-transparent">
                   <Wallet className="h-4 w-4" />
                   <span className="text-xs sm:text-sm max-w-[120px] truncate">
-                    {hasWallet && adminUser?.public_key
-                  ? `${adminUser.public_key.slice(0, 6)}…${adminUser.public_key.slice(-4)}`
-                  : adminUser?.username ?? piUser?.username ?? "Connected"}
+                    {hasWallet && profile?.public_key
+                      ? `${profile.public_key.slice(0, 6)}…${profile.public_key.slice(-4)}`
+                      : displayName}
                   </span>
                 </Button>
-                <Button onClick={handleSignOut} variant="ghost" size="sm" className="text-xs px-2">
+                <Button onClick={signOut} variant="ghost" size="sm" className="text-xs px-2">
                   <span className="hidden sm:inline">Logout</span>
                   <span className="sm:hidden">×</span>
                 </Button>
               </div>
             ) : (
-              <Button onClick={handleConnect} disabled={authLoading} size="sm" className="gap-2 btn-gradient-primary">
+              <Button onClick={handlePiAuth} disabled={profileLoading} size="sm" className="gap-2 btn-gradient-primary">
                 <Wallet className="h-4 w-4" />
-                <span className="text-xs sm:text-sm">{authLoading ? "Connecting…" : "Connect Pi"}</span>
+                <span className="text-xs sm:text-sm">{profileLoading ? "Connecting…" : "Connect Pi"}</span>
               </Button>
             )}
           </div>

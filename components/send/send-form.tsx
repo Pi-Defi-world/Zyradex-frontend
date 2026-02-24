@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,9 +11,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, AlertCircle, ExternalLink } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useAccountBalances } from "@/hooks/useAccountData"
+import { useBalanceRefresh } from "@/components/providers/balance-refresh-provider"
 import { useCheckTrustline } from "@/hooks/useCheckTrustline"
 import { sendPayment } from "@/lib/api/account"
 import Link from "next/link"
+import { Html5Qrcode } from "html5-qrcode"
 
 interface SendFormProps {
   publicKey?: string
@@ -23,6 +25,7 @@ export function SendForm({ publicKey }: SendFormProps) {
   const router = useRouter()
   const { toast } = useToast()
   const { balances, refresh: refreshBalances } = useAccountBalances(publicKey)
+  const { refreshBalances: refreshBalancesGlobal } = useBalanceRefresh() ?? {}
 
   const [selectedToken, setSelectedToken] = useState<string>("")
   const [destination, setDestination] = useState("")
@@ -33,6 +36,9 @@ export function SendForm({ publicKey }: SendFormProps) {
   const [isCheckingTrustline, setIsCheckingTrustline] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [receiverNeedsTrustline, setReceiverNeedsTrustline] = useState(false)
+  const [showScanDialog, setShowScanDialog] = useState(false)
+  const scannerRef = useRef<Html5Qrcode | null>(null)
+  const SCANNER_DIV_ID = "send-qr-scanner"
 
   const selectedTokenBalance = useMemo(() => {
     if (!selectedToken) return null
@@ -53,6 +59,56 @@ export function SendForm({ publicKey }: SendFormProps) {
     selectedTokenBalance?.assetIssuer || undefined,
     false // Don't auto-check, we'll check manually
   )
+
+  useEffect(() => {
+    if (!showScanDialog) return
+    const startScanner = async () => {
+      // Wait for Dialog portal to mount the scanner div
+      await new Promise((r) => setTimeout(r, 100))
+      if (!document.getElementById(SCANNER_DIV_ID)) {
+        toast({
+          title: "Scanner error",
+          description: "Could not start scanner. Please try again.",
+          variant: "destructive",
+        })
+        setShowScanDialog(false)
+        return
+      }
+      try {
+        const html5Qr = new Html5Qrcode(SCANNER_DIV_ID)
+        scannerRef.current = html5Qr
+        await html5Qr.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          (decodedText) => {
+            if (scannerRef.current?.isScanning) {
+              scannerRef.current.stop().catch(() => {})
+            }
+            scannerRef.current = null
+            setDestination(decodedText)
+            setReceiverNeedsTrustline(false)
+            setShowScanDialog(false)
+          },
+          () => {} // qrCodeErrorCallback (no-op for scan failures between successes)
+        )
+      } catch (err) {
+        console.error("QR scanner start failed:", err)
+        toast({
+          title: "Camera access",
+          description: "Could not start camera. Check permissions or try again.",
+          variant: "destructive",
+        })
+        setShowScanDialog(false)
+      }
+    }
+    startScanner()
+    return () => {
+      if (scannerRef.current?.isScanning) {
+        scannerRef.current.stop().catch(() => {})
+      }
+      scannerRef.current = null
+    }
+  }, [showScanDialog])
 
   const handleCheckAndSend = async () => {
     if (!selectedToken || !destination.trim() || !amount.trim()) {
@@ -162,6 +218,7 @@ export function SendForm({ publicKey }: SendFormProps) {
         setUserSecret("")
         setShowSecretDialog(false)
         refreshBalances()
+        refreshBalancesGlobal?.()
       } else if (result.receiverNeedsTrustline) {
         setReceiverNeedsTrustline(true)
         setShowSecretDialog(false)
@@ -237,15 +294,27 @@ export function SendForm({ publicKey }: SendFormProps) {
           {/* Recipient Address */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Recipient Address</label>
-            <Input
-              placeholder="G..."
-              value={destination}
-              onChange={(e) => {
-                setDestination(e.target.value)
-                setReceiverNeedsTrustline(false)
-              }}
-              className="rounded-xl font-mono"
-            />
+            <div className="flex gap-2">
+              <Input
+                placeholder="G..."
+                value={destination}
+                onChange={(e) => {
+                  setDestination(e.target.value)
+                  setReceiverNeedsTrustline(false)
+                }}
+                className="rounded-xl font-mono flex-1"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="rounded-xl shrink-0"
+                onClick={() => setShowScanDialog(true)}
+                title="Scan QR code"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2" /><path d="M17 3h2a2 2 0 0 1 2 2v2" /><path d="M21 17v2a2 2 0 0 1-2 2h-2" /><path d="M7 21H5a2 2 0 0 1-2-2v-2" /><rect width="7" height="7" x="3" y="3" rx="1" /><rect width="7" height="7" x="14" y="3" rx="1" /><rect width="7" height="7" x="14" y="14" rx="1" /></svg>
+              </Button>
+            </div>
           </div>
 
           {/* Amount */}
@@ -368,6 +437,18 @@ export function SendForm({ publicKey }: SendFormProps) {
                 )}
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* Scan QR Dialog */}
+      <Dialog open={showScanDialog} onOpenChange={setShowScanDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Scan recipient address</DialogTitle>
+            <DialogDescription>Point your camera at a QR code to fill the recipient address.</DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <div id={SCANNER_DIV_ID} className="rounded-lg overflow-hidden min-h-[250px] bg-muted" />
           </div>
         </DialogContent>
       </Dialog>

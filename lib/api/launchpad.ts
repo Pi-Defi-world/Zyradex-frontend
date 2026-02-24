@@ -63,6 +63,7 @@ export interface ListLaunchesResponse {
 export interface CommitPiPayload {
   committedPi: string
   userId?: string
+  userSecret: string
 }
 
 export interface CommitPiResponse {

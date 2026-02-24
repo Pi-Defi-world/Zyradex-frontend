@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button"
 import { Copy, CheckCircle2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { usePi } from "@/components/providers/pi-provider"
+import { useUserProfile } from "@/hooks/useUserProfile"
+import { QRCodeSVG } from "qrcode.react"
 
 interface ReceiveModalProps {
   open: boolean
@@ -25,15 +27,17 @@ const getStoredWallet = () => {
 
 export function ReceiveModal({ open, onOpenChange }: ReceiveModalProps) {
   const { user } = usePi()
+  const { profile } = useUserProfile()
   const { toast } = useToast()
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     const stored = getStoredWallet()
-    const address = stored || user?.wallet_address || null
+    // Same priority as rest of app: profile (DB) > localStorage > Pi user
+    const address = profile?.public_key || stored || user?.wallet_address || null
     setWalletAddress(address)
-  }, [user?.wallet_address])
+  }, [profile?.public_key, user?.wallet_address])
 
   const handleCopy = async () => {
     if (!walletAddress) return
@@ -76,9 +80,14 @@ export function ReceiveModal({ open, onOpenChange }: ReceiveModalProps) {
           <DialogDescription>Share this address to receive tokens</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
-          <div className="rounded-lg border bg-muted/50 p-4">
-            <p className="text-xs text-muted-foreground mb-2">Your Wallet Address</p>
-            <p className="font-mono text-sm break-all">{walletAddress}</p>
+          <div className="flex flex-col items-center gap-4">
+            <div className="rounded-lg border bg-white p-3">
+              <QRCodeSVG value={walletAddress} size={180} level="M" />
+            </div>
+            <div className="rounded-lg border bg-muted/50 p-4 w-full">
+              <p className="text-xs text-muted-foreground mb-2">Your Wallet Address</p>
+              <p className="font-mono text-sm break-all">{walletAddress}</p>
+            </div>
           </div>
           <Button onClick={handleCopy} className="w-full" variant="outline">
             {copied ? (

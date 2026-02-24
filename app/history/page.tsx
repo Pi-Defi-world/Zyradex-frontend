@@ -1,14 +1,14 @@
 "use client"
 
-import React, { useState, useMemo } from "react"
+import React, { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Loader2, RefreshCw, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react"
+import { ArrowLeft, Loader2, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useUserProfile } from "@/hooks/useUserProfile"
-import { useAccountTransactions } from "@/hooks/useAccountData"
-import { formatDistanceToNow } from "date-fns"
+import { useAccountOperations } from "@/hooks/useAccountData"
+import { TransactionHistory } from "@/components/transaction-history"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -35,7 +35,7 @@ export default function HistoryPage() {
     }
   }, [profile?.public_key])
 
-  const { transactions, pagination, isLoading, error, refresh } = useAccountTransactions(publicKey, {
+  const { operations, pagination, isLoading, refresh } = useAccountOperations(publicKey, {
     limit: 20,
     order,
     cursor,
@@ -46,7 +46,7 @@ export default function HistoryPage() {
     refresh()
     toast({
       title: "Refreshing",
-      description: "Fetching latest transactions...",
+      description: "Fetching latest activity...",
     })
   }
 
@@ -65,33 +65,9 @@ export default function HistoryPage() {
     setCursor(undefined)
   }
 
-  const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString)
-      return formatDistanceToNow(date, { addSuffix: true })
-    } catch {
-      return dateString
-    }
-  }
-
-  const getTransactionType = (tx: any) => {
-    if (tx.operationCount === 0) return "Unknown"
-    if (tx.operationCount === 1) return "Single Operation"
-    return `${tx.operationCount} Operations`
-  }
-
-  const getTransactionStatus = (tx: any) => {
-    return tx.successful ? "Success" : "Failed"
-  }
-
   const truncateHash = (hash: string) => {
     if (!hash) return ""
     return `${hash.slice(0, 8)}...${hash.slice(-8)}`
-  }
-
-  const viewOnExplorer = (hash: string) => {
-    const explorerUrl = `https://testnet.minepi.com/explorer/transaction/${hash}`
-    window.open(explorerUrl, "_blank")
   }
 
   if (!publicKey) {
@@ -148,77 +124,22 @@ export default function HistoryPage() {
               <div>
                 <CardTitle className="text-xl font-bold">Transactions</CardTitle>
                 <CardDescription className="mt-1">
-                  {pagination ? `${transactions.length} transaction${transactions.length !== 1 ? "s" : ""} loaded` : "Loading..."}
+                  {pagination ? `${operations.length} operation${operations.length !== 1 ? "s" : ""} loaded` : "Loading..."}
                 </CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent>
 
-            {isLoading && transactions.length === 0 ? (
+            {isLoading && operations.length === 0 ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
-            ) : transactions.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">No transactions found</p>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Transactions will appear here once you start using your wallet
-                </p>
-              </div>
             ) : (
-              <div className="space-y-2">
-                {transactions.map((tx) => (
-                  <div
-                    key={tx.id}
-                    className="flex items-center justify-between gap-3 p-3 border rounded-lg hover:bg-accent/50 transition-colors overflow-hidden"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-medium capitalize">
-                          {getTransactionType(tx)}
-                        </span>
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded-full ${
-                            tx.successful
-                              ? "bg-green-500/20 text-green-700 dark:text-green-400"
-                              : "bg-red-500/20 text-red-700 dark:text-red-400"
-                          }`}
-                        >
-                          {getTransactionStatus(tx)}
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {formatDate(tx.createdAt)}
-                      </p>
-                    </div>
-                    <div className="text-right flex-shrink-0 min-w-0 flex items-center gap-2">
-                      <div className="text-right">
-                        <p className="text-xs text-muted-foreground">Fee</p>
-                        <p className="text-sm font-semibold">
-                          {tx.fee ? (Number(tx.fee) / 10000000).toFixed(7) : "0"} Pi
-                        </p>
-                      </div>
-                      {tx.hash && (
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => viewOnExplorer(tx.hash)}
-                            title="View on explorer"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <TransactionHistory operations={operations} isLoading={isLoading} />
             )}
 
-            {pagination && transactions.length > 0 && (
+            {pagination && operations.length > 0 && (
               <div className="flex items-center justify-between mt-6 pt-4 border-t">
                 <Button
                   variant="outline"

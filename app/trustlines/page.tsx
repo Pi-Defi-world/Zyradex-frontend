@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast"
 import { usePi } from "@/components/providers/pi-provider"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { useAccountBalances } from "@/hooks/useAccountData"
+import { useBalanceRefresh } from "@/components/providers/balance-refresh-provider"
 import { useAvailableTokens } from "@/hooks/useAvailableTokens"
 import { useCheckTrustline } from "@/hooks/useCheckTrustline"
 import { TrustlineDialog } from "@/components/trustlines/trustline-dialog"
@@ -35,6 +36,7 @@ export default function TrustlinesPage() {
     : undefined
 
   const { balances, refresh: refreshBalances } = useAccountBalances(publicKey)
+  const { refreshBalances: refreshBalancesGlobal } = useBalanceRefresh() ?? {}
   const { tokens, isLoading: tokensLoading, error: tokensError } = useAvailableTokens({
     searchQuery,
     limit: 50,
@@ -74,6 +76,7 @@ export default function TrustlinesPage() {
 
   const handleTrustlineSuccess = () => {
     refreshBalances()
+    refreshBalancesGlobal?.()
   }
 
   // Filter tokens based on search (if search is active, show network tokens; otherwise show all)

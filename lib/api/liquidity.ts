@@ -177,6 +177,28 @@ export const listLiquidityPools = async (params: ListLiquidityPoolsParams = {}, 
   )
 }
 
+/** Fetches all liquidity pools by following pagination until no more pages. Use for LP page list and search. */
+export const listAllLiquidityPools = async (options?: { skipCache?: boolean }): Promise<ListLiquidityPoolsResponse> => {
+  const limit = 100
+  const all: ILiquidityPool[] = []
+  let cursor: string | undefined
+  let hasMore = true
+  while (hasMore) {
+    const res = await listLiquidityPools({ limit, cursor }, { skipCache: options?.skipCache ?? true })
+    all.push(...res.data)
+    hasMore = res.pagination?.hasMore === true && res.pagination?.nextCursor != null
+    cursor = res.pagination?.nextCursor ?? undefined
+  }
+  return {
+    data: all,
+    pagination: {
+      limit: all.length,
+      nextCursor: null,
+      hasMore: false,
+    },
+  }
+}
+
 export const getLiquidityPoolById = async (poolId: string, options?: { skipCache?: boolean }) => {
   const cacheKey = createRequestKey(`/liquidity-pools/${poolId}`, {})
   

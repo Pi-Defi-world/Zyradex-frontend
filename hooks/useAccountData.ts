@@ -16,6 +16,7 @@ import {
 } from "@/lib/api/account"
 import type { ApiError } from "@/lib/api"
 import { toApiError } from "@/lib/api"
+import { useBalanceRefresh } from "@/components/providers/balance-refresh-provider"
 
 export interface UseAccountOperationsOptions {
   limit?: number
@@ -83,6 +84,7 @@ export const useChangeWallet = () => {
 }
 
 export const useAccountBalances = (publicKey?: string) => {
+  const { balanceRefreshVersion } = useBalanceRefresh() ?? { balanceRefreshVersion: 0 }
   const [data, setData] = useState<AccountBalancesResponse | null>(null)
   const [error, setError] = useState<ApiError | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -103,8 +105,7 @@ export const useAccountBalances = (publicKey?: string) => {
     setIsLoading(true)
     setError(null)
 
- 
-    const shouldRefresh = refreshTrigger > 0
+    const shouldRefresh = refreshTrigger > 0 || balanceRefreshVersion > 0
     getAccountBalances(publicKey, shouldRefresh)
       .then((response) => {
         if (!cancelled) {
@@ -135,7 +136,7 @@ export const useAccountBalances = (publicKey?: string) => {
     return () => {
       cancelled = true
     }
-  }, [publicKey, refreshTrigger])
+  }, [publicKey, refreshTrigger, balanceRefreshVersion])
 
   const balances = data?.balances ?? []
   const totalBalance = useMemo(
@@ -162,8 +163,13 @@ export const useAccountOperations = (publicKey?: string, options: UseAccountOper
   const [data, setData] = useState<PaginatedOperations | null>(null)
   const [error, setError] = useState<ApiError | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
 
   const { limit = 20, order = "desc", cursor, skip } = options
+
+  const refresh = useCallback(() => {
+    setRefreshTrigger((prev) => prev + 1)
+  }, [])
 
   useEffect(() => {
     if (!publicKey || skip) {
@@ -205,7 +211,7 @@ export const useAccountOperations = (publicKey?: string, options: UseAccountOper
     return () => {
       cancelled = true
     }
-  }, [publicKey, limit, order, cursor, skip])
+  }, [publicKey, limit, order, cursor, skip, refreshTrigger])
 
   const operations = (data?.data ?? []) as AccountOperation[]
   const pagination = data?.pagination
@@ -216,6 +222,7 @@ export const useAccountOperations = (publicKey?: string, options: UseAccountOper
     isLoading,
     operations,
     pagination,
+    refresh,
   }
 }
 

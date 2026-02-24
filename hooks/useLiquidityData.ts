@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   listLiquidityPools,
+  listAllLiquidityPools,
   getLiquidityPoolById,
   createLiquidityPool as createLiquidityPoolRequest,
   addLiquidity as addLiquidityRequest,
@@ -58,7 +59,7 @@ export const useLiquidityPools = (params?: ListLiquidityPoolsParams, options?: {
     setIsLoading(true)
     setError(null)
 
-    listLiquidityPools(params ?? {})
+    listLiquidityPools(params ?? {}, { skipCache: refreshKey != null && refreshKey !== undefined })
       .then((response) => {
         if (!cancelled) {
           setData(response)
@@ -89,6 +90,50 @@ export const useLiquidityPools = (params?: ListLiquidityPoolsParams, options?: {
     isLoading,
     pools,
     pagination,
+  }
+}
+
+/** Fetches all pools (all pages) for LP page so list and search are consistent. */
+export const useAllLiquidityPools = (options?: { refreshKey?: unknown }) => {
+  const [data, setData] = useState<ListLiquidityPoolsResponse | null>(null)
+  const [error, setError] = useState<ApiError | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const refreshKey = options?.refreshKey ?? null
+
+  useEffect(() => {
+    let cancelled = false
+    setIsLoading(true)
+    setError(null)
+
+    listAllLiquidityPools({ skipCache: refreshKey != null && refreshKey !== undefined })
+      .then((response) => {
+        if (!cancelled) {
+          setData(response)
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(toApiError(err))
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [refreshKey])
+
+  const pools = useMemo<ILiquidityPool[]>(() => data?.data ?? [], [data])
+
+  return {
+    data,
+    error,
+    isLoading,
+    pools,
   }
 }
 
