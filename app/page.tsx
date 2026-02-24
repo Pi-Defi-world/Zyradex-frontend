@@ -8,13 +8,14 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { ArrowDown, TrendingUp, ArrowRightLeft, Loader2, Copy, Wallet, Plus, ArrowUpRight } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { usePi } from "@/components/providers/pi-provider"
-import { useAccountBalances, useAccountTransactions } from "@/hooks/useAccountData"
+import { useAccountBalances, useAccountOperations } from "@/hooks/useAccountData"
 import { formatDistanceToNow } from "date-fns"
 import { useTokenRegistry } from "@/hooks/useTokenRegistry"
 import { usePiPrice } from "@/hooks/usePiPrice"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { useTokenPrices } from "@/hooks/useTokenPrice"
 import { ReceiveModal } from "@/components/receive-modal"
+import { TransactionHistory } from "@/components/transaction-history"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -62,7 +63,7 @@ export default function HomePage() {
       assetType: b.assetType 
     }))
   )
-  const { transactions, isLoading: transactionsLoading } = useAccountTransactions(publicKey, {
+  const { operations, isLoading: operationsLoading } = useAccountOperations(publicKey, {
     limit: 20,
     order: "desc",
   })
@@ -309,52 +310,17 @@ export default function HomePage() {
 
               <TabsContent value="history" className="mt-0">
                 <div className="space-y-2">
-                  {transactionsLoading ? (
+                  {operationsLoading ? (
                     <div className="flex items-center justify-center py-12 text-muted-foreground text-sm">
                       <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Loading transactions...
+                      Loading activity...
                     </div>
                   ) : !publicKey ? (
                     <div className="text-sm text-muted-foreground py-12 text-center border-2 border-dashed border-border rounded-xl bg-muted/20">
                       Connect a wallet to view transaction history
                     </div>
-                  ) : transactions.length === 0 ? (
-                    <div className="text-sm text-muted-foreground py-12 text-center border-2 border-dashed border-border rounded-xl bg-muted/20">
-                      No transactions found
-                    </div>
                   ) : (
-                    transactions.map((tx) => (
-                      <div
-                        key={tx.id}
-                        className="flex items-center justify-between gap-3 p-3 rounded-xl bg-muted/30 border border-border/50 hover:bg-muted/60 hover:border-border transition-all"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-sm font-medium text-foreground">
-                              {getTransactionType(tx)}
-                            </span>
-                            <span
-                              className={`text-xs px-2 py-0.5 rounded-full ${
-                                tx.successful
-                                  ? "bg-green-500/20 text-green-700 dark:text-green-400"
-                                  : "bg-red-500/20 text-red-700 dark:text-red-400"
-                              }`}
-                            >
-                              {tx.successful ? "Success" : "Failed"}
-                            </span>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            {formatDate(tx.createdAt)}
-                          </p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-xs text-muted-foreground">Fee</p>
-                          <p className="text-sm font-semibold text-foreground">
-                            {tx.fee ? (Number(tx.fee) / 10000000).toFixed(7) : "0"} Pi
-                          </p>
-                        </div>
-                      </div>
-                    ))
+                    <TransactionHistory operations={operations} isLoading={operationsLoading} />
                   )}
                 </div>
               </TabsContent>
