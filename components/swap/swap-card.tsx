@@ -13,6 +13,7 @@ import { useUserProfile } from "@/hooks/useUserProfile"
 import { useToast } from "@/hooks/use-toast"
 import { usePoolsForPair, useSwapQuote, useExecuteSwap } from "@/hooks/useSwapData"
 import { useAccountBalances } from "@/hooks/useAccountData"
+import { useBalanceRefresh } from "@/components/providers/balance-refresh-provider"
 import { listLiquidityPools } from "@/lib/api/liquidity"
 
 const getStoredWallet = () => {
@@ -56,6 +57,7 @@ export function SwapCard() {
   // Get user balances for Token A dropdown
   const publicKey = profile?.public_key || localWallet || user?.wallet_address || undefined
   const { balances: rawBalances, refresh: refreshBalances } = useAccountBalances(publicKey)
+  const { refreshBalances: refreshBalancesGlobal } = useBalanceRefresh() ?? {}
   
   // Filter out duplicate native entries (ensure only one native/Test Pi entry)
   const balances = useMemo(() => {
@@ -187,40 +189,48 @@ export function SwapCard() {
     const fetchPairedTokens = async () => {
       setLoadingPairedTokens(true)
       try {
-        // Fetch all pools and filter those containing Token A
-        const poolsResponse = await listLiquidityPools({ limit: 100 })
-        const pools = poolsResponse.data || []
-
-        // Extract tokens paired with Token A
         const tokenACode = fromToken.code === "native" ? "native" : fromToken.code.toUpperCase()
         const paired = new Set<string>()
+        let cursor: string | null = null
+        const pageSize = 100
 
-        pools.forEach((pool) => {
-          if (!pool.reserves || pool.reserves.length < 2) return
-          
-          const assets = pool.reserves.map((r: any) => {
-            const assetStr = r.asset || ""
-            if (assetStr === "native") return "native"
-            return assetStr.split(":")[0].toUpperCase()
-          })
+        // Paginate through all pools so Token B shows every onchain pair
+        do {
+          const poolsResponse = await listLiquidityPools(
+            { limit: pageSize, cursor: cursor ?? undefined },
+            { skipCache: !!cursor }
+          )
+          const pools = poolsResponse.data || []
 
-          if (assets.includes(tokenACode)) {
-            // Find the other token in the pair
-            const otherToken = assets.find((a: string) => a !== tokenACode)
-            if (otherToken) {
-              // Try to find full format from reserves
-              const otherReserve = pool.reserves.find((r: any) => {
-                const code = r.asset === "native" ? "native" : r.asset.split(":")[0].toUpperCase()
-                return code === otherToken
-              })
-              if (otherReserve) {
-                paired.add(otherReserve.asset === "native" ? "native" : otherReserve.asset)
-              } else {
-                paired.add(otherToken)
+          pools.forEach((pool) => {
+            if (!pool.reserves || pool.reserves.length < 2) return
+
+            const assets = pool.reserves.map((r: any) => {
+              const assetStr = r.asset || ""
+              if (assetStr === "native") return "native"
+              return assetStr.split(":")[0].toUpperCase()
+            })
+
+            if (assets.includes(tokenACode)) {
+              const otherToken = assets.find((a: string) => a !== tokenACode)
+              if (otherToken) {
+                const otherReserve = pool.reserves.find((r: any) => {
+                  const code = r.asset === "native" ? "native" : r.asset.split(":")[0].toUpperCase()
+                  return code === otherToken
+                })
+                if (otherReserve) {
+                  paired.add(otherReserve.asset === "native" ? "native" : otherReserve.asset)
+                } else {
+                  paired.add(otherToken)
+                }
               }
             }
-          }
-        })
+          })
+
+          const next = poolsResponse.pagination?.nextCursor
+          const hasMore = poolsResponse.pagination?.hasMore ?? false
+          cursor = next && hasMore ? next : null
+        } while (cursor)
 
         setPairedTokens(Array.from(paired))
       } catch (err) {
@@ -306,6 +316,7 @@ export function SwapCard() {
         // Backend already clears cache, but we refresh to get the latest data
         setTimeout(() => {
           refreshBalances()
+          refreshBalancesGlobal?.()
         }, 2000) // Wait 2 seconds for transaction to be processed
       } else {
         toast({ 
@@ -320,11 +331,11 @@ export function SwapCard() {
       let errorTitle = "Swap failed"
       
       if (err) {
-        // Check for API error response
-        if (err.response?.data?.error) {
-          errorMessage = err.response.data.error
-        } else if (err.response?.data?.message) {
+        // API errors use { success: false, message: string }
+        if (err.response?.data?.message) {
           errorMessage = err.response.data.message
+        } else if (err.response?.data?.error) {
+          errorMessage = err.response.data.error
         } else if (typeof err === "object" && "message" in err) {
           errorMessage = (err as any).message
         } else if (typeof err === "string") {

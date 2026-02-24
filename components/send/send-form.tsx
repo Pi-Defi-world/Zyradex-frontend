@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, AlertCircle, ExternalLink } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useAccountBalances } from "@/hooks/useAccountData"
+import { useBalanceRefresh } from "@/components/providers/balance-refresh-provider"
 import { useCheckTrustline } from "@/hooks/useCheckTrustline"
 import { sendPayment } from "@/lib/api/account"
 import Link from "next/link"
@@ -24,6 +25,7 @@ export function SendForm({ publicKey }: SendFormProps) {
   const router = useRouter()
   const { toast } = useToast()
   const { balances, refresh: refreshBalances } = useAccountBalances(publicKey)
+  const { refreshBalances: refreshBalancesGlobal } = useBalanceRefresh() ?? {}
 
   const [selectedToken, setSelectedToken] = useState<string>("")
   const [destination, setDestination] = useState("")
@@ -216,6 +218,7 @@ export function SendForm({ publicKey }: SendFormProps) {
         setUserSecret("")
         setShowSecretDialog(false)
         refreshBalances()
+        refreshBalancesGlobal?.()
       } else if (result.receiverNeedsTrustline) {
         setReceiverNeedsTrustline(true)
         setShowSecretDialog(false)

@@ -212,7 +212,17 @@ export const useCreditScore = (userId?: string, options?: { refreshKey?: unknown
     }
   }, [userId, refreshKey])
 
-  return { data: data ?? undefined, score: data?.score ?? null, canBorrow: data?.canBorrow ?? false, error, isLoading, refetch }
+  return {
+    data: data ?? undefined,
+    score: data?.score ?? null,
+    canBorrow: data?.canBorrow ?? false,
+    maxBorrowTermDays: data?.maxBorrowTermDays ?? undefined,
+    hasHistory: data?.hasHistory ?? false,
+    reason: data?.reason,
+    error,
+    isLoading,
+    refetch,
+  }
 }
 
 export const useLendingPrices = (assets?: string[]) => {

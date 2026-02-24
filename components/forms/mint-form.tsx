@@ -13,6 +13,7 @@ import { useMintToken } from "@/hooks/useTokenRegistry"
 import { usePi } from "@/components/providers/pi-provider"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { useAccountBalances } from "@/hooks/useAccountData"
+import { useBalanceRefresh } from "@/components/providers/balance-refresh-provider"
 import { getMintFee } from "@/lib/api/tokens"
 
 const getStoredWallet = () => {
@@ -31,6 +32,7 @@ export function MintForm() {
   // Get public key for balance refresh
   const publicKey = profile?.public_key || walletAddress || user?.wallet_address || undefined
   const { refresh: refreshBalances } = useAccountBalances(publicKey)
+  const { refreshBalances: refreshBalancesGlobal } = useBalanceRefresh() ?? {}
 
   useEffect(() => {
     const stored = getStoredWallet()
@@ -146,10 +148,10 @@ export function MintForm() {
       setAssetCodeError("")
       
       // Refresh balances after successful minting to show new token
-      // Backend already clears cache, but we refresh to get the latest data
       if (publicKey) {
         setTimeout(() => {
           refreshBalances()
+          refreshBalancesGlobal?.()
         }, 2000) // Wait 2 seconds for transaction to be processed
       }
     } catch (err) {

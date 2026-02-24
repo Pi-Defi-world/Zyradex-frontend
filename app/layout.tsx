@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { Navbar } from "@/components/navbar"
 import { Suspense } from "react"
 import { PiProvider } from "@/components/providers/pi-provider"
+import { BalanceRefreshProvider } from "@/components/providers/balance-refresh-provider"
 import { DisclaimerProvider } from "@/components/disclaimer-provider"
 import Script from 'next/script'
 import "./globals.css"
@@ -33,7 +34,7 @@ export default function RootLayout({
             
             if (window.Pi) {
               console.log('Pi SDK loaded, initializing...');
-              window.Pi.init({ version: "2.0"});
+              window.Pi.init({ version: "2.0", sandbox: true });
               console.log('Pi SDK initialized successfully');
             } else {
               console.warn('Pi SDK not available - this app requires Pi Browser');
@@ -41,6 +42,7 @@ export default function RootLayout({
           `}
         </Script>
         <PiProvider>
+          <BalanceRefreshProvider>
           <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
             <Suspense fallback={null}>
               <Navbar />
@@ -49,6 +51,7 @@ export default function RootLayout({
               <DisclaimerProvider />
             </Suspense>
           </ThemeProvider>
+          </BalanceRefreshProvider>
         </PiProvider>
       </body>
     </html>

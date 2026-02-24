@@ -11,6 +11,7 @@ import { Loader2, Search } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { useAccountBalances } from "@/hooks/useAccountData"
+import { useBalanceRefresh } from "@/components/providers/balance-refresh-provider"
 import { useCreateSellOffer, useCreateBuyOffer, useSearchAssets } from "@/hooks/useTrade"
 
 interface TradeFormProps {
@@ -41,6 +42,7 @@ const tokenToDescriptor = (token: { code: string; issuer?: string }): string => 
 export function TradeForm({ publicKey }: TradeFormProps) {
   const { toast } = useToast()
   const { balances, refresh: refreshBalances } = useAccountBalances(publicKey)
+  const { refreshBalances: refreshBalancesGlobal } = useBalanceRefresh() ?? {}
   const [tradeType, setTradeType] = useState<"sell" | "buy">("sell")
   
   // Token selection
@@ -136,9 +138,9 @@ export function TradeForm({ publicKey }: TradeFormProps) {
       setShowSecretDialog(false) // Close dialog
       
       // Refresh balances after successful offer creation
-      // Backend already clears cache, but we refresh to get the latest data
       setTimeout(() => {
         refreshBalances()
+        refreshBalancesGlobal?.()
       }, 2000) // Wait 2 seconds for transaction to be processed
     } catch (err) {
       const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Failed to create offer"

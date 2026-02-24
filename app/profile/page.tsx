@@ -28,6 +28,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
 import { useAccountBalances } from "@/hooks/useAccountData"
+import { useBalanceRefresh } from "@/components/providers/balance-refresh-provider"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { Input } from "@/components/ui/input"
@@ -105,6 +106,7 @@ const ProfilePage: React.FC = () => {
   }, [profile?.public_key, user?.wallet_address, isAuthenticated, profile])
 
   const { balances, totalBalance, isLoading: balancesLoading, refresh: refreshBalances } = useAccountBalances(storedWalletAddress ?? user?.wallet_address ?? undefined)
+  const { refreshBalances: refreshBalancesGlobal } = useBalanceRefresh() ?? {}
 
   const stats = useMemo(
     () => [
@@ -197,6 +199,7 @@ const ProfilePage: React.FC = () => {
       handleWalletPersist(response.publicKey)
       refreshProfile().catch(() => undefined)
       refreshBalances()
+      refreshBalancesGlobal?.()
       setShowSecretDialog(true)
       toast({
         title: response.replacedPreviousWallet ? "Wallet replaced" : "Wallet created",
