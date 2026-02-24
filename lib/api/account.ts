@@ -140,6 +140,14 @@ export const getAccountOperations = async (params: AccountOperationsParams) => {
   }
 }
 
+/**
+ * GET /account/transactions/:publicKey
+ * Returns transaction envelopes (ledger-level records with fee, operationCount, etc.).
+ * This is the backend's "fees history" / transaction list — it does NOT contain per-operation
+ * trade details (swaps, payments). For actual trades/swaps history, use getAccountOperations
+ * (GET /account/operations/:publicKey) instead, which is used by the swap page and token
+ * recent trades.
+ */
 export interface AccountTransactionsParams {
   publicKey: string
   limit?: number

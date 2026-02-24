@@ -162,8 +162,13 @@ export const useAccountOperations = (publicKey?: string, options: UseAccountOper
   const [data, setData] = useState<PaginatedOperations | null>(null)
   const [error, setError] = useState<ApiError | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
 
   const { limit = 20, order = "desc", cursor, skip } = options
+
+  const refresh = useCallback(() => {
+    setRefreshTrigger((prev) => prev + 1)
+  }, [])
 
   useEffect(() => {
     if (!publicKey || skip) {
@@ -205,7 +210,7 @@ export const useAccountOperations = (publicKey?: string, options: UseAccountOper
     return () => {
       cancelled = true
     }
-  }, [publicKey, limit, order, cursor, skip])
+  }, [publicKey, limit, order, cursor, skip, refreshTrigger])
 
   const operations = (data?.data ?? []) as AccountOperation[]
   const pagination = data?.pagination
@@ -216,6 +221,7 @@ export const useAccountOperations = (publicKey?: string, options: UseAccountOper
     isLoading,
     operations,
     pagination,
+    refresh,
   }
 }
 
