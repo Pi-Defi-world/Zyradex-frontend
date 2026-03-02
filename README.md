@@ -14,12 +14,17 @@ A Next.js 15 application that consumes the Pi DEX backend to offer portfolio tra
 pnpm install
 ```
 
-This project relies on the following environment variable:
+This project relies on the following environment variables:
 
 ```bash
 # .env.local
 NEXT_PUBLIC_API_URL=http://localhost:8000
+
+# Pi SDK sandbox mode. Omit or set to "true" for development; set to "false" for production.
+# NEXT_PUBLIC_PI_SANDBOX=false
 ```
+
+**Production (sandbox: false)**: The Connect wallet flow and Pi payments only work inside **Pi Browser**. If Connect does nothing, ensure (1) the app is opened in Pi Browser, and (2) the production URL is registered in the [Pi Developer Portal](https://developer.minepi.com).
 
 ## Development
 
