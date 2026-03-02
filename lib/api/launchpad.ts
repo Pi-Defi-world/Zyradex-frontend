@@ -167,3 +167,33 @@ export const executeTge = async (launchId: string, body: { escrowSecret: string 
     throw toApiError(error)
   }
 }
+
+/** Path A (PiRC): create launch and token in one step. Requires approved project (projectRef or projectId) and token params. */
+export interface CreateLaunchWithTokenPayload {
+  projectRef?: string
+  projectId?: string
+  projectAppUrl?: string
+  T_available: string
+  stakeDurationDays?: number
+  allocationDesign?: 1 | 2
+  createdBeforeCutoff?: boolean
+  teamVestingSchedule?: string
+  assetCode: string
+  totalSupply: string | number
+  name: string
+  description: string
+  distributorSecret: string
+  homeDomain?: string
+}
+
+export const createLaunchWithToken = async (body: CreateLaunchWithTokenPayload) => {
+  try {
+    const { data } = await axiosClient.post<Launch>("/launchpad/launches", {
+      ...body,
+      totalSupply: String(body.totalSupply),
+    })
+    return data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}

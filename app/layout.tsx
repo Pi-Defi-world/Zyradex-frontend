@@ -15,7 +15,7 @@ import "./globals.css"
 export const metadata: Metadata = {
   title: "ZYRADEX CAPITAL - Financial platform on Pi Network",
   description: "Savings, investments, and borrowing on Pi Network. Mint tokens, trade, and manage assets.",
-  generator: "Solie, Junman, RichAdams, ",
+  generator: "Solie, Junman",
 }
 
 export default function RootLayout({

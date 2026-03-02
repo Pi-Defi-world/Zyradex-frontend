@@ -1,12 +1,57 @@
 "use client"
 
+import Link from "next/link"
 import { MintForm } from "@/components/forms/mint-form"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Info } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Info, Lock, TrendingUp } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useUserProfile } from "@/hooks/useUserProfile"
 
 export default function MintPage() {
-  
+  const { profile, isLoading } = useUserProfile()
+  const isAdmin = profile?.role === "admin"
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen premium-gradient pt-16 pb-20 flex items-center justify-center">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    )
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen premium-gradient pt-16 pb-20">
+        <div className="container mx-auto px-4 py-6 max-w-2xl">
+          <Alert className="border-amber-500/50 bg-amber-500/10">
+            <Lock className="h-4 w-4" />
+            <AlertDescription>
+              Token creation is restricted to approved projects (PiRC). Only project owners can create tokens when creating a launch (IPO). Use the Invest page to participate in launches or create a launch from your approved project.
+            </AlertDescription>
+          </Alert>
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>How to create a token</CardTitle>
+              <CardDescription>Tokens are created as part of an IPO launch by approved projects.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                If you represent an approved project, create a launch with token details from the API or project dashboard. If you want to participate in token launches, browse open IPOs on the Invest page.
+              </p>
+              <Button asChild>
+                <Link href="/invest" className="inline-flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                  Go to Invest (IPO)
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen premium-gradient pt-16 pb-20">
       <div className="container mx-auto px-4 py-6">
@@ -14,8 +59,7 @@ export default function MintPage() {
           <Alert>
             <Info className="h-4 w-4" />
             <AlertDescription>
-              Minting creates new tokens and adds them to the total supply. Make sure you have the necessary permissions
-              and understand the tokenomics before minting.
+              Admin: Minting creates new tokens. For PiRC-aligned flows, projects should create launches with token params instead. This form is for admin or legacy use.
             </AlertDescription>
           </Alert>
 
