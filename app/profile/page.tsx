@@ -478,7 +478,7 @@ const ProfilePage: React.FC = () => {
           <h2 className="text-lg font-semibold text-foreground">Connect with us</h2>
           <div className="flex flex-wrap gap-3">
             <a
-              href="https://github.com/Pi-Defi-world/demo-app-fronted"
+              href="https://github.com/Pi-Defi-world/Zyradex-frontend"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-card border border-border/30 hover:bg-muted/50 transition-colors text-sm font-medium text-foreground"
