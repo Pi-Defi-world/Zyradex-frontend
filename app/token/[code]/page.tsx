@@ -15,6 +15,7 @@ import { useUserProfile } from "@/hooks/useUserProfile"
 import { useTokenPrice } from "@/hooks/useTokenPrice"
 import { usePiPrice } from "@/hooks/usePiPrice"
 import { ReceiveModal } from "@/components/receive-modal"
+import { viewTransactionOnExplorer } from "@/lib/explorer"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -290,9 +291,9 @@ export default function TokenDetailPage({ params }: { params: { code: string } }
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleCopy(op.transactionHash)}
+                        onClick={() => viewTransactionOnExplorer(op.transactionHash!)}
                         className="ml-4 shrink-0"
-                        title="Copy transaction hash"
+                        title="View on explorer"
                       >
                         <ExternalLink className="h-4 w-4" />
                       </Button>

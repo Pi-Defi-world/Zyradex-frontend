@@ -4,8 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
-import { ChevronRight } from "lucide-react"
+import { ChevronRight, ExternalLink } from "lucide-react"
 import type { AccountOperation } from "@/lib/api/account"
+import { viewTransactionOnExplorer } from "@/lib/explorer"
 
 interface RecentSwapsProps {
   operations?: AccountOperation[]
@@ -90,9 +91,22 @@ export function RecentSwaps({ operations = [], isLoading }: RecentSwapsProps) {
                   </p>
                 )}
                 {swap.transactionHash && (
-                  <Badge variant="outline" className="mt-1 text-xs">
-                    {swap.transactionHash.slice(0, 6)}...{swap.transactionHash.slice(-4)}
-                  </Badge>
+                  <div className="flex items-center gap-1 mt-1">
+                    <Badge
+                      variant="outline"
+                      className="text-xs cursor-pointer hover:bg-accent transition-colors"
+                      onClick={() => viewTransactionOnExplorer(swap.transactionHash!)}
+                    >
+                      {swap.transactionHash.slice(0, 6)}...{swap.transactionHash.slice(-4)}
+                    </Badge>
+                    <button
+                      onClick={() => viewTransactionOnExplorer(swap.transactionHash!)}
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                      title="View on explorer"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
