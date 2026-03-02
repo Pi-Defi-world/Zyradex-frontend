@@ -21,6 +21,10 @@ import {
   User,
   Shield,
   History,
+  Heart,
+  Github,
+  Send,
+  Share2,
 } from "lucide-react"
 import { usePi } from "@/components/providers/pi-provider"
 import { Button } from "@/components/ui/button"
@@ -248,13 +252,17 @@ const ProfilePage: React.FC = () => {
       href: "/my-tokens",
       showChevron: true,
     },
-    {
-      title: "Launchpad",
-      description: "Create new assets",
-      icon: Rocket,
-      href: "/mint",
-      showChevron: true,
-    },
+    ...(profile?.role === "admin"
+      ? [
+          {
+            title: "Launchpad (Mint)",
+            description: "Create new tokens (admin)",
+            icon: Rocket,
+            href: "/mint",
+            showChevron: true,
+          },
+        ]
+      : []),
     {
       title: "Liquidity Pools",
       description: "Manage LP Holdings",
@@ -274,6 +282,13 @@ const ProfilePage: React.FC = () => {
       description: "View your transaction history",
       icon: History,
       href: "/history",
+      showChevron: true,
+    },
+    {
+      title: "Donate",
+      description: "Support ZYRADEX with Pi donations",
+      icon: Heart,
+      href: "/donate",
       showChevron: true,
     },
   ]
@@ -457,6 +472,39 @@ const ProfilePage: React.FC = () => {
               </div>
             </div>
           </button>
+        </div>
+
+        <div className="space-y-3 pt-4">
+          <h2 className="text-lg font-semibold text-foreground">Connect with us</h2>
+          <div className="flex flex-wrap gap-3">
+            <a
+              href="https://github.com/Pi-Defi-world/demo-app-fronted"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-card border border-border/30 hover:bg-muted/50 transition-colors text-sm font-medium text-foreground"
+            >
+              <Github className="h-5 w-5" />
+              GitHub
+            </a>
+            <a
+              href="https://t.me/zyrachains"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-card border border-border/30 hover:bg-muted/50 transition-colors text-sm font-medium text-foreground"
+            >
+              <Send className="h-5 w-5" />
+              Telegram
+            </a>
+            <a
+              href="https://x.com/zyradex"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-card border border-border/30 hover:bg-muted/50 transition-colors text-sm font-medium text-foreground"
+            >
+              <Share2 className="h-5 w-5" />
+              X
+            </a>
+          </div>
         </div>
 
       </div>

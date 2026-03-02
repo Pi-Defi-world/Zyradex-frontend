@@ -99,7 +99,7 @@ export default function HomePage() {
     return native ? Number(native.amount) : 0
   }, [balances])
 
-  const handleTrade = () => router.push("/trade")
+  const handleSavings = () => router.push("/savings")
   const handleSwap = () => router.push("/swap")
   const handleManageTokens = () => router.push("/trustlines")
   const handleSend = () => router.push("/send")
@@ -189,7 +189,7 @@ export default function HomePage() {
                 )}
               </>
             )}
-          </div>
+          </div> 
 
           {/* Action Buttons - Wallet Style Compact */}
           <div className="grid grid-cols-4 gap-1.5">
@@ -220,10 +220,10 @@ export default function HomePage() {
             <Button
               variant="outline"
               className="h-10 flex flex-col items-center justify-center gap-0.5 rounded-lg border hover:border-primary/50 hover:bg-muted/50 transition-all py-1 px-2"
-              onClick={handleTrade}
+              onClick={handleSavings}
             >
               <TrendingUp className="h-3.5 w-3.5" />
-              <span className="text-[10px] font-medium leading-tight">Trade</span>
+              <span className="text-[10px] font-medium leading-tight">Save</span>
             </Button>
           </div>
         </div>

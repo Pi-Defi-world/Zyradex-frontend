@@ -186,12 +186,14 @@ export default function DashboardPage() {
                     Borrow
                   </Button>
                 </Link>
-                <Link href="/mint">
-                  <Button className="w-full h-20 text-lg btn-gradient-primary" size="lg">
-                    <Coins className="mr-2 h-5 w-5" />
-                    Mint Token
-                  </Button>
-                </Link>
+                {user?.role === "admin" && (
+                  <Link href="/mint">
+                    <Button className="w-full h-20 text-lg btn-gradient-primary" size="lg">
+                      <Coins className="mr-2 h-5 w-5" />
+                      Mint Token
+                    </Button>
+                  </Link>
+                )}
                 <Link href="/liquidity">
                   <Button className="w-full h-20 text-lg bg-transparent" size="lg" variant="outline">
                     <Droplets className="mr-2 h-5 w-5" />

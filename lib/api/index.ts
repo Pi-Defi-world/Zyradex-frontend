@@ -8,6 +8,7 @@ export * from "./market"
 export * from "./trade"
 export * from "./pairs"
 export * from "./launchpad"
+export * from "./projects"
 export * from "./dividends"
 // Re-export savings with aliases to avoid conflict with liquidity (AssetRef) and lending (withdraw)
 export {

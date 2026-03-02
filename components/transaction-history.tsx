@@ -4,6 +4,7 @@ import { useMemo } from "react"
 import { Badge } from "@/components/ui/badge"
 import { ExternalLink } from "lucide-react"
 import type { AccountOperation } from "@/lib/api/account"
+import { viewTransactionOnExplorer } from "@/lib/explorer"
 
 interface TransactionHistoryProps {
   operations?: AccountOperation[]
@@ -41,10 +42,6 @@ const isSwapOperation = (operation: AccountOperation) => {
   return false
 }
 
-const viewOnExplorer = (hash: string) => {
-  const explorerUrl = `https://testnet.minepi.com/explorer/transaction/${hash}`
-  window.open(explorerUrl, "_blank")
-}
 
 export function TransactionHistory({ operations = [], isLoading }: TransactionHistoryProps) {
   const rows = useMemo(() => operations.slice(0, 20), [operations])
@@ -138,12 +135,12 @@ export function TransactionHistory({ operations = [], isLoading }: TransactionHi
                   <Badge 
                     variant="outline" 
                     className="text-xs cursor-pointer hover:bg-accent transition-colors"
-                    onClick={() => viewOnExplorer(op.transactionHash)}
+                    onClick={() => viewTransactionOnExplorer(op.transactionHash)}
                   >
                     {op.transactionHash.slice(0, 6)}...{op.transactionHash.slice(-4)}
                   </Badge>
                   <button
-                    onClick={() => viewOnExplorer(op.transactionHash)}
+                    onClick={() => viewTransactionOnExplorer(op.transactionHash)}
                     className="text-muted-foreground hover:text-foreground transition-colors"
                     title="View on explorer"
                   >

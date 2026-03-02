@@ -88,7 +88,7 @@ export default function InvestPage() {
               Launchpad launches and equity-style investments. Participate and earn.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {statusOptions.map((opt) => (
               <Button
                 key={opt.value ?? "all"}
@@ -99,6 +99,12 @@ export default function InvestPage() {
                 {opt.label}
               </Button>
             ))}
+            <Button asChild variant="secondary" size="sm">
+              <Link href="/invest/create">Create launch</Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/invest/projects">My projects</Link>
+            </Button>
           </div>
         </div>
 
