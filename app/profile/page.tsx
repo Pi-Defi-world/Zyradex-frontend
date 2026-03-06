@@ -25,6 +25,7 @@ import {
   Github,
   Send,
   Share2,
+  Gift,
 } from "lucide-react"
 import { usePi } from "@/components/providers/pi-provider"
 import { Button } from "@/components/ui/button"
@@ -291,6 +292,13 @@ const ProfilePage: React.FC = () => {
       href: "/donate",
       showChevron: true,
     },
+    {
+      title: "Rewards & Referral",
+      description: "Earn points and refer friends",
+      icon: Gift,
+      href: "/profile/rewards",
+      showChevron: true,
+    },
   ]
 
   // const additionalMenuItems = [
@@ -496,7 +504,7 @@ const ProfilePage: React.FC = () => {
               Telegram
             </a>
             <a
-              href="https://x.com/zyradex"
+              href="https://x.com/intent/follow?screen_name=zyradex"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-card border border-border/30 hover:bg-muted/50 transition-colors text-sm font-medium text-foreground"

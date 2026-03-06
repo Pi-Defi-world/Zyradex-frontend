@@ -6,6 +6,7 @@ import { usePi } from "@/components/providers/pi-provider"
 import { signIn, type AdminUser } from "@/lib/api/auth"
 import type { ApiError } from "@/lib/api"
 import { toApiError, setAuthToken, clearAuthToken } from "@/lib/api"
+import { getStoredReferralRef, storeReferralRef } from "@/lib/api/rewards"
 
 const USER_TOKEN_KEY = "dex_user_token"
 const USER_PROFILE_KEY = "dex_user_profile"
@@ -36,6 +37,16 @@ export const useUserProfile = (): UseUserProfileReturn => {
   const [profile, setProfile] = useState<AdminUser | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<ApiError | null>(null)
+
+  // Capture ref from URL on mount and store for signin
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    const ref = params.get("ref")
+    if (ref?.trim()) {
+      storeReferralRef(ref)
+    }
+  }, [])
 
   // Restore token and profile from localStorage on mount
   useEffect(() => {
@@ -89,6 +100,7 @@ export const useUserProfile = (): UseUserProfileReturn => {
         throw new Error("Missing Pi access token")
       }
 
+      const ref = getStoredReferralRef(false)
       const payload = {
         authResult: {
           accessToken: session.accessToken,
@@ -97,6 +109,7 @@ export const useUserProfile = (): UseUserProfileReturn => {
             uid: session.user?.uid || piUser?.uid || "",
           },
         },
+        ...(ref ? { ref } : {}),
       }
 
       let backendUser, token
@@ -123,6 +136,8 @@ export const useUserProfile = (): UseUserProfileReturn => {
       if (typeof window !== "undefined") {
         localStorage.setItem(USER_TOKEN_KEY, token)
         localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(backendUser))
+        // Clear referral ref after successful signin
+        getStoredReferralRef(true)
       }
 
       return backendUser

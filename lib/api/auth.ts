@@ -10,6 +10,7 @@ export interface AuthResultPayload {
 
 export interface SignInPayload {
   authResult: AuthResultPayload
+  ref?: string
 }
 
 export interface AdminUser {
