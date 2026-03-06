@@ -59,6 +59,10 @@ export function DisclaimerPopup({ open, onOpenChange }: DisclaimerPopupProps) {
               <p>
                 By using or accessing this Interface, the ZyraDex Protocol, or related tools, you represent that you are not located in, incorporated or established in, or a citizen or resident of the Prohibited Jurisdictions. You also represent that you are not subject to sanctions or otherwise designated on any list of prohibited or restricted parties or excluded or denied persons, including but not limited to the lists maintained by the United States' Department of Treasury's Office of Foreign Assets Control, the United Nations Security Council, the European Union or its Member States, or any other government authority.
               </p>
+              
+              <p className="text-xs italic">
+                Pi, Pi Network and the Pi logo are trademarks of the Pi Community Company.
+              </p>
             </div>
           </ScrollArea>
         </div>

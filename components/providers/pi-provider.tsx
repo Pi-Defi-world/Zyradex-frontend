@@ -71,7 +71,7 @@ export function PiProvider({ children }: { children: ReactNode }) {
 
     setIsLoading(true)
     try {
-      window.Pi.init({ version: "2.0", })
+      window.Pi.init({ version: "2.0" })
 
       const onIncompletePaymentFound = (payment: any) => {
         console.log("Incomplete payment found:", payment)
@@ -170,7 +170,7 @@ export function PiProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      window.Pi.init({ version: "2.0"})
+      window.Pi.init({ version: "2.0" })
 
       return new Promise((resolve, reject) => {
         const callbacks = {

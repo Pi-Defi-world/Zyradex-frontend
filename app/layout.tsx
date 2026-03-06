@@ -9,13 +9,14 @@ import { Suspense } from "react"
 import { PiProvider } from "@/components/providers/pi-provider"
 import { BalanceRefreshProvider } from "@/components/providers/balance-refresh-provider"
 import { DisclaimerProvider } from "@/components/disclaimer-provider"
+import { RefCapture } from "@/components/ref-capture"
 import Script from 'next/script'
 import "./globals.css"
 
 export const metadata: Metadata = {
   title: "ZYRADEX CAPITAL - Financial platform on Pi Network",
   description: "Savings, investments, and borrowing on Pi Network. Mint tokens, trade, and manage assets.",
-  generator: "Solie, Junman",
+  generator: "ZyraDex Capital",
 }
 
 export default function RootLayout({
@@ -45,6 +46,7 @@ export default function RootLayout({
           <BalanceRefreshProvider>
           <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
             <Suspense fallback={null}>
+              <RefCapture />
               <Navbar />
               {children}
               <Toaster />
