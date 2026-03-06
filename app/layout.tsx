@@ -17,6 +17,16 @@ export const metadata: Metadata = {
   title: "ZYRADEX CAPITAL - Financial platform on Pi Network",
   description: "Savings, investments, and borrowing on Pi Network. Mint tokens, trade, and manage assets.",
   generator: "ZyraDex Capital",
+  manifest: "/site.webmanifest",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
 }
 
 export default function RootLayout({
