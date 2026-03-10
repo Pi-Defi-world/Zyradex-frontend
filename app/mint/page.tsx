@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { PageBackHeader } from "@/components/ui/page-back-header"
 import { MintForm } from "@/components/forms/mint-form"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -24,6 +25,7 @@ export default function MintPage() {
     return (
       <div className="min-h-screen premium-gradient pt-16 pb-20">
         <div className="container mx-auto px-4 py-6 max-w-2xl">
+          <PageBackHeader title="Mint Token" />
           <Alert className="border-amber-500/50 bg-amber-500/10">
             <Lock className="h-4 w-4" />
             <AlertDescription>
@@ -55,6 +57,7 @@ export default function MintPage() {
   return (
     <div className="min-h-screen premium-gradient pt-16 pb-20">
       <div className="container mx-auto px-4 py-6">
+        <PageBackHeader title="Mint Token" />
         <div className="space-y-6 max-w-2xl mx-auto">
           <Alert>
             <Info className="h-4 w-4" />

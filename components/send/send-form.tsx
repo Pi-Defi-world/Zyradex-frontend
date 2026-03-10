@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, AlertCircle, ExternalLink } from "lucide-react"
+import { Loader2, AlertCircle, ExternalLink, ClipboardPaste } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useAccountBalances } from "@/hooks/useAccountData"
 import { useBalanceRefresh } from "@/components/providers/balance-refresh-provider"
@@ -39,6 +39,36 @@ export function SendForm({ publicKey }: SendFormProps) {
   const [showScanDialog, setShowScanDialog] = useState(false)
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const SCANNER_DIV_ID = "send-qr-scanner"
+
+  // Pi (native) first, then others; dedupe by native and by code:issuer
+  const sortedBalances = useMemo(() => {
+    const seen = new Set<string>()
+    return balances
+      .filter((balance) => {
+        if (balance.assetType === "native") return true
+        return balance.assetCode && balance.assetCode.trim() !== ""
+      })
+      .filter((balance) => {
+        const isNative = balance.assetType === "native"
+        if (isNative) {
+          if (seen.has("native")) return false
+          seen.add("native")
+          return true
+        }
+        const key = balance.assetIssuer
+          ? `${balance.assetCode}:${balance.assetIssuer}`
+          : balance.assetCode || ""
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+      .sort((a, b) => {
+        const aNative = a.assetType === "native" ? 1 : 0
+        const bNative = b.assetType === "native" ? 1 : 0
+        if (bNative !== aNative) return bNative - aNative
+        return (a.assetCode || "").localeCompare(b.assetCode || "")
+      })
+  }, [balances])
 
   const selectedTokenBalance = useMemo(() => {
     if (!selectedToken) return null
@@ -109,6 +139,29 @@ export function SendForm({ publicKey }: SendFormProps) {
       scannerRef.current = null
     }
   }, [showScanDialog])
+
+  const handlePasteAddress = async () => {
+    try {
+      const text = await navigator.clipboard.readText()
+      if (text?.trim()) {
+        setDestination(text.trim())
+        setReceiverNeedsTrustline(false)
+        toast({ title: "Address pasted", description: "Recipient address pasted from clipboard." })
+      } else {
+        toast({
+          title: "Clipboard empty",
+          description: "No text found in clipboard.",
+          variant: "destructive",
+        })
+      }
+    } catch {
+      toast({
+        title: "Paste failed",
+        description: "Could not read clipboard. Check permissions.",
+        variant: "destructive",
+      })
+    }
+  }
 
   const handleCheckAndSend = async () => {
     if (!selectedToken || !destination.trim() || !amount.trim()) {
@@ -253,7 +306,7 @@ export function SendForm({ publicKey }: SendFormProps) {
           <CardDescription>Send tokens to another wallet address</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Token Selector */}
+          {/* Token Selector — Pi first, then name + icon */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Token</label>
             <Select value={selectedToken} onValueChange={setSelectedToken}>
@@ -261,39 +314,54 @@ export function SendForm({ publicKey }: SendFormProps) {
                 <SelectValue placeholder="Select token to send" />
               </SelectTrigger>
               <SelectContent>
-                {balances
-                  .filter((balance) => {
-                    // Filter out balances that would result in empty value
-                    if (balance.assetType === "native") return true
-                    return balance.assetCode && balance.assetCode.trim() !== ""
+                {sortedBalances.map((balance) => {
+                  const isNative = balance.assetType === "native"
+                  const displayName = isNative ? "Test Pi" : balance.assetCode
+                  const value = isNative
+                    ? "native"
+                    : balance.assetIssuer
+                    ? `${balance.assetCode}:${balance.assetIssuer}`
+                    : balance.assetCode || "unknown"
+                  const amount = Number(balance.amount).toLocaleString(undefined, {
+                    maximumFractionDigits: 6,
                   })
-                  .map((balance) => {
-                    const isNative = balance.assetType === "native"
-                    const displayName = isNative ? "Test Pi" : balance.assetCode
-                    const value = isNative
-                      ? "native"
-                      : balance.assetIssuer
-                      ? `${balance.assetCode}:${balance.assetIssuer}`
-                      : balance.assetCode || "unknown"
-                    const amount = Number(balance.amount).toLocaleString(undefined, {
-                      maximumFractionDigits: 6,
-                    })
-                    return (
-                      <SelectItem key={value} value={value}>
-                        <div className="flex items-center justify-between w-full">
-                          <span>{displayName}</span>
-                          <span className="text-xs text-muted-foreground ml-2">{amount}</span>
+                  return (
+                    <SelectItem key={value} value={value}>
+                      <div className="flex items-center justify-between w-full gap-2">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white text-xs font-bold"
+                            aria-hidden
+                          >
+                            {isNative ? "π" : (balance.assetCode || "").slice(0, 2).toUpperCase()}
+                          </span>
+                          <span className="font-medium">{displayName}</span>
                         </div>
-                      </SelectItem>
-                    )
-                  })}
+                        <span className="text-xs text-muted-foreground">{amount}</span>
+                      </div>
+                    </SelectItem>
+                  )
+                })}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Recipient Address */}
+          {/* Recipient Address — Paste icon by label + Paste/Scan by input */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Recipient Address</label>
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium">Recipient Address</label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 rounded-full"
+                onClick={handlePasteAddress}
+                title="Paste address"
+                aria-label="Paste address from clipboard"
+              >
+                <ClipboardPaste className="h-4 w-4" />
+              </Button>
+            </div>
             <div className="flex gap-2">
               <Input
                 placeholder="G..."
@@ -304,6 +372,16 @@ export function SendForm({ publicKey }: SendFormProps) {
                 }}
                 className="rounded-xl font-mono flex-1"
               />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="rounded-xl shrink-0"
+                onClick={handlePasteAddress}
+                title="Paste"
+              >
+                <ClipboardPaste className="h-4 w-4" />
+              </Button>
               <Button
                 type="button"
                 variant="outline"

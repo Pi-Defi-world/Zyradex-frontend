@@ -28,11 +28,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Loader2, Plus, Droplets, TrendingUp, Users, Search } from "lucide-react"
+import { PageBackHeader } from "@/components/ui/page-back-header"
+import { Loader2, Plus, Droplets, TrendingUp, Users, Search, ClipboardPaste } from "lucide-react"
 import type React from "react"
 import Link from "next/link"
 
 import { useToast } from "@/hooks/use-toast"
+import { usePasteFromClipboard } from "@/hooks/use-paste-from-clipboard"
 import {
   useAllLiquidityPools,
   useCreateLiquidityPool,
@@ -188,6 +190,16 @@ export default function LiquidityPage() {
   const [withdrawSecret, setWithdrawSecret] = useState("")
   const [quoteData, setQuoteData] = useState<{ totalFee?: string; platformFee?: string; baseFee?: string } | null>(null)
 
+  const { handlePaste: handlePasteTokenAIssuer } = usePasteFromClipboard({
+    onPaste: (text) => setCreateForm((prev) => ({ ...prev, tokenAIssuer: text })),
+    successTitle: "Address pasted",
+    successLabel: "Token A issuer",
+  })
+  const { handlePaste: handlePasteTokenBIssuer } = usePasteFromClipboard({
+    onPaste: (text) => setCreateForm((prev) => ({ ...prev, tokenBIssuer: text })),
+    successTitle: "Address pasted",
+    successLabel: "Token B issuer",
+  })
 
   const displayPools = useMemo(() => {
     const formatted = pools.map(formatPool)
@@ -375,6 +387,7 @@ export default function LiquidityPage() {
   return (
     <div className="min-h-screen premium-gradient pt-16 pb-20">
       <div className="container mx-auto px-4 py-6 space-y-6">
+        <PageBackHeader title="Liquidity Pools" />
         <div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Liquidity Pools</h1>
@@ -483,12 +496,18 @@ export default function LiquidityPage() {
                           required
                         />
                         {createForm.tokenACode !== "native" && (
-                          <Input
-                            id="tokenA-issuer"
-                            placeholder="Issuer public key (leave empty for native)"
-                            value={createForm.tokenAIssuer}
-                            onChange={(event) => setCreateForm((prev) => ({ ...prev, tokenAIssuer: event.target.value }))}
-                          />
+                          <div className="flex gap-2">
+                            <Input
+                              id="tokenA-issuer"
+                              placeholder="Issuer public key (leave empty for native)"
+                              value={createForm.tokenAIssuer}
+                              onChange={(event) => setCreateForm((prev) => ({ ...prev, tokenAIssuer: event.target.value }))}
+                              className="flex-1"
+                            />
+                            <Button type="button" variant="outline" size="icon" onClick={handlePasteTokenAIssuer} title="Paste" aria-label="Paste issuer address">
+                              <ClipboardPaste className="h-4 w-4" />
+                            </Button>
+                          </div>
                         )}
                       </div>
                     )}
@@ -540,13 +559,19 @@ export default function LiquidityPage() {
                           required
                         />
                         {createForm.tokenBCode !== "native" && (
-                          <Input
-                            id="tokenB-issuer"
-                            placeholder="Issuer public key"
-                            value={createForm.tokenBIssuer}
-                            onChange={(event) => setCreateForm((prev) => ({ ...prev, tokenBIssuer: event.target.value }))}
-                            required
-                          />
+                          <div className="flex gap-2">
+                            <Input
+                              id="tokenB-issuer"
+                              placeholder="Issuer public key"
+                              value={createForm.tokenBIssuer}
+                              onChange={(event) => setCreateForm((prev) => ({ ...prev, tokenBIssuer: event.target.value }))}
+                              className="flex-1"
+                              required
+                            />
+                            <Button type="button" variant="outline" size="icon" onClick={handlePasteTokenBIssuer} title="Paste" aria-label="Paste issuer address">
+                              <ClipboardPaste className="h-4 w-4" />
+                            </Button>
+                          </div>
                         )}
                       </div>
                     )}
