@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
+import { PageBackHeader } from "@/components/ui/page-back-header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -92,6 +93,7 @@ export default function TrustlinesPage() {
   return (
     <div className="min-h-screen premium-gradient pt-16 pb-20">
       <div className="container mx-auto px-4 py-8 space-y-6 max-w-4xl">
+        <PageBackHeader title="Trustlines" />
         <Card className="relative overflow-hidden border border-border/50 bg-card shadow-xl rounded-2xl">
           <CardHeader>
             <CardTitle className="text-2xl font-bold">Manage Token List</CardTitle>

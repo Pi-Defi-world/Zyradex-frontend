@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { useLogger } from "@/hooks/use-logger"
-import { Loader2 } from "lucide-react"
+import { usePasteFromClipboard } from "@/hooks/use-paste-from-clipboard"
+import { Loader2, ClipboardPaste } from "lucide-react"
 import { useTrustline } from "@/hooks/useTokenRegistry"
 import { usePi } from "@/components/providers/pi-provider"
 import { useUserProfile } from "@/hooks/useUserProfile"
@@ -30,6 +31,12 @@ export function TrustlineForm() {
     assetCode: "",
     issuer: "",
     limit: "100000000",
+  })
+
+  const { handlePaste: handlePasteIssuer } = usePasteFromClipboard({
+    onPaste: (text) => setFormData((prev) => ({ ...prev, issuer: text })),
+    successTitle: "Address pasted",
+    successLabel: "Issuer address",
   })
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -90,7 +97,20 @@ export function TrustlineForm() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="issuer">Issuer Public Key</Label>
+        <div className="flex items-center gap-2">
+          <Label htmlFor="issuer">Issuer Public Key</Label>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 rounded-full"
+            onClick={handlePasteIssuer}
+            title="Paste address"
+            aria-label="Paste issuer address from clipboard"
+          >
+            <ClipboardPaste className="h-4 w-4" />
+          </Button>
+        </div>
         <Input
           id="issuer"
           placeholder="G..."

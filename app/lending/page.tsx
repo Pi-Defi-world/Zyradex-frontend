@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
+import { PageBackHeader } from "@/components/ui/page-back-header"
 import {
   Loader2,
   CreditCard,
@@ -372,6 +373,7 @@ export default function LendingPage() {
   return (
     <div className="min-h-screen premium-gradient pt-16 pb-20">
       <div className="container mx-auto px-4 py-6 space-y-6">
+        <PageBackHeader title="Borrow & Lend" />
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <CreditCard className="h-7 w-7" />

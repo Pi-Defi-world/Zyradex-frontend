@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState, useEffect } from "react"
+import { PageBackHeader } from "@/components/ui/page-back-header"
 import { SwapCard } from "@/components/swap/swap-card"
 import { PriceChart, type PricePoint } from "@/components/swap/price-chart"
 import { RecentSwaps } from "@/components/swap/recent-swaps"
@@ -45,6 +46,7 @@ export default function SwapPage() {
   return (
     <div className="min-h-screen premium-gradient pt-16 pb-20">
       <div className="container mx-auto px-4 py-6 space-y-6">
+        <PageBackHeader title="Swap" />
         <div className="hidden lg:grid lg:grid-cols-5 lg:gap-6 lg:mb-6">
           <div className="lg:col-span-3">
             <PriceChart series={chartSeries} isLoading={isLoading} />

@@ -19,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { PageBackHeader } from "@/components/ui/page-back-header"
 import { Loader2, PiggyBank } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useUserProfile } from "@/hooks/useUserProfile"
@@ -247,6 +248,7 @@ export default function SavingsPage() {
   return (
     <div className="min-h-screen premium-gradient pt-16 pb-20">
       <div className="container mx-auto px-4 py-6 space-y-6">
+        <PageBackHeader title="Savings" />
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <PiggyBank className="h-7 w-7" />

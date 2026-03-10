@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { PageBackHeader } from "@/components/ui/page-back-header"
 import { TradeForm } from "@/components/trade/trade-form"
 import { Orderbook } from "@/components/trade/orderbook"
 import { ActiveOffers } from "@/components/trade/active-offers"
@@ -47,6 +48,7 @@ export default function TradePage() {
   return (
     <div className="min-h-screen premium-gradient pt-16 pb-20">
       <div className="container mx-auto px-4 py-6 space-y-6">
+        <PageBackHeader title="Trade" />
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Trading Form - Main Section */}
           <div className="lg:col-span-2">

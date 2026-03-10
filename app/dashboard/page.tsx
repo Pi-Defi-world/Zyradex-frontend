@@ -10,6 +10,7 @@ import { ActivityChart, type ActivityPoint } from "@/components/activity-chart"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
+import { PageBackHeader } from "@/components/ui/page-back-header"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
 import { useAccountBalances, useAccountOperations } from "@/hooks/useAccountData"
 import { useTokenRegistry } from "@/hooks/useTokenRegistry"
@@ -143,6 +144,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen premium-gradient pt-16 pb-20">
       <div className="container mx-auto px-4 py-6">
+        <PageBackHeader title="Dashboard" />
         <div className="space-y-6">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {stats.map((stat) => (
