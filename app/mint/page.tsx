@@ -7,10 +7,14 @@ import { Button } from "@/components/ui/button"
 import { Info, Lock, TrendingUp } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useUserProfile } from "@/hooks/useUserProfile"
+import { usePlatformFees } from "@/hooks/useFeesData"
+import { FeeBreakdown } from "@/components/fee-breakdown"
 
 export default function MintPage() {
   const { profile, isLoading } = useUserProfile()
   const isAdmin = profile?.role === "admin"
+  const { fees } = usePlatformFees()
+  const mintFee = fees.find((f) => f.key === "mint_fee")
 
   if (isLoading) {
     return (
@@ -70,6 +74,18 @@ export default function MintPage() {
             </CardHeader>
             <CardContent>
               <MintForm />
+              {mintFee && (
+                <div className="mt-4">
+                  <FeeBreakdown
+                    items={[
+                      {
+                        label: "Application fee",
+                        value: `${mintFee.baseValue.toFixed(2)} Pi`,
+                      },
+                    ]}
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
 

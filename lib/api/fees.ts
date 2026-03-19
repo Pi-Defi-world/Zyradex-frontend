@@ -4,8 +4,13 @@ export interface FeeConfig {
   _id: string
   key: string
   description?: string
-  value: unknown
+  feeType: "fixed" | "percentage" | "tiered"
+  baseValue: number
+  minValue?: number
+  maxValue?: number
   currency: string
+  appliesTo?: string[]
+  collectOnChain: boolean
   isActive: boolean
   createdAt: string
   updatedAt: string
@@ -19,7 +24,10 @@ export interface FetchFeesResponse {
 export interface CreateFeePayload {
   key: string
   description?: string
-  value: unknown
+  feeType: "fixed" | "percentage" | "tiered"
+  baseValue: number
+  minValue?: number
+  maxValue?: number
   currency?: string
   isActive?: boolean
 }
@@ -31,7 +39,10 @@ export interface CreateFeeResponse {
 
 export interface UpdateFeePayload {
   description?: string
-  value?: unknown
+  feeType?: "fixed" | "percentage" | "tiered"
+  baseValue?: number
+  minValue?: number
+  maxValue?: number
   currency?: string
   isActive?: boolean
 }

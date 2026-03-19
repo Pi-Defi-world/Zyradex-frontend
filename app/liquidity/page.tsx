@@ -39,6 +39,8 @@ import {
   useAddLiquidity,
   useWithdrawLiquidity,
 } from "@/hooks/useLiquidityData"
+import { usePlatformFees } from "@/hooks/useFeesData"
+import { FeeBreakdown } from "@/components/fee-breakdown"
 import { useBalanceRefresh } from "@/components/providers/balance-refresh-provider"
 import { usePi } from "@/components/providers/pi-provider"
 import { useUserProfile } from "@/hooks/useUserProfile"
@@ -173,6 +175,10 @@ export default function LiquidityPage() {
   const { addLiquidity, isLoading: adding } = useAddLiquidity()
   const { withdrawLiquidity, isLoading: withdrawing } = useWithdrawLiquidity()
   const { refreshBalances: refreshBalancesGlobal } = useBalanceRefresh() ?? {}
+
+  const { fees } = usePlatformFees()
+  const addFee = fees.find((f) => f.key === "pool_add_fee")
+  const removeFee = fees.find((f) => f.key === "pool_remove_fee")
 
   const [createForm, setCreateForm] = useState<LiquidityFormState>(defaultCreateForm)
   const [depositForm, setDepositForm] = useState<DepositFormState>(defaultDepositForm)
@@ -379,6 +385,18 @@ export default function LiquidityPage() {
           <div>
             <h1 className="text-2xl font-bold text-foreground">Liquidity Pools</h1>
             <p className="text-sm text-muted-foreground">Discover and manage liquidity pools on the Pi testnet DEX.</p>
+            {removeFee && (
+              <div className="mt-2 max-w-xs">
+                <FeeBreakdown
+                  items={[
+                    {
+                      label: "Remove liquidity fee",
+                      value: `${removeFee.baseValue.toFixed(2)} Pi`,
+                    },
+                  ]}
+                />
+              </div>
+            )}
           </div>
           <Dialog>
             <DialogTrigger asChild>
@@ -586,14 +604,18 @@ export default function LiquidityPage() {
                     />
                   </div>
                 </div>
-                <div className="rounded-xl border-2 border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-green-500/10 to-teal-500/10 p-4 backdrop-blur-sm">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Transaction Fee</span>
-                    <span className="text-lg font-bold text-emerald-600 dark:text-emerald-500">
-                      ~0.01 Test Pi
-                    </span>
+                {addFee && (
+                  <div className="mt-4">
+                    <FeeBreakdown
+                      items={[
+                        {
+                          label: "Add liquidity fee",
+                          value: `${addFee.baseValue.toFixed(2)} Pi`,
+                        },
+                      ]}
+                    />
                   </div>
-                </div>
+                )}
                 <Button type="submit" className="w-full btn-gradient-primary" disabled={creating}>
                   {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                   Create Pool
@@ -1024,14 +1046,18 @@ export default function LiquidityPage() {
                               />
                             </div>
                           </div>
-                          <div className="rounded-xl border-2 border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-green-500/10 to-teal-500/10 p-4 backdrop-blur-sm">
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Total Fee</span>
-                              <span className="text-lg font-bold text-emerald-600 dark:text-emerald-500">
-                                ~10.01 Test Pi
-                              </span>
+                          {removeFee && (
+                            <div className="mt-4">
+                              <FeeBreakdown
+                                items={[
+                                  {
+                                    label: "Remove liquidity fee",
+                                    value: `${removeFee.baseValue.toFixed(2)} Pi`,
+                                  },
+                                ]}
+                              />
                             </div>
-                          </div>
+                          )}
                           <Button 
                             className="w-full h-14 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white font-bold text-lg rounded-xl shadow-lg hover:shadow-red-500/25 transition-all disabled:opacity-50" 
                             onClick={() => handleWithdrawClick(pool)}

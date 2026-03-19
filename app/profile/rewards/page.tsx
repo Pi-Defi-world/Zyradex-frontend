@@ -11,7 +11,12 @@ import { useToast } from "@/hooks/use-toast"
 import { usePi } from "@/components/providers/pi-provider"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { getRewards, addReferrer, type RewardsSummary } from "@/lib/api/rewards"
-import { Copy, Gift, ChevronLeft, Loader2, Share2, Users } from "lucide-react"
+import { Copy, Loader2, Users } from "lucide-react"
+
+const parsePi = (v: string | undefined | null) => {
+  const n = v ? Number(v) : 0
+  return Number.isFinite(n) ? n : 0
+}
 
 export default function RewardsPage() {
   const { isAuthenticated } = usePi()
@@ -99,7 +104,7 @@ export default function RewardsPage() {
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" asChild>
             <Link href="/profile">
-              <ChevronLeft className="h-5 w-5" />
+              <span className="text-base">←</span>
             </Link>
           </Button>
           <h1 className="text-xl font-semibold">Rewards & Referral</h1>
@@ -120,7 +125,6 @@ export default function RewardsPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Share2 className="h-5 w-5" />
                   Your Referral Link
                 </CardTitle>
                 <CardDescription>
@@ -145,7 +149,6 @@ export default function RewardsPage() {
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Gift className="h-4 w-4" />
                     My Points
                   </CardTitle>
                 </CardHeader>
@@ -165,6 +168,45 @@ export default function RewardsPage() {
                 </CardContent>
               </Card>
             </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Referral Earnings (Pi)</CardTitle>
+                <CardDescription>
+                  You earn 20% of the 0.3% platform fee from swaps made by users you referred. Payouts are manual once per month after you reach 100 Pi.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Earned</p>
+                    <p className="text-base font-semibold">{rewards.referralFeePiEarned} Pi</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Paid</p>
+                    <p className="text-base font-semibold">{rewards.referralFeePiPaid} Pi</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Owed</p>
+                    <p className="text-base font-semibold">{rewards.referralFeePiOwed} Pi</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Payout threshold</span>
+                  <span className={rewards.payoutEligible ? "font-semibold text-primary" : "font-medium"}>
+                    {parsePi(rewards.referralFeePiOwed).toFixed(7)} / 100.0000000 Pi
+                  </span>
+                </div>
+                {rewards.payoutEligible && (
+                  <Alert>
+                    <AlertDescription>
+                      You’re eligible for a payout. Payouts are processed manually once per month.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
 
             {!rewards.referredByUserId && (
               <Card>

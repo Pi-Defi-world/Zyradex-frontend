@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
+import { FeeBreakdown } from "@/components/fee-breakdown"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -523,25 +524,33 @@ export function SwapCard() {
           </div>
             {/* Quote Display - Eye-catching colors */}
             {quote && quote.expectedOutput && (
-              <div className="rounded-xl border-2 border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-green-500/10 to-teal-500/10 p-4 space-y-2 backdrop-blur-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Estimated Output</span>
-                  <span className="text-lg font-bold text-emerald-600 dark:text-emerald-500">
-                    {quote.expectedOutput} {toTokenDisplay}
-                  </span>
+              <div className="space-y-3">
+                <div className="rounded-xl border-2 border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-green-500/10 to-teal-500/10 p-4 space-y-2 backdrop-blur-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Estimated Output</span>
+                    <span className="text-lg font-bold text-emerald-600 dark:text-emerald-500">
+                      {quote.expectedOutput} {toTokenDisplay}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Min Received</span>
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">{quote.minOut}</span>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Min Received</span>
-                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">{quote.minOut}</span>
-                </div>
-                <div className="flex items-center justify-between text-xs pt-2 border-t border-emerald-500/20">
-                  <span className="text-muted-foreground">Total Fee</span>
-                  <span className="font-semibold text-emerald-600 dark:text-emerald-500">
-                    {quote.totalFee ? `${quote.totalFee.toFixed(2)}%` : `${quote.fee}%`}
-                  </span>
-                </div>
-                </div>
-              )}
+                <FeeBreakdown
+                  items={[
+                    {
+                      label: "Pool fee",
+                      value: `${(quote.fee ?? quote.totalFee ?? 0).toFixed(2)}%`,
+                    },
+                    {
+                      label: "Platform fee",
+                      value: `${quote.platformFeeAmount ?? "0"} Pi`,
+                    },
+                  ]}
+                />
+              </div>
+            )}
 
             {/* Transaction Details - Collapsible */}
             {quote && quote.expectedOutput && (

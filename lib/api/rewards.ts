@@ -7,6 +7,10 @@ export interface RewardsSummary {
   referralLink: string
   points: number
   successfulReferralsCount: number
+  referralFeePiEarned: string
+  referralFeePiPaid: string
+  referralFeePiOwed: string
+  payoutEligible: boolean
   referrals: Array<{
     referredUserName: string
     createdAt: string
