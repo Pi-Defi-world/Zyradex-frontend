@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { PageBackHeader } from "@/components/ui/page-back-header"
 import { usePi } from "@/components/providers/pi-provider"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { SendForm } from "@/components/send/send-form"
@@ -37,6 +38,7 @@ export default function SendPage() {
   return (
     <div className="min-h-screen premium-gradient pt-16 pb-20">
       <div className="container mx-auto px-4 py-8 space-y-6 max-w-2xl">
+        <PageBackHeader title="Send Tokens" />
         <SendForm publicKey={publicKey} />
       </div>
     </div>

@@ -48,6 +48,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
+import { PageBackHeader } from "@/components/ui/page-back-header"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -338,7 +339,7 @@ const ProfilePage: React.FC = () => {
   return (
     <div className="min-h-screen premium-gradient pt-16 pb-20 p-3 sm:p-4">
       <div className="max-w-md mx-auto space-y-6">
-
+        <PageBackHeader title="Profile" />
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

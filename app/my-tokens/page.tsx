@@ -2,6 +2,7 @@
 
 import { useMemo } from "react"
 import { useRouter } from "next/navigation"
+import { PageBackHeader } from "@/components/ui/page-back-header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -23,6 +24,7 @@ export default function MyTokensPage() {
   return (
     <div className="min-h-screen premium-gradient pt-16 pb-20">
       <div className="container mx-auto px-4 py-6">
+        <PageBackHeader title="My Tokens" />
         <div className="space-y-6">
           <Card>
             <CardHeader>
