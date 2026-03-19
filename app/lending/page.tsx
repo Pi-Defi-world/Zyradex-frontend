@@ -42,6 +42,8 @@ import {
   useLendingRepay,
   useSetCreditScore,
 } from "@/hooks/useLendingData"
+import { usePlatformFees } from "@/hooks/useFeesData"
+import { FeeBreakdown } from "@/components/fee-breakdown"
 import { useBalanceRefresh } from "@/components/providers/balance-refresh-provider"
 import { supply as supplyApi, borrow as borrowApi, repay as repayApi } from "@/lib/api/lending"
 import type { LendingPool, SupplyPosition, BorrowPosition } from "@/lib/api/lending"
@@ -113,7 +115,7 @@ function PoolCard({
             <TabsTrigger value="borrow">Borrow</TabsTrigger>
           </TabsList>
           <TabsContent value="supply" className="space-y-2 mt-2">
-            <Label>Amount (0.6% fee)</Label>
+            <Label>Amount</Label>
             <Input
               type="text"
               placeholder="0"
@@ -125,7 +127,7 @@ function PoolCard({
             </Button>
           </TabsContent>
           <TabsContent value="withdraw" className="space-y-2 mt-2">
-            <Label>Amount (0.6% fee)</Label>
+            <Label>Amount</Label>
             <Input
               type="text"
               placeholder="0"
@@ -257,6 +259,9 @@ export default function LendingPage() {
   } | null>(null)
   const [pendingRepay, setPendingRepay] = useState<{ positionId: string; amount: string } | null>(null)
 
+  const { fees } = usePlatformFees()
+  const payoutFee = fees.find((f) => f.key === "payout_fee")
+
   useEffect(() => {
     if (!isAuthenticated || profile || profileLoading) return
     refreshProfile().catch(() => undefined)
@@ -380,6 +385,19 @@ export default function LendingPage() {
           <p className="text-muted-foreground mt-1">
             Supply assets to earn interest; borrow against collateral. Rates depend on amount and credit score.
           </p>
+          {payoutFee && (
+            <div className="mt-3 max-w-sm">
+              <FeeBreakdown
+                title="Platform payout fee"
+                items={[
+                  {
+                    label: "On interest & rewards",
+                    value: `${(payoutFee.baseValue * 100).toFixed(2)}%`,
+                  },
+                ]}
+              />
+            </div>
+          )}
         </div>
 
         <Tabs defaultValue="pools" className="space-y-4">

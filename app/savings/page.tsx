@@ -30,6 +30,8 @@ import {
   useSavingsDeposit,
   useSavingsWithdraw,
 } from "@/hooks/useSavingsData"
+import { usePlatformFees } from "@/hooks/useFeesData"
+import { FeeBreakdown } from "@/components/fee-breakdown"
 import { getTermOptions } from "@/lib/api/savings"
 import type { SavingsProduct, SavingsPosition, SavingsTermOption } from "@/lib/api/savings"
 
@@ -146,6 +148,9 @@ export default function SavingsPage() {
   const { deposit: depositMutation } = useSavingsDeposit()
   const { withdraw: withdrawMutation } = useSavingsWithdraw()
 
+  const { fees } = usePlatformFees()
+  const payoutFee = fees.find((f) => f.key === "payout_fee")
+
   const [depositDialogOpen, setDepositDialogOpen] = useState(false)
   const [depositProductId, setDepositProductId] = useState<string | null>(null)
   const [depositAmount, setDepositAmount] = useState("")
@@ -255,6 +260,19 @@ export default function SavingsPage() {
           <p className="text-muted-foreground mt-1">
             Time-lock products with APY. Deposit and earn interest.
           </p>
+          {payoutFee && (
+            <div className="mt-3 max-w-sm">
+              <FeeBreakdown
+                title="Platform payout fee"
+                items={[
+                  {
+                    label: "On interest payouts",
+                    value: `${(payoutFee.baseValue * 100).toFixed(2)}%`,
+                  },
+                ]}
+              />
+            </div>
+          )}
         </div>
 
         <Tabs defaultValue="products" className="space-y-4">
