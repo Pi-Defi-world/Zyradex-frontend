@@ -20,6 +20,16 @@ export interface RewardsSummary {
   referredByUserId: string | null
 }
 
+export interface ReferralPayoutRecord {
+  id: string
+  amountPi: string
+  note?: string
+  paidAt: string
+  paidByAdminId?: string
+  txHash?: string
+  operation?: string
+}
+
 export interface PointTransactionRecord {
   id: string
   type: string
@@ -27,6 +37,20 @@ export interface PointTransactionRecord {
   balanceAfter: number
   metadata?: Record<string, unknown>
   createdAt: string
+}
+
+export const getReferralPayouts = async (
+  params?: { limit?: number; offset?: number }
+): Promise<{ payouts: ReferralPayoutRecord[]; total: number }> => {
+  try {
+    const { data } = await axiosClient.get<{
+      payouts: ReferralPayoutRecord[]
+      total: number
+    }>("/rewards/payouts", { params })
+    return data
+  } catch (error) {
+    throw toApiError(error)
+  }
 }
 
 export const getRewards = async (): Promise<RewardsSummary> => {
