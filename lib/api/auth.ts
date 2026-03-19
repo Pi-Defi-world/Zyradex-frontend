@@ -21,6 +21,25 @@ export interface AdminUser {
   verified: boolean
   public_key?: string
   avatarUrl?: string
+  roles?: ("pioneer" | "business" | "developer")[]
+  businessProfile?: {
+    companyName?: string
+    kycStatus?: "none" | "pending" | "approved" | "rejected"
+    billingEmail?: string
+    approvedProjectIds?: string[]
+  }
+  developerProfile?: {
+    sandboxEnabled?: boolean
+    productionEnabled?: boolean
+    webhookUrl?: string
+    apiKeys?: {
+      id: string
+      name?: string
+      last4: string
+      createdAt: string
+      revokedAt?: string
+    }[]
+  }
 }
 
 export interface SignInResponse {

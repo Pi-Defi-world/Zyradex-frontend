@@ -17,6 +17,11 @@ export interface SwapQuoteResponse {
   slippagePercent: number
   fee: number
   poolId: string
+  platformFee?: number
+  platformFeeAmount?: string
+  totalFee?: number
+  platformFeeReasonSummary?: string
+  platformFeeReasonCodes?: string[]
 }
 
 export interface ExecuteSwapPayload {

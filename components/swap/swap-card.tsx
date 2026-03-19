@@ -541,12 +541,26 @@ export function SwapCard() {
                   items={[
                     {
                       label: "Pool fee",
-                      value: `${(quote.fee ?? quote.totalFee ?? 0).toFixed(2)}%`,
+                      value: `${(quote.fee ?? 0).toFixed(2)}%`,
                     },
                     {
-                      label: "Platform fee",
-                      value: `${quote.platformFeeAmount ?? "0"} Pi`,
+                      label: profile?.roles?.includes("business")
+                        ? "Platform fee (Business pricing)"
+                        : profile?.roles?.includes("developer")
+                          ? "Platform fee (Developer pricing)"
+                          : "Platform fee",
+                      value: `${quote.platformFeeAmount ?? "0"} Pi${
+                        quote.platformFee != null ? ` (${Number(quote.platformFee).toFixed(2)}%)` : ""
+                      }`,
                     },
+                    ...(quote.platformFeeReasonSummary
+                      ? [
+                          {
+                            label: "Fee policy",
+                            value: quote.platformFeeReasonSummary,
+                          },
+                        ]
+                      : []),
                   ]}
                 />
               </div>

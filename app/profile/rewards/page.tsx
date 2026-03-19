@@ -10,8 +10,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
 import { usePi } from "@/components/providers/pi-provider"
 import { useUserProfile } from "@/hooks/useUserProfile"
-import { getRewards, addReferrer, type RewardsSummary } from "@/lib/api/rewards"
-import { Copy, Loader2, Users } from "lucide-react"
+import { getRewards, addReferrer, getReferralPayouts, type RewardsSummary, type ReferralPayoutRecord } from "@/lib/api/rewards"
+import { Copy, ExternalLink, Loader2, Users } from "lucide-react"
 
 const parsePi = (v: string | undefined | null) => {
   const n = v ? Number(v) : 0
@@ -23,6 +23,7 @@ export default function RewardsPage() {
   const { profile } = useUserProfile()
   const { toast } = useToast()
   const [rewards, setRewards] = useState<RewardsSummary | null>(null)
+  const [payouts, setPayouts] = useState<ReferralPayoutRecord[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [addReferralCode, setAddReferralCode] = useState("")
@@ -33,8 +34,12 @@ export default function RewardsPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const data = await getRewards()
-      setRewards(data)
+      const [rewardsData, payoutsData] = await Promise.all([
+        getRewards(),
+        getReferralPayouts({ limit: 20, offset: 0 }),
+      ])
+      setRewards(rewardsData)
+      setPayouts(payoutsData.payouts || [])
     } catch (err: unknown) {
       const msg = err && typeof err === "object" && "message" in err ? (err as { message: string }).message : "Failed to load rewards"
       setError(msg)
@@ -128,7 +133,7 @@ export default function RewardsPage() {
                   Your Referral Link
                 </CardTitle>
                 <CardDescription>
-                  Share this link. You get 100 points when a new user signs up using it.
+                  Your referral link uses your username. Share it so new users can sign up with it; they can also enter your username when signing up or in Add referrer.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -142,6 +147,11 @@ export default function RewardsPage() {
                     <Copy className="h-4 w-4" />
                   </Button>
                 </div>
+                {profile?.username && (
+                  <p className="text-sm text-muted-foreground">
+                    Link uses <span className="font-medium text-foreground">@{profile.username}</span>. Others can enter this username when signing up or in Add referrer.
+                  </p>
+                )}
               </CardContent>
             </Card>
 
@@ -173,7 +183,7 @@ export default function RewardsPage() {
               <CardHeader>
                 <CardTitle>Referral Earnings (Pi)</CardTitle>
                 <CardDescription>
-                  You earn 20% of the 0.3% platform fee from swaps made by users you referred. Payouts are manual once per month after you reach 100 Pi.
+                  You earn 20% of the platform fee from swaps and mints by users you referred. Earnings are automatically sent to your wallet and appear in your transaction history.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -191,19 +201,45 @@ export default function RewardsPage() {
                     <p className="text-base font-semibold">{rewards.referralFeePiOwed} Pi</p>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
 
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Payout threshold</span>
-                  <span className={rewards.payoutEligible ? "font-semibold text-primary" : "font-medium"}>
-                    {parsePi(rewards.referralFeePiOwed).toFixed(7)} / 100.0000000 Pi
-                  </span>
-                </div>
-                {rewards.payoutEligible && (
-                  <Alert>
-                    <AlertDescription>
-                      You’re eligible for a payout. Payouts are processed manually once per month.
-                    </AlertDescription>
-                  </Alert>
+            <Card>
+              <CardHeader>
+                <CardTitle>Referral earnings history</CardTitle>
+                <CardDescription>Paid amounts sent to your wallet (also visible in transaction history)</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {payouts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No payouts yet. Earned amounts are sent automatically when your referrals swap or mint.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {payouts.map((p) => (
+                      <div
+                        key={p.id}
+                        className="flex items-center justify-between py-2 border-b border-border/50 last:border-0"
+                      >
+                        <div>
+                          <p className="font-medium text-sm">{p.amountPi} Pi</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(p.paidAt).toLocaleDateString()}
+                            {p.operation ? ` · ${p.operation}` : ""}
+                          </p>
+                        </div>
+                        {p.txHash && (
+                          <a
+                            href={`https://minepi.com/explorer/tx/${p.txHash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-muted-foreground hover:text-primary"
+                            title="View on explorer"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -213,18 +249,18 @@ export default function RewardsPage() {
                 <CardHeader>
                   <CardTitle>Add Who Referred You</CardTitle>
                   <CardDescription>
-                    If someone referred you, enter their referral code to credit them with 100 points.
+                    If someone referred you, enter their username (e.g. @username) to credit them with 100 points.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleAddReferrer} className="space-y-3">
                     <div>
-                      <Label htmlFor="referralCode">Referral Code</Label>
+                      <Label htmlFor="referralCode">Referrer username</Label>
                       <Input
                         id="referralCode"
                         value={addReferralCode}
                         onChange={(e) => setAddReferralCode(e.target.value)}
-                        placeholder="Enter referral code"
+                        placeholder="e.g. @username or username"
                         className="mt-1"
                       />
                     </div>
