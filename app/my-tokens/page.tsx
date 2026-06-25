@@ -21,7 +21,7 @@ export default function MyTokensPage() {
   const isAuthError = error?.status === 401 || error?.status === 403
 
   return (
-    <div className="min-h-screen premium-gradient pt-16 pb-20">
+    <div className="min-h-screen premium-gradient pt-24 pb-24 lg:pb-6">
       <div className="container mx-auto px-4 py-6">
         <div className="space-y-6">
           <Card>

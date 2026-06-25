@@ -45,7 +45,7 @@ export default function TradePage() {
   const { error: profileError } = useUserProfile()
 
   return (
-    <div className="min-h-screen premium-gradient pt-16 pb-20">
+    <div className="min-h-screen premium-gradient pt-24 pb-24 lg:pb-6">
       <div className="container mx-auto px-4 py-6 space-y-6">
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Trading Form - Main Section */}

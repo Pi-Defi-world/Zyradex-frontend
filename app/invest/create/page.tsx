@@ -72,7 +72,7 @@ export default function CreateLaunchPage() {
 
   if (profileLoading) {
     return (
-      <div className="min-h-screen premium-gradient pt-16 pb-20 flex items-center justify-center">
+      <div className="min-h-screen premium-gradient pt-24 pb-24 lg:pb-6 flex items-center justify-center">
         <p className="text-muted-foreground">Loading...</p>
       </div>
     )
@@ -80,7 +80,7 @@ export default function CreateLaunchPage() {
 
   if (!profile) {
     return (
-      <div className="min-h-screen premium-gradient pt-16 pb-20">
+      <div className="min-h-screen premium-gradient pt-24 pb-24 lg:pb-6">
         <div className="container mx-auto px-4 py-6 max-w-2xl">
           <div className="flex items-center gap-4 mb-6">
             <Button variant="ghost" size="icon" asChild>
@@ -104,7 +104,7 @@ export default function CreateLaunchPage() {
   }
 
   return (
-    <div className="min-h-screen premium-gradient pt-16 pb-20">
+    <div className="min-h-screen premium-gradient pt-24 pb-24 lg:pb-6">
       <div className="container mx-auto px-4 py-6 max-w-2xl">
         <div className="flex items-center gap-4 mb-6">
           <Button variant="ghost" size="icon" asChild>

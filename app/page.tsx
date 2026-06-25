@@ -4,12 +4,11 @@ import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { ArrowDown, TrendingUp, ArrowRightLeft, Loader2, Copy, Wallet, Plus, ArrowUpRight } from "lucide-react"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
+import { ArrowDown, TrendingUp, ArrowRightLeft, Loader2, Copy, Wallet, ArrowUpRight, Zap, BarChart3, Sparkles } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { usePi } from "@/components/providers/pi-provider"
 import { useAccountBalances, useAccountOperations } from "@/hooks/useAccountData"
-import { formatDistanceToNow } from "date-fns"
 import { useTokenRegistry } from "@/hooks/useTokenRegistry"
 import { usePiPrice } from "@/hooks/usePiPrice"
 import { useUserProfile } from "@/hooks/useUserProfile"
@@ -29,15 +28,13 @@ export default function HomePage() {
   const { profile } = useUserProfile()
   const [localWallet, setLocalWallet] = useState<string | null>(null)
   const [receiveModalOpen, setReceiveModalOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState("tokens")
+  const [activeTab, setActiveTab] = useState("holdings")
   const { price: piPrice, isLoading: priceLoading } = usePiPrice()
 
   useEffect(() => {
-    // Only restore wallet if user is authenticated
     if (isAuthenticated) {
       const stored = getStoredWallet()
       setLocalWallet(stored)
-      // Also sync with profile public_key if available
       if (profile?.public_key && stored !== profile.public_key) {
         if (typeof window !== "undefined") {
           localStorage.setItem("zyradex-wallet-address", profile.public_key)
@@ -49,18 +46,15 @@ export default function HomePage() {
     }
   }, [isAuthenticated, profile?.public_key])
 
-
-  // Priority: profile.public_key (from DB) > user.wallet_address (from Pi SDK) > localWallet (from localStorage)
-  const publicKey = isAuthenticated 
-    ? (profile?.public_key || user?.wallet_address || localWallet || undefined) 
+  const publicKey = isAuthenticated
+    ? (profile?.public_key || user?.wallet_address || localWallet || undefined)
     : undefined
-  const { balances, totalBalance: nativeBalanceOnly, isLoading: balancesLoading, error: balancesError } = useAccountBalances(publicKey)
-  const { tokens, isLoading: tokensLoading, error: tokensError } = useTokenRegistry()
+  const { balances, totalBalance: nativeBalanceOnly, isLoading: balancesLoading } = useAccountBalances(publicKey)
   const { getPrice, isLoading: pricesLoading } = useTokenPrices(
-    balances.map(b => ({ 
-      assetCode: b.assetCode, 
-      assetIssuer: b.assetIssuer || undefined, 
-      assetType: b.assetType 
+    balances.map(b => ({
+      assetCode: b.assetCode,
+      assetIssuer: b.assetIssuer || undefined,
+      assetType: b.assetType
     }))
   )
   const { operations, isLoading: operationsLoading } = useAccountOperations(publicKey, {
@@ -68,46 +62,32 @@ export default function HomePage() {
     order: "desc",
   })
 
-  // Calculate total balance: native Pi + tokens with pools (valued in Pi)
   const totalBalance = useMemo(() => {
-    let total = nativeBalanceOnly // Start with native Pi
-    
-    // Add token values in Pi for tokens that have pools
+    let total = nativeBalanceOnly
     balances.forEach((balance) => {
       if (balance.assetType === "native") return
-      
       const priceInPi = getPrice(balance.assetCode, balance.assetIssuer || undefined, balance.assetType)
       if (priceInPi !== null && priceInPi !== undefined) {
-        const tokenAmount = Number(balance.amount) || 0
-        total += tokenAmount * priceInPi
+        total += (Number(balance.amount) || 0) * priceInPi
       }
     })
-    
     return total
   }, [nativeBalanceOnly, balances, getPrice])
 
-  // Calculate USD equivalent
   const usdBalance = useMemo(() => {
     if (!piPrice || !totalBalance || piPrice <= 0) return null
     const calculated = totalBalance * piPrice
     return isNaN(calculated) || !isFinite(calculated) ? null : calculated
   }, [piPrice, totalBalance])
 
-  // Format native balance (Test Pi)
-  const nativeBalance = useMemo(() => {
-    const native = balances.find((b) => b.assetType === "native")
-    return native ? Number(native.amount) : 0
-  }, [balances])
-
-  const handleSavings = () => router.push("/savings")
   const handleSwap = () => router.push("/swap")
-  const handleManageTokens = () => router.push("/trustlines")
   const handleSend = () => router.push("/send")
+  const handleExplore = () => router.push("/explore")
   const handleCopy = async () => {
     const key = publicKey || ""
     try {
       await navigator.clipboard.writeText(key)
-      toast({ title: "Copied", description: "Public key copied to clipboard" })
+      toast({ title: "Copied", description: "Wallet address copied to clipboard" })
     } catch {
       toast({ title: "Copy failed", description: key, variant: "destructive" })
     }
@@ -118,187 +98,229 @@ export default function HomePage() {
     return `${publicKey.slice(0, 6)}...${publicKey.slice(-6)}`
   }, [publicKey])
 
-
   const handleTokenClick = (balance: any) => {
     if (balance.assetType === "native") {
       router.push("/token/native")
     } else if (balance.assetCode) {
-      const tokenCode = balance.assetCode
-      router.push(`/token/${encodeURIComponent(tokenCode)}${balance.assetIssuer ? `?issuer=${encodeURIComponent(balance.assetIssuer)}` : ''}`)
+      router.push(`/token/${encodeURIComponent(balance.assetCode)}${balance.assetIssuer ? `?issuer=${encodeURIComponent(balance.assetIssuer)}` : ''}`)
     }
   }
 
-  const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString)
-      return formatDistanceToNow(date, { addSuffix: true })
-    } catch {
-      return dateString
-    }
-  }
+  // UNAUTHENTICATED: Welcome screen
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen premium-gradient pt-20 pb-24 lg:pb-6 flex items-center justify-center">
+        <div className="container mx-auto px-4 max-w-lg text-center space-y-8">
+          <div className="space-y-4">
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-green-600 to-mint-500 flex items-center justify-center shadow-xl mx-auto">
+              <Sparkles className="w-10 h-10 text-white" />
+            </div>
+            <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Welcome to ZyraDex
+            </h1>
+            <p className="text-lg text-slate-600 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
+              A decentralized exchange on Pi Network. Swap tokens instantly, earn yield, and maintain complete control of your assets.
+            </p>
+          </div>
 
-  const getTransactionType = (tx: any) => {
-    if (tx.operationCount === 0) return "Unknown"
-    if (tx.operationCount === 1) return "Transaction"
-    return `${tx.operationCount} Operations`
-  }
-
-  return (
-    <div className="min-h-screen premium-gradient pt-16 pb-20">
-      <div className="container mx-auto px-4 py-6 space-y-4 max-w-3xl">
-        {/* Wallet Header - Compact Mobile Design */}
-        <div className="space-y-4">
-          {/* Wallet Address */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground font-medium">Wallet</span>
-              <span className="text-sm font-medium text-foreground">{truncatedKey || "No wallet connected"}</span>
-              {publicKey && (
-                <button
-                  onClick={handleCopy}
-                  className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-muted"
-                  title="Copy public key"
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                </button>
-              )}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm text-slate-600 dark:text-slate-400">
+            <div className="p-4 rounded-xl bg-white/60 dark:bg-slate-800/60 border border-green-200/30 dark:border-green-900/20">
+              <ArrowRightLeft className="h-5 w-5 text-green-600 mx-auto mb-2" />
+              <span className="font-medium text-slate-900 dark:text-white">Swap Instantly</span>
+              <p className="text-xs mt-1">Best rates, no middlemen</p>
+            </div>
+            <div className="p-4 rounded-xl bg-white/60 dark:bg-slate-800/60 border border-green-200/30 dark:border-green-900/20">
+              <BarChart3 className="h-5 w-5 text-green-600 mx-auto mb-2" />
+              <span className="font-medium text-slate-900 dark:text-white">Earn Yield</span>
+              <p className="text-xs mt-1">Savings & liquidity pools</p>
+            </div>
+            <div className="p-4 rounded-xl bg-white/60 dark:bg-slate-800/60 border border-green-200/30 dark:border-green-900/20">
+              <Zap className="h-5 w-5 text-green-600 mx-auto mb-2" />
+              <span className="font-medium text-slate-900 dark:text-white">Full Control</span>
+              <p className="text-xs mt-1">Your keys, your assets</p>
             </div>
           </div>
 
-          {/* Balance Display - Centered, Pi Primary */}
-          <div className="space-y-1 text-center">
+          <div className="space-y-3">
+            <Button
+              onClick={() => router.push("/swap")}
+              className="w-full h-14 text-lg font-semibold rounded-2xl bg-gradient-to-r from-green-600 to-mint-500 text-white hover:shadow-lg hover:shadow-green-500/25"
+            >
+              Start Trading
+            </Button>
+            <p className="text-xs text-slate-500 dark:text-slate-500">
+              Connect your wallet in Profile to track holdings and execute trades
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // AUTHENTICATED: Full dashboard
+  return (
+    <div className="min-h-screen premium-gradient pt-24 pb-24 lg:pb-6">
+      <div className="container mx-auto px-4 py-8 space-y-6 max-w-4xl">
+        {/* Balance Card */}
+        <div className="bg-gradient-to-br from-white to-green-50/30 dark:from-slate-800 dark:to-slate-900 rounded-2xl p-8 border border-green-200/50 dark:border-green-900/40 shadow-xl">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-600 to-mint-500 flex items-center justify-center shadow-lg">
+                <Wallet className="w-6 h-6 text-white" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm text-slate-600 dark:text-slate-400 font-medium">Wallet</span>
+                <span className="text-base font-semibold text-slate-900 dark:text-white font-mono">{truncatedKey || "Not connected"}</span>
+              </div>
+            </div>
+            {publicKey && (
+              <button onClick={handleCopy} className="p-2.5 rounded-lg hover:bg-green-100 dark:hover:bg-green-950/30 text-green-600 dark:text-green-400 transition-all" title="Copy address">
+                <Copy className="h-5 w-5" />
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-2 mb-8">
             {balancesLoading || pricesLoading ? (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-10 w-10 animate-spin text-green-600 dark:text-green-400" />
               </div>
             ) : (
               <>
-                <h1 className="text-4xl font-bold text-foreground tracking-tight">
-                  {totalBalance.toLocaleString(undefined, { maximumFractionDigits: 4 })} Pi
+                <h1 className="text-6xl font-bold bg-gradient-to-r from-green-600 to-mint-500 bg-clip-text text-transparent">
+                  {totalBalance.toLocaleString(undefined, { maximumFractionDigits: 4 })}
                 </h1>
+                <p className="text-lg text-slate-600 dark:text-slate-400">
+                  <span className="font-semibold text-green-600 dark:text-green-400">Pi Network</span>
+                </p>
                 {usdBalance !== null && piPrice && (
-                  <p className="text-sm text-muted-foreground">
-                    ${usdBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  <p className="text-sm text-slate-500 dark:text-slate-500">
+                    ≈ ${usdBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })} USD
                   </p>
-                )}
-                {priceLoading && usdBalance === null && piPrice === null && (
-                  <p className="text-sm text-muted-foreground">Loading price...</p>
-                )}
-                {!priceLoading && piPrice === null && totalBalance > 0 && (
-                  <p className="text-sm text-muted-foreground">Price unavailable</p>
                 )}
               </>
             )}
-          </div> 
+          </div>
 
-          {/* Action Buttons - Wallet Style Compact */}
-          <div className="grid grid-cols-4 gap-1.5">
+          {/* Action Buttons - Swap FIRST */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Button
-              variant="outline"
-              className="h-10 flex flex-col items-center justify-center gap-0.5 rounded-lg border hover:border-primary/50 hover:bg-muted/50 transition-all py-1 px-2"
-              onClick={() => setReceiveModalOpen(true)}
-            >
-              <ArrowDown className="h-3.5 w-3.5" />
-              <span className="text-[10px] font-medium leading-tight">Receive</span>
-            </Button>
-            <Button
-              variant="outline"
-              className="h-10 flex flex-col items-center justify-center gap-0.5 rounded-lg border hover:border-primary/50 hover:bg-muted/50 transition-all py-1 px-2"
-              onClick={handleSend}
-            >
-              <ArrowUpRight className="h-3.5 w-3.5" />
-              <span className="text-[10px] font-medium leading-tight">Send</span>
-            </Button>
-            <Button
-              variant="outline"
-              className="h-10 flex flex-col items-center justify-center gap-0.5 rounded-lg border hover:border-primary/50 hover:bg-muted/50 transition-all py-1 px-2"
               onClick={handleSwap}
+              className="h-14 flex flex-col items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-green-600 to-mint-500 text-white hover:shadow-lg hover:shadow-green-500/25 font-semibold"
             >
-              <ArrowRightLeft className="h-3.5 w-3.5" />
-              <span className="text-[10px] font-medium leading-tight">Swap</span>
+              <ArrowRightLeft className="h-5 w-5" />
+              <span className="text-xs">Swap</span>
             </Button>
             <Button
+              onClick={handleSend}
               variant="outline"
-              className="h-10 flex flex-col items-center justify-center gap-0.5 rounded-lg border hover:border-primary/50 hover:bg-muted/50 transition-all py-1 px-2"
-              onClick={handleSavings}
+              className="h-14 flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300"
             >
-              <TrendingUp className="h-3.5 w-3.5" />
-              <span className="text-[10px] font-medium leading-tight">Save</span>
+              <ArrowUpRight className="h-5 w-5" />
+              <span className="text-xs font-semibold">Send</span>
+            </Button>
+            <Button
+              onClick={() => setReceiveModalOpen(true)}
+              variant="outline"
+              className="h-14 flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300"
+            >
+              <ArrowDown className="h-5 w-5" />
+              <span className="text-xs font-semibold">Receive</span>
+            </Button>
+            <Button
+              onClick={handleExplore}
+              variant="outline"
+              className="h-14 flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300"
+            >
+              <TrendingUp className="h-5 w-5" />
+              <span className="text-xs font-semibold">Earn</span>
             </Button>
           </div>
         </div>
 
-        {/* Tokens List with Tabs */}
-        <Card className="relative overflow-hidden border border-border/50 bg-card shadow-xl rounded-2xl">
-          <CardContent className="p-4">
+        {/* Holdings List */}
+        <Card className="bg-gradient-to-br from-white to-green-50/20 dark:from-slate-800 dark:to-slate-900 shadow-xl rounded-2xl border border-green-200/50 dark:border-green-900/40">
+          <CardContent className="p-6">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <div className="flex items-center justify-between mb-4">
-                <TabsList className="w-fit">
-                  <TabsTrigger value="tokens">Tokens</TabsTrigger>
-                  <TabsTrigger value="history">History</TabsTrigger>
-                </TabsList>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-7 w-7" 
-                  onClick={handleManageTokens}
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                </Button>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-1">Your Holdings</h2>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">Track all your assets</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setActiveTab(activeTab === "holdings" ? "activity" : "holdings")}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      activeTab === "holdings"
+                        ? "bg-gradient-to-r from-green-600 to-mint-500 text-white shadow"
+                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/50"
+                    }`}
+                  >
+                    Holdings
+                  </button>
+                  <button
+                    onClick={() => setActiveTab(activeTab === "activity" ? "holdings" : "activity")}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      activeTab === "activity"
+                        ? "bg-gradient-to-r from-green-600 to-mint-500 text-white shadow"
+                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/50"
+                    }`}
+                  >
+                    Activity
+                  </button>
+                </div>
               </div>
 
-              <TabsContent value="tokens" className="mt-0">
+              <TabsContent value="holdings" className="mt-0">
                 <div className="space-y-2">
                   {balancesLoading ? (
-                    <div className="flex items-center justify-center py-12 text-muted-foreground text-sm">
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Loading balances...
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                      <span className="ml-2 text-sm text-slate-500">Loading holdings...</span>
                     </div>
                   ) : balances.length === 0 ? (
-                    <div className="text-sm text-muted-foreground py-12 text-center border-2 border-dashed border-border rounded-xl bg-muted/20">
-                      {publicKey ? "No balances found" : "Connect a wallet to view your holdings"}
+                    <div className="text-center py-12 space-y-4">
+                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-100 to-green-100/50 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center mx-auto">
+                        <Wallet className="h-8 w-8 text-slate-400" />
+                      </div>
+                      <p className="text-slate-600 dark:text-slate-400 font-medium">No holdings yet</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-500">Ready for your first swap?</p>
+                      <Button onClick={handleSwap} variant="outline" size="sm" className="gap-1.5">
+                        <ArrowRightLeft className="h-4 w-4" />
+                        Start Trading
+                      </Button>
                     </div>
                   ) : (
                     balances.map((balance, index) => {
                       const isNative = balance.assetType === "native"
-                      const displayName = isNative ? "Test Pi" : balance.assetCode
+                      const displayName = isNative ? "Pi" : balance.assetCode
                       const amount = Number(balance.amount)
                       const priceInPi = getPrice(balance.assetCode, balance.assetIssuer || undefined, balance.assetType)
                       const valueInPi = priceInPi !== null ? amount * priceInPi : null
-                      const usdValue = piPrice && (isNative || valueInPi !== null) 
-                        ? (isNative ? amount : valueInPi!) * piPrice 
+                      const usdValue = piPrice && (isNative || valueInPi !== null)
+                        ? (isNative ? amount : valueInPi!) * piPrice
                         : null
 
                       return (
                         <button
                           key={`${balance.asset}-${index}`}
                           onClick={() => handleTokenClick(balance)}
-                          className="w-full flex items-center justify-between p-3 rounded-lg bg-muted/20 hover:bg-muted/40 transition-all cursor-pointer"
+                          className="w-full flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-slate-50 to-white dark:from-slate-700/50 dark:to-slate-800/50 hover:from-slate-100 hover:to-green-50/50 dark:hover:from-slate-700 dark:hover:to-slate-700 border border-slate-200/50 dark:border-slate-700/50 transition-all cursor-pointer group"
                         >
                           <div className="flex-1 min-w-0 text-left">
-                            <p className="font-semibold text-base text-foreground truncate">{displayName}</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">
+                            <p className="font-bold text-base text-slate-900 dark:text-white truncate group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">{displayName}</p>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                               {amount.toLocaleString(undefined, { maximumFractionDigits: 6 })}
-                              {!isNative && balance.assetCode && ` ${balance.assetCode}`}
-                              {isNative && " Test Pi"}
+                              {isNative && " Pi"}
                             </p>
                           </div>
                           <div className="text-right ml-4 shrink-0">
                             {usdValue !== null ? (
-                              <>
-                                <p className="font-semibold text-base text-foreground">
-                                  ${usdValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                                </p>
-                                {valueInPi !== null && !isNative && (
-                                  <p className="text-xs text-muted-foreground mt-0.5">
-                                    ≈ {valueInPi.toLocaleString(undefined, { maximumFractionDigits: 4 })} Pi
-                                  </p>
-                                )}
-                              </>
-                            ) : (
-                              <p className="font-semibold text-base text-foreground">
-                                {amount.toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                              <p className="font-bold text-base text-green-600 dark:text-green-400">
+                                ${usdValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                               </p>
+                            ) : (
+                              <p className="font-medium text-sm text-slate-500 dark:text-slate-400">—</p>
                             )}
                           </div>
                         </button>
@@ -308,43 +330,22 @@ export default function HomePage() {
                 </div>
               </TabsContent>
 
-              <TabsContent value="history" className="mt-0">
-                <div className="space-y-2">
-                  {operationsLoading ? (
-                    <div className="flex items-center justify-center py-12 text-muted-foreground text-sm">
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Loading activity...
-                    </div>
-                  ) : !publicKey ? (
-                    <div className="text-sm text-muted-foreground py-12 text-center border-2 border-dashed border-border rounded-xl bg-muted/20">
-                      Connect a wallet to view transaction history
-                    </div>
-                  ) : (
-                    <TransactionHistory operations={operations} isLoading={operationsLoading} />
-                  )}
-                </div>
+              <TabsContent value="activity" className="mt-0">
+                {operationsLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                    <span className="ml-2 text-sm text-slate-500">Loading activity...</span>
+                  </div>
+                ) : (
+                  <TransactionHistory operations={operations} isLoading={operationsLoading} />
+                )}
               </TabsContent>
             </Tabs>
           </CardContent>
         </Card>
-
-        {!publicKey && (
-          <Card className="rounded-2xl">
-            <CardHeader>
-              <CardTitle>Connect Your Wallet</CardTitle>
-              <CardDescription>Connect a wallet to view your balance and holdings</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={() => router.push("/profile")} className="w-full h-12 btn-gradient-primary rounded-xl">
-                Go to Profile
-              </Button>
-            </CardContent>
-          </Card>
-        )}
       </div>
 
       <ReceiveModal open={receiveModalOpen} onOpenChange={setReceiveModalOpen} />
-
     </div>
   )
 }

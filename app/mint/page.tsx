@@ -18,7 +18,7 @@ export default function MintPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen premium-gradient pt-16 pb-20 flex items-center justify-center">
+      <div className="min-h-screen premium-gradient pt-24 pb-24 lg:pb-6 flex items-center justify-center">
         <p className="text-muted-foreground">Loading...</p>
       </div>
     )
@@ -26,7 +26,7 @@ export default function MintPage() {
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen premium-gradient pt-16 pb-20">
+      <div className="min-h-screen premium-gradient pt-24 pb-24 lg:pb-6">
         <div className="container mx-auto px-4 py-6 max-w-2xl">
           <Alert className="border-amber-500/50 bg-amber-500/10">
             <Lock className="h-4 w-4" />
@@ -57,7 +57,7 @@ export default function MintPage() {
   }
 
   return (
-    <div className="min-h-screen premium-gradient pt-16 pb-20">
+    <div className="min-h-screen premium-gradient pt-24 pb-24 lg:pb-6">
       <div className="container mx-auto px-4 py-6">
         <div className="space-y-6 max-w-2xl mx-auto">
           <Alert>
