@@ -1,7 +1,7 @@
 // @ts-nocheck
 "use client"
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react"
 import { approvePiPayment, completePiPayment, cancelPiPayment } from "@/lib/api/pi-payments"
 
 interface PiUser {
@@ -42,11 +42,10 @@ export function PiProvider({ children }: { children: ReactNode }) {
   const [authResult, setAuthResult] = useState<PiAuthResult | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const autoAuthAttempted = useRef(false)
 
   useEffect(() => {
     if (typeof window === "undefined") return
-    // No auto-login: clear saved Pi auth so user must explicitly connect.
-    // Do not clear zyradex-wallet-address - that can disrupt wallet display before re-auth.
     const savedToken = localStorage.getItem("pi_access_token")
     const savedUser = localStorage.getItem("pi_user")
     if (savedToken && savedUser) {
@@ -60,6 +59,22 @@ export function PiProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  useEffect(() => {
+    if (autoAuthAttempted.current) return
+    if (typeof window === "undefined") return
+    if (!window.Pi) return
+
+    autoAuthAttempted.current = true
+
+    const timer = setTimeout(() => {
+      authenticate().catch(() => {
+        // silent — user can manually sign in via button
+      })
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [])
+
   const authenticate = async (): Promise<PiAuthResult> => {
     if (typeof window === "undefined") {
       throw new Error("Window not available. Please refresh the page.")
@@ -71,17 +86,16 @@ export function PiProvider({ children }: { children: ReactNode }) {
 
     setIsLoading(true)
     try {
-      window.Pi.init({ version: "2.0" })
+      await window.Pi.init({ version: "2.0" })
 
       const onIncompletePaymentFound = (payment: any) => {
         console.log("Incomplete payment found:", payment)
-        // Fire-and-forget: don't block authenticate if cancel fails
         cancelPiPayment(payment.identifier).catch((err) =>
           console.error("Error cancelling incomplete payment:", err)
         )
       }
 
-      const auth = await window.Pi.authenticate(["username", "payments", "wallet_address"], onIncompletePaymentFound)
+      const auth = await window.Pi.authenticate(["username"], onIncompletePaymentFound)
 
       if (!auth?.accessToken) {
         throw new Error("No access token received from Pi SDK")
