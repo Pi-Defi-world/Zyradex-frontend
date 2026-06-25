@@ -85,7 +85,7 @@ export default function RewardsPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen premium-gradient pt-24 pb-24 lg:pb-6 p-3 sm:p-4">
+      <div className="min-h-screen premium-gradient pt-16 pb-20 p-3 sm:p-4">
         <div className="max-w-md mx-auto">
           <Card>
             <CardHeader>
@@ -104,7 +104,7 @@ export default function RewardsPage() {
   }
 
   return (
-    <div className="min-h-screen premium-gradient pt-24 pb-24 lg:pb-6 p-3 sm:p-4">
+    <div className="min-h-screen premium-gradient pt-16 pb-20 p-3 sm:p-4">
       <div className="max-w-md mx-auto space-y-6">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" asChild>
@@ -223,7 +223,7 @@ export default function RewardsPage() {
                           <p className="font-medium text-sm">{p.amountPi} Pi</p>
                           <p className="text-xs text-muted-foreground">
                             {new Date(p.paidAt).toLocaleDateString()}
-                            {p.operation ? ` · ${p.operation}` : ""}
+                            {p.operation ? ` �- ${p.operation}` : ""}
                           </p>
                         </div>
                         {p.txHash && (
@@ -291,7 +291,7 @@ export default function RewardsPage() {
                         <div>
                           <p className="font-medium text-sm">@{r.referredUserName}</p>
                           <p className="text-xs text-muted-foreground">
-                            {new Date(r.createdAt).toLocaleDateString()} · {r.status}
+                            {new Date(r.createdAt).toLocaleDateString()} �- {r.status}
                           </p>
                         </div>
                         <span className="text-sm font-semibold text-primary">+{r.awardedPoints} pts</span>

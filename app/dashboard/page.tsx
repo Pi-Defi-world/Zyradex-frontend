@@ -142,8 +142,10 @@ export default function DashboardPage() {
   const showWalletCta = !publicKey
 
   return (
-    <div className="min-h-screen premium-gradient pt-24 pb-24 lg:pb-6">
-      <div className="container mx-auto px-4 py-8 space-y-6 max-w-5xl">
+    <div className="min-h-screen premium-gradient pt-16 pb-20">
+      <div className="container mx-auto px-4 py-6">
+        <PageBackHeader title="Dashboard" />
+        <div className="space-y-6">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {stats.map((stat) => (
               <Card key={stat.label}>
@@ -168,12 +170,12 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-                  <Link href="/invest">
-                    <Button className="w-full h-20 text-lg" size="lg" variant="outline">
-                      <TrendingUp className="mr-2 h-5 w-5" />
-                      Launchpad
-                    </Button>
-                  </Link>
+                <Link href="/invest">
+                  <Button className="w-full h-20 text-lg bg-transparent" size="lg" variant="outline">
+                    <TrendingUp className="mr-2 h-5 w-5" />
+                    Invest
+                  </Button>
+                </Link>
                 <Link href="/savings">
                   <Button className="w-full h-20 text-lg bg-transparent" size="lg" variant="outline">
                     <PiggyBank className="mr-2 h-5 w-5" />
@@ -216,7 +218,7 @@ export default function DashboardPage() {
                     <CardContent className="pt-4">
                       <div className="flex items-center gap-2">
                         <TrendingUp className="h-5 w-5 text-muted-foreground" />
-                        <span className="font-medium">Launchpad</span>
+                        <span className="font-medium">Invest</span>
                       </div>
                       <p className="text-sm text-muted-foreground mt-1">
                         {openLaunchesCount} open launch{openLaunchesCount !== 1 ? "es" : ""}
@@ -233,7 +235,7 @@ export default function DashboardPage() {
                       </div>
                       <p className="text-sm text-muted-foreground mt-1">
                         {lockedSavingsCount} locked position{lockedSavingsCount !== 1 ? "s" : ""}
-                        {nextUnlock && ` · Next unlock ${nextUnlock}`}
+                        {nextUnlock && ` �- Next unlock ${nextUnlock}`}
                       </p>
                     </CardContent>
                   </Card>
@@ -246,7 +248,7 @@ export default function DashboardPage() {
                         <span className="font-medium">Borrow & lend</span>
                       </div>
                       <p className="text-sm text-muted-foreground mt-1">
-                        {supplyPositions.length} supply · {borrowPositions.length} borrow
+                        {supplyPositions.length} supply �- {borrowPositions.length} borrow
                         {borrowsAtRisk.length > 0 && (
                           <span className="text-amber-600 flex items-center gap-1 mt-1">
                             <AlertTriangle className="h-3 w-3" />
@@ -271,7 +273,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <Link href="/profile">
-                  <Button className="bg-gradient-to-r from-green-600 to-mint-500 text-white">Connect Wallet</Button>
+                  <Button className="btn-gradient-primary">Open Profile</Button>
                 </Link>
               </CardContent>
             </Card>

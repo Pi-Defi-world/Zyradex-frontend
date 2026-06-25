@@ -106,7 +106,7 @@ function PositionRow({
           <div>
             <p className="font-medium">{assetLabel}</p>
             <p className="text-sm text-muted-foreground">
-              Amount: {position.amount} · Unlocks: {new Date(position.unlockedAt).toLocaleString()}
+              Amount: {position.amount} �- Unlocks: {new Date(position.unlockedAt).toLocaleString()}
             </p>
             {depositedAt && (
               <p className="text-xs text-muted-foreground">Deposited: {depositedAt}</p>
@@ -251,7 +251,7 @@ export default function SavingsPage() {
   }
 
   return (
-    <div className="min-h-screen premium-gradient pt-24 pb-24 lg:pb-6">
+    <div className="min-h-screen premium-gradient pt-16 pb-20">
       <div className="container mx-auto px-4 py-6 space-y-6">
         <PageBackHeader title="Savings" />
         <div>
@@ -344,7 +344,7 @@ export default function SavingsPage() {
                           Deposit amount
                         </CardTitle>
                         <CardDescription>
-                          {products[0]?.asset ? `${products[0].asset.code}` : "—"} · Min: {products[0]?.minAmount ?? "0"}
+                          {products[0]?.asset ? `${products[0].asset.code}` : "—"} �- Min: {products[0]?.minAmount ?? "0"}
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-3">
@@ -442,7 +442,7 @@ export default function SavingsPage() {
                 <>
                   <p className="text-sm text-muted-foreground">
                     Term: <span className="font-medium text-foreground">{formatTermLabel(depositTermOption.days)}</span>
-                    {" · "}APY: <span className="font-medium text-foreground">{depositTermOption.apy}%</span>
+                    {" �- "}APY: <span className="font-medium text-foreground">{depositTermOption.apy}%</span>
                   </p>
                   <p className="text-sm text-muted-foreground">
                     Unlocks: <span className="font-medium text-foreground">

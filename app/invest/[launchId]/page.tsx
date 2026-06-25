@@ -182,7 +182,7 @@ export default function InvestLaunchDetailPage() {
 
   if (!launchId) {
     return (
-      <div className="min-h-screen premium-gradient pt-24 pb-24 lg:pb-6 flex items-center justify-center">
+      <div className="min-h-screen premium-gradient pt-16 pb-20 flex items-center justify-center">
         <p className="text-muted-foreground">Invalid launch</p>
       </div>
     )
@@ -190,7 +190,7 @@ export default function InvestLaunchDetailPage() {
 
   if (launchLoading || !launch) {
     return (
-      <div className="min-h-screen premium-gradient pt-24 pb-24 lg:pb-6 flex items-center justify-center">
+      <div className="min-h-screen premium-gradient pt-16 pb-20 flex items-center justify-center">
         {launchError ? (
           <Card className="max-w-md">
             <CardContent className="pt-4">
@@ -216,7 +216,7 @@ export default function InvestLaunchDetailPage() {
     launch.status === "allocation_running"
 
   return (
-    <div className="min-h-screen premium-gradient pt-24 pb-24 lg:pb-6">
+    <div className="min-h-screen premium-gradient pt-16 pb-20">
       <div className="container mx-auto px-4 py-6 space-y-6">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
@@ -475,7 +475,7 @@ export default function InvestLaunchDetailPage() {
                 <div className="rounded-lg border p-4 space-y-2">
                   <p className="text-sm font-medium">Round: {selectedRound.status}</p>
                   <p className="text-sm text-muted-foreground">
-                    Eligible: {selectedRound.eligibleHoldersCount ?? "—"} · Supply:{" "}
+                    Eligible: {selectedRound.eligibleHoldersCount ?? "—"} �- Supply:{" "}
                     {selectedRound.totalEligibleSupply ?? "—"}
                   </p>
                   {holders.length > 0 && (

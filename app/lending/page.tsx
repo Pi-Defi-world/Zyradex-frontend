@@ -102,10 +102,10 @@ function PoolCard({
           {assetLabel}
         </CardTitle>
         <CardDescription>
-          Supply APY: {pool.supplyRate}% · Borrow: {pool.borrowRate}% · Collateral factor: {pool.collateralFactor}
+          Supply APY: {pool.supplyRate}% �- Borrow: {pool.borrowRate}% �- Collateral factor: {pool.collateralFactor}
         </CardDescription>
         <p className="text-xs text-muted-foreground mt-1">
-          Total supply: {pool.totalSupply} · Total borrow: {pool.totalBorrow}
+          Total supply: {pool.totalSupply} �- Total borrow: {pool.totalBorrow}
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -177,7 +177,7 @@ function SupplyPositionRow({ position }: { position: SupplyPosition }) {
         <div>
           <p className="font-medium flex items-center gap-1">
             <TrendingUp className="h-4 w-4 text-green-500" />
-            Supply · {assetLabel}
+            Supply �- {assetLabel}
           </p>
           <p className="text-sm text-muted-foreground">Amount: {position.amount}</p>
         </div>
@@ -211,10 +211,10 @@ function BorrowPositionRow({
           <div>
             <p className="font-medium flex items-center gap-1">
               <TrendingDown className="h-4 w-4 text-amber-500" />
-              Borrow · {assetLabel}
+              Borrow �- {assetLabel}
             </p>
             <p className="text-sm text-muted-foreground">
-              Principal: {position.borrowedAmount} · Accrued: {position.accruedInterest ?? "0"} · Total debt: {totalDebt}
+              Principal: {position.borrowedAmount} �- Accrued: {position.accruedInterest ?? "0"} �- Total debt: {totalDebt}
             </p>
             {position.healthFactor != null && (
               <p className={`text-xs mt-1 ${healthOk ? "text-muted-foreground" : "text-amber-600"}`}>
@@ -376,7 +376,7 @@ export default function LendingPage() {
   }
 
   return (
-    <div className="min-h-screen premium-gradient pt-24 pb-24 lg:pb-6">
+    <div className="min-h-screen premium-gradient pt-16 pb-20">
       <div className="container mx-auto px-4 py-6 space-y-6">
         <PageBackHeader title="Borrow & Lend" />
         <div>
@@ -417,7 +417,7 @@ export default function LendingPage() {
                   <p className="text-sm text-muted-foreground mt-1">
                     Credit score: <span className="font-medium text-foreground">{score}%</span>
                     {maxBorrowTermDays != null && (
-                      <> · Max borrow term: <span className="font-medium text-foreground">{maxBorrowTermDays} days</span></>
+                      <> �- Max borrow term: <span className="font-medium text-foreground">{maxBorrowTermDays} days</span></>
                     )}
                     {score >= 98 && !hasHistory && (
                       <span className="block mt-1 text-xs text-muted-foreground">Build history (repay a loan or supply) to unlock max term (5 years).</span>
