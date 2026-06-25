@@ -85,7 +85,7 @@ export default function RewardsPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen premium-gradient pt-16 pb-20 p-3 sm:p-4">
+      <div className="min-h-screen premium-gradient pt-24 pb-24 lg:pb-6 p-3 sm:p-4">
         <div className="max-w-md mx-auto">
           <Card>
             <CardHeader>
@@ -104,7 +104,7 @@ export default function RewardsPage() {
   }
 
   return (
-    <div className="min-h-screen premium-gradient pt-16 pb-20 p-3 sm:p-4">
+    <div className="min-h-screen premium-gradient pt-24 pb-24 lg:pb-6 p-3 sm:p-4">
       <div className="max-w-md mx-auto space-y-6">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" asChild>

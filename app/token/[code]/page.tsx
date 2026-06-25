@@ -139,7 +139,7 @@ export default function TokenDetailPage({ params }: { params: { code: string } }
   const displayName = isNative ? "Test Pi" : tokenCode
 
   return (
-    <div className="min-h-screen premium-gradient pt-16 pb-20">
+    <div className="min-h-screen premium-gradient pt-24 pb-24 lg:pb-6">
       <div className="container mx-auto px-4 py-8 space-y-6 max-w-4xl">
         {/* Back Button */}
         <Button

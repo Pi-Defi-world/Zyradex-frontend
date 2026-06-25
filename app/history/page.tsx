@@ -72,7 +72,7 @@ export default function HistoryPage() {
 
   if (!publicKey) {
     return (
-      <div className="min-h-screen premium-gradient pt-16 pb-20 p-3 sm:p-4">
+      <div className="min-h-screen premium-gradient pt-24 pb-24 lg:pb-6 p-3 sm:p-4">
         <div className="max-w-4xl mx-auto">
           <Card>
             <CardHeader>
@@ -94,7 +94,7 @@ export default function HistoryPage() {
   }
 
   return (
-    <div className="min-h-screen premium-gradient pt-16 pb-20 p-3 sm:p-4">
+    <div className="min-h-screen premium-gradient pt-24 pb-24 lg:pb-6 p-3 sm:p-4">
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
