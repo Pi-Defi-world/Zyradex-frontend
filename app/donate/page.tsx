@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { PageBackHeader } from "@/components/ui/page-back-header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DonationModal } from "@/components/donation-modal"
@@ -19,6 +20,7 @@ export default function DonatePage() {
   return (
     <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto space-y-8">
+        <PageBackHeader title="Donate" />
         <div className="text-center space-y-4">
           <h1 className="text-3xl font-bold tracking-tight">Support ZYRADEX</h1>
           <p className="text-muted-foreground max-w-2xl mx-auto">
