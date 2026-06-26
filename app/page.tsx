@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
-import { ArrowDown, TrendingUp, ArrowRightLeft, Loader2, Copy, Wallet, ArrowUpRight, Zap, BarChart3, Sparkles } from "lucide-react"
+import { ArrowDown, TrendingUp, ArrowRightLeft, Loader2, Copy, Wallet, ArrowUpRight, Zap, BarChart3, Sparkles, Plus } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { usePi } from "@/components/providers/pi-provider"
 import { useAccountBalances, useAccountOperations } from "@/hooks/useAccountData"
@@ -83,6 +83,7 @@ export default function HomePage() {
   const handleSwap = () => router.push("/swap")
   const handleSend = () => router.push("/send")
   const handleExplore = () => router.push("/explore")
+  const handleManageTokens = () => router.push("/trustlines")
   const handleCopy = async () => {
     const key = publicKey || ""
     try {
@@ -149,7 +150,8 @@ export default function HomePage() {
               Start Trading
             </Button>
             <p className="text-xs text-slate-500 dark:text-slate-500">
-              Connect your wallet in Profile to track holdings and execute trades
+              <button onClick={() => router.push("/explore")} className="underline hover:text-slate-700 dark:hover:text-slate-300">Browse tokens</button> or{" "}
+              <button onClick={() => router.push("/profile")} className="underline hover:text-slate-700 dark:hover:text-slate-300">connect your wallet</button> to track holdings and execute trades
             </p>
           </div>
         </div>
@@ -247,6 +249,14 @@ export default function HomePage() {
                   <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-1">Your Holdings</h2>
                   <p className="text-sm text-slate-600 dark:text-slate-400">Track all your assets</p>
                 </div>
+                <Button
+                  onClick={handleManageTokens}
+                  variant="outline"
+                  className="gap-1.5"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline">Manage Tokens</span>
+                </Button>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setActiveTab(activeTab === "holdings" ? "activity" : "holdings")}

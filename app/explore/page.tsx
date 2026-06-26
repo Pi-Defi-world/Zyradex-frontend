@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -11,58 +11,82 @@ import {
   PiggyBank,
   CreditCard,
   TrendingUp,
-  Coins,
   Droplets,
   Loader2,
   Star,
   ChevronRight,
+  Send,
+  History,
+  Shield,
 } from "lucide-react"
 import { useTokenRegistry } from "@/hooks/useTokenRegistry"
 
 export default function ExplorePage() {
   const router = useRouter()
   const { tokens, isLoading: tokensLoading, error: tokensError } = useTokenRegistry()
-  const [search, setSearch] = useState("")
 
-  const filteredTokens = tokens.filter(token =>
-    !search || token.assetCode.toLowerCase().includes(search.toLowerCase()) || token.name?.toLowerCase().includes(search.toLowerCase())
-  ).slice(0, 12)
+  const filteredTokens = tokens
+    .filter(token =>
+      token.assetCode && token.assetCode.trim() !== ""
+    )
+    .slice(0, 12)
 
   const exploreCategories = [
     {
-      title: "Trade",
-      description: "Swap tokens instantly at the best rates",
+      title: "Swap",
+      description: "Trade tokens instantly at the best rates",
       icon: ArrowRightLeft,
       href: "/swap",
       color: "from-green-600 to-mint-500",
+    },
+    {
+      title: "Send",
+      description: "Transfer tokens to any wallet",
+      icon: Send,
+      href: "/send",
+      color: "from-blue-600 to-cyan-500",
     },
     {
       title: "Savings",
       description: "Earn yield with time-locked deposits",
       icon: PiggyBank,
       href: "/savings",
-      color: "from-blue-600 to-cyan-500",
+      color: "from-purple-600 to-pink-500",
     },
     {
       title: "Borrow & Lend",
       description: "Supply assets or borrow against collateral",
       icon: CreditCard,
       href: "/lending",
-      color: "from-purple-600 to-pink-500",
+      color: "from-amber-600 to-orange-500",
     },
     {
       title: "Launchpad",
       description: "Discover and participate in new launches",
       icon: TrendingUp,
       href: "/invest",
-      color: "from-amber-600 to-orange-500",
+      color: "from-teal-600 to-cyan-500",
     },
     {
       title: "Liquidity",
       description: "Provide liquidity and earn fees",
       icon: Droplets,
       href: "/liquidity",
-      color: "from-teal-600 to-cyan-500",
+      color: "from-indigo-600 to-blue-500",
+    },
+    {
+      title: "History",
+      description: "View your transaction history",
+      icon: History,
+      href: "/history",
+      color: "from-slate-600 to-slate-500",
+    },
+    {
+      title: "Manage Tokens",
+      description: "Add tokens and setup trustlines",
+      icon: Shield,
+      href: "/trustlines",
+      color: "from-rose-600 to-red-500",
     },
   ]
 
@@ -75,22 +99,22 @@ export default function ExplorePage() {
             <Compass className="h-8 w-8 text-green-600" />
             Explore
           </h1>
-          <p className="text-slate-600 dark:text-slate-400 mt-2">Discover tokens, launchpads, and earning opportunities</p>
+          <p className="text-slate-600 dark:text-slate-400 mt-2">Discover tokens, trading tools, and earning opportunities</p>
         </div>
 
         {/* Categories Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {exploreCategories.map((cat) => (
             <Link key={cat.href} href={cat.href}>
-              <Card className="h-full hover:shadow-lg transition-all border border-slate-200 dark:border-slate-700 hover:border-green-300 dark:hover:border-green-800 group">
+              <Card className="h-full hover:shadow-md transition-shadow border border-slate-200 dark:border-slate-700 hover:border-green-200 dark:hover:border-green-800/50 group">
                 <CardContent className="p-5">
-                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${cat.color} flex items-center justify-center mb-3 shadow`}>
+                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${cat.color} flex items-center justify-center mb-3 shadow-sm`}>
                     <cat.icon className="h-5 w-5 text-white" />
                   </div>
-                  <p className="font-semibold text-slate-900 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">
+                  <p className="font-semibold text-sm text-slate-900 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">
                     {cat.title}
                   </p>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{cat.description}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{cat.description}</p>
                 </CardContent>
               </Card>
             </Link>
@@ -99,11 +123,9 @@ export default function ExplorePage() {
 
         {/* Token Discovery */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white">Available Tokens</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Discover tokens on the network</p>
-            </div>
+          <div>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Available Tokens</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Discover tokens on the network</p>
           </div>
 
           {tokensLoading ? (
@@ -120,9 +142,9 @@ export default function ExplorePage() {
             </Card>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-              {filteredTokens.length === 0 && !tokensLoading ? (
+              {filteredTokens.length === 0 ? (
                 <div className="col-span-full text-center py-8">
-                  <p className="text-sm text-slate-500">No tokens found.</p>
+                  <p className="text-sm text-slate-500">No tokens available yet.</p>
                 </div>
               ) : (
                 filteredTokens.map((token) => (
@@ -130,9 +152,9 @@ export default function ExplorePage() {
                     key={`${token.assetCode}-${token.issuer || ""}`}
                     href={`/token/${encodeURIComponent(token.assetCode)}${token.issuer ? `?issuer=${encodeURIComponent(token.issuer)}` : ''}`}
                   >
-                    <Card className="h-full hover:shadow-md transition-all border border-slate-200 dark:border-slate-700 hover:border-green-200 dark:hover:border-green-800 group cursor-pointer">
+                    <Card className="h-full hover:shadow-md transition-shadow border border-slate-200 dark:border-slate-700 hover:border-green-200 dark:hover:border-green-800/50 group cursor-pointer">
                       <CardContent className="p-4 flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-100 to-green-100 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center shrink-0">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-100 to-green-50 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center shrink-0">
                           <Star className="h-5 w-5 text-green-600 dark:text-green-400" />
                         </div>
                         <div className="min-w-0 flex-1">
