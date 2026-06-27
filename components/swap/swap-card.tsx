@@ -103,6 +103,15 @@ export function SwapCard() {
     [balances, lookup]
   )
 
+  // Token input state
+  const [tokenA, setTokenA] = useState<string>("")
+  const [tokenB, setTokenB] = useState<string>("")
+  const [fromAmount, setFromAmount] = useState("")
+  const [selectedPoolId, setSelectedPoolId] = useState<string>("")
+  const [slippagePercent, setSlippagePercent] = useState<number>(1)
+  const [pairedTokens, setPairedTokens] = useState<string[]>([])
+  const [loadingPairedTokens, setLoadingPairedTokens] = useState(false)
+
   const tokenBOptions = useMemo<TokenOption[]>(() =>
     pairedTokens
       .filter((t) => t && typeof t === "string" && t.trim() !== "")
@@ -122,15 +131,6 @@ export function SwapCard() {
       }),
     [pairedTokens, lookup]
   )
-
-  // Token input state
-  const [tokenA, setTokenA] = useState<string>("")
-  const [tokenB, setTokenB] = useState<string>("")
-  const [fromAmount, setFromAmount] = useState("")
-  const [selectedPoolId, setSelectedPoolId] = useState<string>("")
-  const [slippagePercent, setSlippagePercent] = useState<number>(1)
-  const [pairedTokens, setPairedTokens] = useState<string[]>([])
-  const [loadingPairedTokens, setLoadingPairedTokens] = useState(false)
   
   const walletAddress = localWallet || profile?.public_key || user?.wallet_address
   const [userSecret, setUserSecret] = useState<string>("")
