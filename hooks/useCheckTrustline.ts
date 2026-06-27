@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { getAccountBalances } from "@/lib/api/account"
 import type { ApiError } from "@/lib/api"
 import { toApiError } from "@/lib/api"
@@ -13,14 +13,13 @@ export const useCheckTrustline = (
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<ApiError | null>(null)
 
-  useEffect(() => {
+  const check = useCallback(() => {
     if (!enabled || !publicKey || !assetCode) {
       setHasTrustline(null)
       setIsLoading(false)
       return
     }
 
-    // Native assets don't need trustlines
     if (assetCode === "native" || assetCode.toLowerCase() === "pi") {
       setHasTrustline(true)
       setIsLoading(false)
@@ -34,40 +33,32 @@ export const useCheckTrustline = (
     getAccountBalances(publicKey)
       .then((response) => {
         if (cancelled) return
-
         const hasToken = response.balances.some((balance) => {
           if (balance.assetType === "native") return false
           const codeMatch = balance.assetCode === assetCode
-          const issuerMatch = issuer
-            ? balance.assetIssuer === issuer
-            : !balance.assetIssuer
+          const issuerMatch = issuer ? balance.assetIssuer === issuer : !balance.assetIssuer
           return codeMatch && issuerMatch
         })
-
         setHasTrustline(hasToken)
       })
       .catch((err) => {
         if (!cancelled) {
-          const apiError = toApiError(err)
-          setError(apiError)
+          setError(toApiError(err))
           setHasTrustline(null)
         }
       })
       .finally(() => {
-        if (!cancelled) {
-          setIsLoading(false)
-        }
+        if (!cancelled) setIsLoading(false)
       })
 
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [publicKey, assetCode, issuer, enabled])
 
-  return {
-    hasTrustline,
-    isLoading,
-    error,
-  }
+  useEffect(() => {
+    const cleanup = check()
+    return cleanup
+  }, [check])
+
+  return { hasTrustline, isLoading, error, refresh: check }
 }
 

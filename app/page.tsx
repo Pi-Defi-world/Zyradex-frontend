@@ -13,6 +13,8 @@ import { useTokenRegistry } from "@/hooks/useTokenRegistry"
 import { usePiPrice } from "@/hooks/usePiPrice"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { useTokenPrices } from "@/hooks/useTokenPrice"
+import { useTokenMetadataMap } from "@/hooks/useTokenMetadataMap"
+import { TokenIcon } from "@/components/token-icon"
 import { ReceiveModal } from "@/components/receive-modal"
 import { TransactionHistory } from "@/components/transaction-history"
 
@@ -30,6 +32,7 @@ export default function HomePage() {
   const [receiveModalOpen, setReceiveModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("holdings")
   const { price: piPrice, isLoading: priceLoading } = usePiPrice()
+  const { lookup } = useTokenMetadataMap()
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -310,6 +313,7 @@ export default function HomePage() {
                       const usdValue = piPrice && (isNative || valueInPi !== null)
                         ? (isNative ? amount : valueInPi!) * piPrice
                         : null
+                      const meta = !isNative ? lookup(balance.assetCode, balance.assetIssuer) : undefined
 
                       return (
                         <button
@@ -317,12 +321,20 @@ export default function HomePage() {
                           onClick={() => handleTokenClick(balance)}
                           className="w-full flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-slate-50 to-white dark:from-slate-700/50 dark:to-slate-800/50 hover:from-slate-100 hover:to-green-50/50 dark:hover:from-slate-700 dark:hover:to-slate-700 border border-slate-200/50 dark:border-slate-700/50 transition-all cursor-pointer group"
                         >
-                          <div className="flex-1 min-w-0 text-left">
-                            <p className="font-bold text-base text-slate-900 dark:text-white truncate group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">{displayName}</p>
-                            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                              {amount.toLocaleString(undefined, { maximumFractionDigits: 6 })}
-                              {isNative && " Pi"}
-                            </p>
+                          <div className="flex items-center gap-3 flex-1 min-w-0 text-left">
+                            <TokenIcon
+                              image={meta?.image}
+                              code={isNative ? "PI" : balance.assetCode}
+                              issuer={isNative ? undefined : balance.assetIssuer}
+                              size="md"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="font-bold text-base text-slate-900 dark:text-white truncate group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">{displayName}</p>
+                              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                                {amount.toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                                {isNative && " Pi"}
+                              </p>
+                            </div>
                           </div>
                           <div className="text-right ml-4 shrink-0">
                             {usdValue !== null ? (

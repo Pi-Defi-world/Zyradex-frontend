@@ -124,3 +124,19 @@ export const burnToken = async (payload: BurnTokenPayload) => {
     throw toApiError(error)
   }
 }
+
+export const lookupTokenMetadata = async (code: string, issuer: string) => {
+  try {
+    const { data } = await axiosClient.get<{ success: boolean; metadata: {
+      image?: string
+      circulatingSupply?: number
+      holders?: number
+      liquidityPools?: number
+      tomlName?: string
+      tomlDescription?: string
+    } }>("/tokens/lookup", { params: { code, issuer } })
+    return data.metadata
+  } catch {
+    return null
+  }
+}

@@ -5,15 +5,16 @@ import { PageBackHeader } from "@/components/ui/page-back-header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Search, Loader2, CheckCircle2, Plus } from "lucide-react"
+import { Search, Loader2, CheckCircle2, Plus, ChevronDown } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { usePi } from "@/components/providers/pi-provider"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { useAccountBalances } from "@/hooks/useAccountData"
 import { useBalanceRefresh } from "@/components/providers/balance-refresh-provider"
-import { useAvailableTokens } from "@/hooks/useAvailableTokens"
+import { useNetworkTokens } from "@/hooks/useNetworkTokens"
 import { useCheckTrustline } from "@/hooks/useCheckTrustline"
 import { TrustlineDialog } from "@/components/trustlines/trustline-dialog"
+import { TokenIcon } from "@/components/token-icon"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -38,11 +39,7 @@ export default function TrustlinesPage() {
 
   const { balances, refresh: refreshBalances } = useAccountBalances(publicKey)
   const { refreshBalances: refreshBalancesGlobal } = useBalanceRefresh() ?? {}
-  const { tokens, isLoading: tokensLoading, error: tokensError } = useAvailableTokens({
-    searchQuery,
-    limit: 50,
-    enabled: true,
-  })
+  const { tokens: allTokens, isLoading: tokensLoading, error: tokensError, hasMore, loadMore, isLoadingMore, refresh: refreshTokens } = useNetworkTokens({ searchQuery, limit: 50 })
 
   // Check which tokens user already has trustlines for
   const userTrustedTokens = useMemo(() => {
@@ -55,7 +52,7 @@ export default function TrustlinesPage() {
     return trusted
   }, [balances])
 
-  const handleToggleToken = (token: typeof tokens[0]) => {
+  const handleToggleToken = (token: typeof allTokens[0]) => {
     const tokenKey = `${token.assetCode}:${token.issuer}`
     const hasTrustline = userTrustedTokens.has(tokenKey)
 
@@ -79,16 +76,6 @@ export default function TrustlinesPage() {
     refreshBalances()
     refreshBalancesGlobal?.()
   }
-
-  // Filter tokens based on search (if search is active, show network tokens; otherwise show all)
-  const displayedTokens = useMemo(() => {
-    if (!searchQuery.trim()) {
-      // Show platform tokens when no search
-      return tokens.filter((t) => t.isPlatformToken)
-    }
-    // Show all matching tokens when searching
-    return tokens
-  }, [tokens, searchQuery])
 
   return (
     <div className="min-h-screen premium-gradient pt-24 pb-24 lg:pb-6">
@@ -121,14 +108,14 @@ export default function TrustlinesPage() {
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                   Loading tokens...
                 </div>
-              ) : displayedTokens.length === 0 ? (
+              ) : allTokens.length === 0 ? (
                 <div className="text-sm text-muted-foreground py-12 text-center border-2 border-dashed border-border rounded-xl bg-muted/20">
                   {searchQuery.trim()
                     ? "No tokens found matching your search"
                     : "No tokens available"}
                 </div>
               ) : (
-                displayedTokens.map((token) => {
+                allTokens.map((token) => {
                   const tokenKey = `${token.assetCode}:${token.issuer}`
                   const hasTrustline = userTrustedTokens.has(tokenKey)
 
@@ -137,7 +124,14 @@ export default function TrustlinesPage() {
                       key={tokenKey}
                       className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border/50 hover:bg-muted/60 transition-colors"
                     >
-                      <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <TokenIcon
+                          image={token.image}
+                          code={token.assetCode}
+                          issuer={token.issuer}
+                          size="md"
+                        />
+                        <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <p className="font-bold text-lg text-foreground">
                             {token.name || token.assetCode}
@@ -165,6 +159,7 @@ export default function TrustlinesPage() {
                           </p>
                         )}
                       </div>
+                      </div>
                       <div className="ml-4 shrink-0">
                         {hasTrustline ? (
                           <Button variant="outline" disabled className="rounded-xl">
@@ -188,10 +183,29 @@ export default function TrustlinesPage() {
               )}
             </div>
 
-            {searchQuery.trim() && displayedTokens.length > 0 && (
+            {allTokens.length > 0 && (
               <p className="text-xs text-muted-foreground text-center pt-2">
-                Showing {displayedTokens.length} result{displayedTokens.length !== 1 ? "s" : ""}
+                Showing {allTokens.length} result{allTokens.length !== 1 ? "s" : ""}
               </p>
+            )}
+
+            {hasMore && !searchQuery.trim() && (
+              <div className="flex justify-center pt-2">
+                <Button
+                  variant="outline"
+                  onClick={loadMore}
+                  disabled={isLoadingMore}
+                  className="gap-2 rounded-xl"
+                  size="sm"
+                >
+                  {isLoadingMore ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                  {isLoadingMore ? "Loading..." : "Load more"}
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>

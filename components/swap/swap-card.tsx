@@ -16,6 +16,9 @@ import { usePoolsForPair, useSwapQuote, useExecuteSwap } from "@/hooks/useSwapDa
 import { useAccountBalances } from "@/hooks/useAccountData"
 import { useBalanceRefresh } from "@/components/providers/balance-refresh-provider"
 import { listLiquidityPools } from "@/lib/api/liquidity"
+import { useTokenMetadataMap } from "@/hooks/useTokenMetadataMap"
+import { TokenIcon } from "@/components/token-icon"
+import { TokenSelect, type TokenOption } from "@/components/swap/token-select"
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null
@@ -59,6 +62,7 @@ export function SwapCard() {
   const publicKey = profile?.public_key || localWallet || user?.wallet_address || undefined
   const { balances: rawBalances, refresh: refreshBalances } = useAccountBalances(publicKey)
   const { refreshBalances: refreshBalancesGlobal } = useBalanceRefresh() ?? {}
+  const { lookup } = useTokenMetadataMap()
   
   // Filter out duplicate native entries (ensure only one native/Test Pi entry)
   const balances = useMemo(() => {
@@ -81,6 +85,44 @@ export function SwapCard() {
       return true
     })
   }, [rawBalances])
+
+  const tokenAOptions = useMemo<TokenOption[]>(() =>
+    balances.map((balance) => {
+      const isNative = balance.assetType === "native"
+      const code = isNative ? "PI" : balance.assetCode
+      const value = isNative ? "native" : (balance.assetIssuer ? `${balance.assetCode}:${balance.assetIssuer}` : balance.assetCode || "unknown")
+      const meta = !isNative ? lookup(balance.assetCode, balance.assetIssuer) : undefined
+      return {
+        value,
+        code,
+        issuer: isNative ? undefined : balance.assetIssuer,
+        name: isNative ? "Pi" : (meta?.name || balance.assetCode),
+        image: meta?.image,
+        balance: Number(balance.amount),
+      }
+    }),
+    [balances, lookup]
+  )
+
+  const tokenBOptions = useMemo<TokenOption[]>(() =>
+    pairedTokens
+      .filter((t) => t && typeof t === "string" && t.trim() !== "")
+      .map((token) => {
+        const safeToken = token.trim()
+        const isNative = safeToken === "native"
+        const code = isNative ? "PI" : (safeToken.includes(":") ? safeToken.split(":")[0] : safeToken)
+        const issuer = !isNative && safeToken.includes(":") ? safeToken.split(":")[1] : undefined
+        const meta = issuer ? lookup(code, issuer) : undefined
+        return {
+          value: safeToken,
+          code,
+          issuer,
+          name: isNative ? "Pi" : (meta?.name || code),
+          image: meta?.image,
+        }
+      }),
+    [pairedTokens, lookup]
+  )
 
   // Token input state
   const [tokenA, setTokenA] = useState<string>("")
@@ -409,38 +451,12 @@ export function SwapCard() {
                   onChange={(event) => setFromAmount(event.target.value)}
                   className="border-0 bg-transparent text-2xl font-semibold p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0 flex-1"
                 />
-            <Select value={tokenA} onValueChange={handleTokenAChange}>
-                  <SelectTrigger className="w-auto min-w-[120px] border-0 bg-muted hover:bg-muted/80 h-12 rounded-xl">
-                    <SelectValue placeholder="Select" />
-              </SelectTrigger>
-              <SelectContent>
-                {balances
-                  .filter((balance) => {
-                    // Filter out balances that would result in empty value
-                    if (balance.assetType === "native") return true
-                    return balance.assetCode && balance.assetCode.trim() !== ""
-                  })
-                  .map((balance) => {
-                    const isNative = balance.assetType === "native"
-                    const displayName = isNative ? "Test Pi" : balance.assetCode
-                    let value = isNative ? "native" : (balance.assetIssuer ? `${balance.assetCode}:${balance.assetIssuer}` : balance.assetCode || "unknown")
-                    // Ensure value is never empty
-                    if (!value || value.trim() === "") {
-                      value = "unknown"
-                    }
-                    const amount = Number(balance.amount).toLocaleString(undefined, { maximumFractionDigits: 6 })
-                    return (
-                      <SelectItem key={value} value={value}>
-                        <div className="flex items-center justify-between w-full">
-                              <span className="font-medium">{displayName}</span>
-                          <span className="text-xs text-muted-foreground ml-2">{amount}</span>
-                        </div>
-                      </SelectItem>
-                    )
-                  })
-                  .filter((item) => item.props.value && item.props.value.trim() !== "")}
-              </SelectContent>
-            </Select>
+                <TokenSelect
+                  options={tokenAOptions}
+                  value={tokenA}
+                  onChange={handleTokenAChange}
+                  placeholder="Select"
+                />
               </div>
               {tokenA && (
                 <div className="absolute bottom-3 left-4 text-xs text-muted-foreground">
@@ -484,36 +500,16 @@ export function SwapCard() {
                     Select token
                   </div>
                 ) : loadingPairedTokens ? (
-                  <div className="w-auto min-w-[120px] h-12 rounded-xl bg-muted/50 border border-border/50 flex items-center justify-center">
+                  <div className="w-auto min-w-[140px] h-12 rounded-xl bg-muted/50 border border-border/50 flex items-center justify-center">
                     <Loader2 className="h-4 w-4 animate-spin" />
                   </div>
                 ) : (
-                    <Select value={tokenB} onValueChange={handleTokenBChange}>
-                    <SelectTrigger className="w-auto min-w-[120px] border-0 bg-muted hover:bg-muted/80 h-12 rounded-xl">
-                      <SelectValue placeholder={pairedTokens.length > 0 ? "Select" : "No pairs"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                      {pairedTokens.length > 0 ? (
-                        pairedTokens
-                          .filter((token) => token && typeof token === "string" && token.trim() !== "")
-                          .map((token) => {
-                            // Ensure token value is never empty
-                            const safeToken = token && token.trim() !== "" ? token : "unknown"
-                            const isNative = safeToken === "native"
-                            const displayName = isNative ? "Test Pi" : (safeToken.includes(":") ? safeToken.split(":")[0] : safeToken)
-                            return (
-                              <SelectItem key={safeToken} value={safeToken}>
-                                {displayName}
-                              </SelectItem>
-                            )
-                          })
-                      ) : (
-                        <div className="p-2 text-sm text-muted-foreground text-center">
-                          No pairs found
-                        </div>
-                      )}
-                      </SelectContent>
-                    </Select>
+                  <TokenSelect
+                    options={tokenBOptions}
+                    value={tokenB}
+                    onChange={handleTokenBChange}
+                    placeholder={pairedTokens.length > 0 ? "Select" : "No pairs"}
+                  />
                 )}
               </div>
               {tokenB && quote && (
