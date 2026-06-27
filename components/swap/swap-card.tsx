@@ -17,7 +17,6 @@ import { useAccountBalances } from "@/hooks/useAccountData"
 import { useBalanceRefresh } from "@/components/providers/balance-refresh-provider"
 import { listLiquidityPools } from "@/lib/api/liquidity"
 import { useTokenMetadataMap } from "@/hooks/useTokenMetadataMap"
-import { TokenIcon } from "@/components/token-icon"
 import { TokenSelect, type TokenOption } from "@/components/swap/token-select"
 
 const getStoredWallet = () => {

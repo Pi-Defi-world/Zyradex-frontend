@@ -7,7 +7,6 @@ import {
   Copy,
   LogOut,
   Loader2,
-  Coins,
   User,
   Shield,
   History,
@@ -33,8 +32,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useCreateWallet, useChangeWallet } from "@/hooks/useAccountData"
 import { useUserProfile } from "@/hooks/useUserProfile"
-import { useTokenMetadataMap } from "@/hooks/useTokenMetadataMap"
-import { TokenIcon } from "@/components/token-icon"
 import {
   Dialog,
   DialogContent,
@@ -96,7 +93,6 @@ const ProfilePage: React.FC = () => {
 
   const { balances, totalBalance, isLoading: balancesLoading, refresh: refreshBalances } = useAccountBalances(storedWalletAddress ?? user?.wallet_address ?? undefined)
   const { refreshBalances: refreshBalancesGlobal } = useBalanceRefresh() ?? {}
-  const { lookup } = useTokenMetadataMap()
 
   const usdBalance = useMemo(() => {
     if (!piPrice || !totalBalance) return null
@@ -305,52 +301,6 @@ const ProfilePage: React.FC = () => {
               <p className="text-center text-sm text-slate-500 dark:text-slate-400 mt-3">
                 ≈ ${usdBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })} USD
               </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Holdings Summary */}
-        <Card className="border border-slate-200 dark:border-slate-700">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Coins className="h-5 w-5" />
-              Holdings
-            </CardTitle>
-            <CardDescription>Your assets on ZyraDex</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {balancesLoading ? (
-              <div className="flex justify-center py-4">
-                <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
-              </div>
-            ) : balances.length === 0 ? (
-              <div className="text-center py-4 space-y-3">
-                <p className="text-sm text-slate-500">No assets tracked yet</p>
-                <Button asChild variant="outline" size="sm">
-                  <Link href="/swap">Start trading</Link>
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {balances.map((b, i) => {
-                  const isNative = b.assetType === "native"
-                  const meta = !isNative ? lookup(b.assetCode, b.assetIssuer) : undefined
-                  return (
-                  <div key={i} className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800 last:border-0">
-                    <div className="flex items-center gap-2">
-                      <TokenIcon
-                        image={meta?.image}
-                        code={isNative ? "PI" : b.assetCode}
-                        issuer={isNative ? undefined : b.assetIssuer}
-                        size="sm"
-                      />
-                      <span className="font-medium text-sm">{isNative ? "Pi" : b.assetCode}</span>
-                    </div>
-                    <span className="text-sm text-slate-600 dark:text-slate-400">{Number(b.amount).toLocaleString(undefined, { maximumFractionDigits: 6 })}</span>
-                  </div>
-                  )
-                })}
-              </div>
             )}
           </CardContent>
         </Card>
