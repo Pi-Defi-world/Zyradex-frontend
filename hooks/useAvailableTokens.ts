@@ -9,9 +9,14 @@ export interface AvailableToken {
   issuer: string
   name?: string
   description?: string
+  image?: string
   numAccounts?: number
   isPlatformToken: boolean
   homeDomain?: string
+  holders?: number
+  liquidityPools?: number
+  totalSupply?: number
+  circulatingSupply?: number
 }
 
 export interface UseAvailableTokensOptions {
@@ -101,10 +106,15 @@ export const useAvailableTokens = (options: UseAvailableTokensOptions = {}) => {
       tokens.push({
         assetCode: token.assetCode,
         issuer: token.issuer,
-        name: token.name,
-        description: token.description,
+        name: token.tomlName || token.name,
+        description: token.tomlDescription || token.description,
+        image: token.image,
         isPlatformToken: true,
         homeDomain: token.homeDomain,
+        holders: token.holders,
+        liquidityPools: token.liquidityPools,
+        totalSupply: token.totalSupply,
+        circulatingSupply: token.circulatingSupply,
       })
     })
 

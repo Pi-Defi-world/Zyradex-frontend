@@ -34,7 +34,10 @@ const formatMintedToken = (token: TokenSummary): TokenSummary => ({
   code: token.code,
   issuer: token.issuer,
   name: token.name,
+  image: token.image,
   totalSupply: token.totalSupply,
+  circulating: token.circulating,
+  holders: token.holders,
   liquidityPools: token.liquidityPools,
   description: token.description,
 })
@@ -90,9 +93,13 @@ export default function DashboardPage() {
       mintedTokens.map((token) => ({
         code: token.assetCode,
         issuer: token.issuer,
-        name: token.name,
+        name: token.tomlName || token.name,
+        image: token.image,
         totalSupply: token.totalSupply,
-        description: token.description,
+        circulating: token.circulatingSupply,
+        holders: token.holders,
+        liquidityPools: token.liquidityPools,
+        description: token.tomlDescription || token.description,
       })),
     [mintedTokens]
   )

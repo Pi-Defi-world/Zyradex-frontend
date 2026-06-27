@@ -10,6 +10,12 @@ export interface TokenRecord {
   description: string
   totalSupply: number
   homeDomain?: string
+  image?: string
+  circulatingSupply?: number
+  holders?: number
+  liquidityPools?: number
+  tomlName?: string
+  tomlDescription?: string
   createdAt: string
   updatedAt: string
 }

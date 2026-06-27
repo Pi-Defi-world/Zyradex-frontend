@@ -154,16 +154,20 @@ export default function ExplorePage() {
                   >
                     <Card className="h-full hover:shadow-md transition-shadow border border-slate-200 dark:border-slate-700 hover:border-green-200 dark:hover:border-green-800/50 group cursor-pointer">
                       <CardContent className="p-4 flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-100 to-green-50 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center shrink-0">
-                          <Star className="h-5 w-5 text-green-600 dark:text-green-400" />
+                        <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-slate-100 to-green-50 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center shrink-0">
+                          {token.image ? (
+                            <img src={token.image} alt={token.assetCode} className="object-cover w-full h-full" loading="lazy" />
+                          ) : (
+                            <Star className="h-5 w-5 text-green-600 dark:text-green-400" />
+                          )}
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="font-semibold text-sm text-slate-900 dark:text-white truncate group-hover:text-green-600 transition-colors">
                             {token.assetCode}
                           </p>
-                          {token.name && (
-                            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{token.name}</p>
-                          )}
+                          {token.tomlName || token.name ? (
+                            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{token.tomlName || token.name}</p>
+                          ) : null}
                         </div>
                         <ChevronRight className="h-4 w-4 text-slate-300 dark:text-slate-600 group-hover:text-green-500 transition-colors shrink-0" />
                       </CardContent>
