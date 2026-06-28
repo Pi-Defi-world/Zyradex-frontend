@@ -395,6 +395,9 @@ const ProfilePage: React.FC = () => {
             </a>
           </div>
         </div>
+
+        {/* Version */}
+        <p className="text-center text-xs text-slate-400 dark:text-slate-600 pt-2">ZyraDex v1.0.0</p>
       </div>
 
       {/* Secret Seed Dialog */}
