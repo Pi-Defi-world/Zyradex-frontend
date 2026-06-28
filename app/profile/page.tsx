@@ -7,7 +7,6 @@ import {
   Copy,
   LogOut,
   Loader2,
-  Coins,
   User,
   Shield,
   History,
@@ -306,40 +305,6 @@ const ProfilePage: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Holdings Summary */}
-        <Card className="border border-slate-200 dark:border-slate-700">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Coins className="h-5 w-5" />
-              Holdings
-            </CardTitle>
-            <CardDescription>Your assets on ZyraDex</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {balancesLoading ? (
-              <div className="flex justify-center py-4">
-                <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
-              </div>
-            ) : balances.length === 0 ? (
-              <div className="text-center py-4 space-y-3">
-                <p className="text-sm text-slate-500">No assets tracked yet</p>
-                <Button asChild variant="outline" size="sm">
-                  <Link href="/swap">Start trading</Link>
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {balances.map((b, i) => (
-                  <div key={i} className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800 last:border-0">
-                    <span className="font-medium text-sm">{b.assetType === "native" ? "Pi" : b.assetCode}</span>
-                    <span className="text-sm text-slate-600 dark:text-slate-400">{Number(b.amount).toLocaleString(undefined, { maximumFractionDigits: 6 })}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
         {/* Navigation Links */}
         <div className="space-y-3">
           <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Quick Actions</h2>
@@ -430,6 +395,9 @@ const ProfilePage: React.FC = () => {
             </a>
           </div>
         </div>
+
+        {/* Version */}
+        <p className="text-center text-xs text-slate-400 dark:text-slate-600 pt-2">ZyraDex v1.0.0</p>
       </div>
 
       {/* Secret Seed Dialog */}

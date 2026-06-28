@@ -22,13 +22,15 @@ export interface AssetSearchResult {
   asset_issuer: string
   num_accounts: number
   num_claimable_balances: number
-  balances: string
+  num_liquidity_pools: number
+  balances: any
   flags: {
     auth_required: boolean
     auth_revocable: boolean
     auth_immutable: boolean
     auth_clawback_enabled: boolean
   }
+  toml_url?: string | null
   paging_token: string
 }
 
@@ -87,6 +89,34 @@ export const searchAssets = async (code: string, limit: number = 10) => {
     const { data } = await axiosClient.get<AssetSearchResponse>("/market/search-assets", {
       params: { code, limit },
     })
+    return data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}
+
+export interface ListedAsset {
+  asset_type: string
+  asset_code: string
+  asset_issuer: string
+  num_accounts: number
+  num_liquidity_pools: number
+  balances: { authorized: string; unauthorized: string }
+  flags: Record<string, boolean>
+  toml_url: string | null
+  paging_token: string
+}
+
+export interface ListAssetsResponse {
+  success: boolean
+  assets: ListedAsset[]
+  count: number
+  next: string | null
+}
+
+export const fetchListedAssets = async (params: { cursor?: string; limit?: number } = {}) => {
+  try {
+    const { data } = await axiosClient.get<ListAssetsResponse>("/market/list-assets", { params })
     return data
   } catch (error) {
     throw toApiError(error)

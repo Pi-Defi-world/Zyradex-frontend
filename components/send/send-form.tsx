@@ -16,6 +16,8 @@ import { useCheckTrustline } from "@/hooks/useCheckTrustline"
 import { sendPayment } from "@/lib/api/account"
 import Link from "next/link"
 import { Html5Qrcode } from "html5-qrcode"
+import { useTokenMetadataMap } from "@/hooks/useTokenMetadataMap"
+import { TokenIcon } from "@/components/token-icon"
 
 interface SendFormProps {
   publicKey?: string
@@ -26,6 +28,7 @@ export function SendForm({ publicKey }: SendFormProps) {
   const { toast } = useToast()
   const { balances, refresh: refreshBalances } = useAccountBalances(publicKey)
   const { refreshBalances: refreshBalancesGlobal } = useBalanceRefresh() ?? {}
+  const { lookup } = useTokenMetadataMap()
 
   const [selectedToken, setSelectedToken] = useState<string>("")
   const [destination, setDestination] = useState("")
@@ -329,12 +332,12 @@ export function SendForm({ publicKey }: SendFormProps) {
                     <SelectItem key={value} value={value}>
                       <div className="flex items-center justify-between w-full gap-2">
                         <div className="flex items-center gap-2">
-                          <span
-                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white text-xs font-bold"
-                            aria-hidden
-                          >
-                            {isNative ? "π" : (balance.assetCode || "").slice(0, 2).toUpperCase()}
-                          </span>
+                          <TokenIcon
+                            image={(!isNative ? lookup(balance.assetCode, balance.assetIssuer)?.image : undefined) ?? undefined}
+                            code={isNative ? "PI" : balance.assetCode}
+                            issuer={isNative ? undefined : balance.assetIssuer}
+                            size="sm"
+                          />
                           <span className="font-medium">{displayName}</span>
                         </div>
                         <span className="text-xs text-muted-foreground">{amount}</span>

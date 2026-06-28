@@ -1,14 +1,18 @@
 "use client"
 
 import { useMemo, useState, useEffect } from "react"
+import dynamic from "next/dynamic"
 import { PageBackHeader } from "@/components/ui/page-back-header"
-import { SwapCard } from "@/components/swap/swap-card"
 import { PriceChart, type PricePoint } from "@/components/swap/price-chart"
 import { RecentSwaps } from "@/components/swap/recent-swaps"
 import { Button } from "@/components/ui/button"
 import { useAccountOperations } from "@/hooks/useAccountData"
 import { usePi } from "@/components/providers/pi-provider"
 import { BarChart3, X } from "lucide-react"
+
+const SwapCard = dynamic(() => import("@/components/swap/swap-card").then((m) => ({ default: m.SwapCard })), {
+  ssr: false,
+})
 
 const getStoredWallet = () => {
   if (typeof window === "undefined") return null

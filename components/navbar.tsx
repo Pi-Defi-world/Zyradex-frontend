@@ -117,9 +117,11 @@ export function Navbar() {
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-green-600 to-mint-500 flex items-center justify-center shadow group-hover:shadow-md transition-shadow">
-              <span className="text-white font-bold text-base">Z</span>
-            </div>
+            <img
+              src="/logo.jpg"
+              alt="ZyraDex"
+              className="w-9 h-9 rounded-lg object-cover shadow group-hover:shadow-md transition-shadow"
+            />
             <span className="font-bold text-lg text-slate-900 dark:text-white">
               ZyraDex
             </span>

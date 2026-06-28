@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Loader2 } from "lucide-react"
 import { useTokenRegistry } from "@/hooks/useTokenRegistry"
 import { usePi } from "@/components/providers/pi-provider"
+import { TokenIcon } from "@/components/token-icon"
 
 const formatSupply = (value?: number) =>
   (value ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })
@@ -67,11 +68,14 @@ export default function MyTokensPage() {
                     <Card key={token.assetCode} className="bg-card border-border">
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <div>
+                    <div className="flex items-center gap-3">
+                      <TokenIcon image={token.image} code={token.assetCode} issuer={token.issuer} size="lg" />
+                      <div>
                             <CardTitle className="text-xl">{token.assetCode}</CardTitle>
                       <CardDescription className="text-xs mt-1">
                               Issuer: {token.issuer.slice(0, 8)}...{token.issuer.slice(-6)}
                       </CardDescription>
+                      </div>
                     </div>
                           <Badge variant="secondary">{token.name || "Custom Token"}</Badge>
                   </div>
