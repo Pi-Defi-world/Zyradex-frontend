@@ -70,7 +70,12 @@ export function TokenIcon({ image, code, issuer, size = "md", className = "" }: 
       className={`${sizeClass} rounded-full inline-flex items-center justify-center shrink-0 overflow-hidden bg-gradient-to-br ${GRADIENTS[gradientIndex]} ${className}`}
     >
       {resolvedImage ? (
-        <img src={resolvedImage} alt={code} className="object-cover w-full h-full" loading="lazy" />
+        <img
+          src={resolvedImage}
+          alt={code}
+          className={isNative ? "object-contain w-3/4 h-3/4" : "object-cover w-full h-full"}
+          loading="lazy"
+        />
       ) : (
         <span className="text-white font-bold">{fallback}</span>
       )}
