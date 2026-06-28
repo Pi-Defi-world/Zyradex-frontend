@@ -8,6 +8,7 @@ import { Navbar } from "@/components/navbar"
 import { Suspense } from "react"
 import { PiProvider } from "@/components/providers/pi-provider"
 import { BalanceRefreshProvider } from "@/components/providers/balance-refresh-provider"
+import { PoolPriceProvider } from "@/components/providers/pool-price-provider"
 import { DisclaimerProvider } from "@/components/disclaimer-provider"
 import { RefCapture } from "@/components/ref-capture"
 import Script from 'next/script'
@@ -40,6 +41,7 @@ export default function RootLayout({
         <Script src="https://sdk.minepi.com/pi-sdk.js" strategy="beforeInteractive" />
         <PiProvider>
           <BalanceRefreshProvider>
+          <PoolPriceProvider>
           <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
             <Suspense fallback={null}>
               <RefCapture />
@@ -49,6 +51,7 @@ export default function RootLayout({
               <DisclaimerProvider />
             </Suspense>
           </ThemeProvider>
+          </PoolPriceProvider>
           </BalanceRefreshProvider>
         </PiProvider>
       </body>

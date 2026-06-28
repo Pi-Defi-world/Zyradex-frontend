@@ -20,17 +20,17 @@ export const usePiPrice = () => {
 
       try {
         // Try the main price endpoint first
-        const response = await fetch("https://www.zyrachain.org/api/v1/price")
+        const response = await fetch("https://api.zyrachain.org/api/v1/price")
         
         if (!response.ok) {
           // Fallback to pi-price endpoint
-          const fallbackResponse = await fetch("https://www.zyrachain.org/data/pi-price")
+          const fallbackResponse = await fetch("https://api.zyrachain.org/data/pi-price")
           if (!fallbackResponse.ok) {
             throw new Error("Failed to fetch Pi price")
           }
           const fallbackData = await fallbackResponse.json()
           if (!cancelled) {
-            const priceValue = fallbackData.price || fallbackData.usd || fallbackData.value || null
+            const priceValue = fallbackData.price_usd || fallbackData.price || fallbackData.usd || null
             setPrice(priceValue)
             setIsLoading(false)
           }
@@ -40,14 +40,12 @@ export const usePiPrice = () => {
         const data = await response.json()
         
         if (!cancelled) {
-          // Handle different possible response formats
-          const priceValue = 
-            data.price || 
-            data.usd || 
-            data.value || 
+          const priceValue =
+            data.price_usd ||
+            data.price ||
+            data.usd ||
+            data.value ||
             (typeof data === 'number' ? data : null) ||
-            (data.data?.price) ||
-            (data.data?.usd) ||
             null
           setPrice(priceValue)
           setIsLoading(false)

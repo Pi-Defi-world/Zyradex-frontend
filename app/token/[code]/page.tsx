@@ -12,6 +12,8 @@ import { useAccountOperations } from "@/hooks/useAccountData"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { useTokenPrice } from "@/hooks/useTokenPrice"
 import { usePiPrice } from "@/hooks/usePiPrice"
+import { usePoolPrice } from "@/components/providers/pool-price-provider"
+import { useTokenMarketData } from "@/hooks/useTokenMarketData"
 import { useCheckTrustline } from "@/hooks/useCheckTrustline"
 import { useTokenMetadataMap } from "@/hooks/useTokenMetadataMap"
 import { useNetworkTokens } from "@/hooks/useNetworkTokens"
@@ -35,6 +37,7 @@ export default function TokenDetailPage({ params }: { params: Promise<{ code: st
   const [receiveModalOpen, setReceiveModalOpen] = useState(false)
   const [trustlineDialogOpen, setTrustlineDialogOpen] = useState(false)
   const { price: piPrice } = usePiPrice()
+  const { getPrice: getPoolPriceValue } = usePoolPrice()
   const { lookup, fetchMetadata } = useTokenMetadataMap()
   const [fetchedMeta, setFetchedMeta] = useState<{
     image?: string
@@ -103,11 +106,12 @@ export default function TokenDetailPage({ params }: { params: Promise<{ code: st
     !isNative
   )
 
-  const { priceInPi, isLoading: priceLoading } = useTokenPrice(
-    isNative ? "" : tokenCode,
-    issuer,
-    !isNative
-  )
+  const priceInPi = useMemo(() => {
+    if (isNative) return 1
+    return getPoolPriceValue(tokenCode, issuer, piPrice)
+  }, [isNative, tokenCode, issuer, getPoolPriceValue, piPrice])
+
+  const { volume24h } = useTokenMarketData(tokenCode, issuer)
 
   const valueInPi = useMemo(() => {
     if (isNative) return amount
@@ -157,6 +161,22 @@ export default function TokenDetailPage({ params }: { params: Promise<{ code: st
   const tokenMetaLiquidity = resolvedMeta?.liquidityPools
   const tokenMetaSupply = resolvedMeta?.circulatingSupply
 
+  const tokenUsdPrice = useMemo(() => {
+    if (isNative && piPrice) return piPrice
+    if (priceInPi !== null && priceInPi !== undefined && piPrice) return priceInPi * piPrice
+    return null
+  }, [isNative, priceInPi, piPrice])
+
+  const marketCap = useMemo(() => {
+    if (!tokenUsdPrice || tokenMetaSupply === undefined) return null
+    return tokenMetaSupply * tokenUsdPrice
+  }, [tokenUsdPrice, tokenMetaSupply])
+
+  const volMktCapRatio = useMemo(() => {
+    if (!volume24h || !marketCap || marketCap === 0) return null
+    return (volume24h / marketCap) * 100
+  }, [volume24h, marketCap])
+
   const canAct = isNative || hasTrustline === true
 
   return (
@@ -195,6 +215,18 @@ export default function TokenDetailPage({ params }: { params: Promise<{ code: st
               {/* Metadata */}
               {!isNative && (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {tokenUsdPrice !== null && (
+                    <div className="rounded-xl bg-muted/30 p-3 text-center">
+                      <p className="text-lg font-bold text-green-600">${tokenUsdPrice.toFixed(6)}</p>
+                      <p className="text-[10px] text-muted-foreground">Price (USD)</p>
+                    </div>
+                  )}
+                  {marketCap !== null && (
+                    <div className="rounded-xl bg-muted/30 p-3 text-center">
+                      <p className="text-lg font-bold">${marketCap.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                      <p className="text-[10px] text-muted-foreground">Market Cap</p>
+                    </div>
+                  )}
                   {tokenMetaSupply !== undefined && (
                     <div className="rounded-xl bg-muted/30 p-3 text-center">
                       <Coins className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
@@ -216,10 +248,16 @@ export default function TokenDetailPage({ params }: { params: Promise<{ code: st
                       <p className="text-[10px] text-muted-foreground">Pools</p>
                     </div>
                   )}
-                  {priceInPi !== null && priceInPi !== undefined && (
+                  {volume24h !== null && volume24h > 0 && (
                     <div className="rounded-xl bg-muted/30 p-3 text-center">
-                      <p className="text-lg font-bold text-green-600">{priceInPi.toFixed(6)}</p>
-                      <p className="text-[10px] text-muted-foreground">Pi / Token</p>
+                      <p className="text-lg font-bold">{volume24h.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                      <p className="text-[10px] text-muted-foreground">24h Volume</p>
+                    </div>
+                  )}
+                  {volMktCapRatio !== null && (
+                    <div className="rounded-xl bg-muted/30 p-3 text-center">
+                      <p className="text-lg font-bold">{volMktCapRatio.toFixed(2)}%</p>
+                      <p className="text-[10px] text-muted-foreground">Vol/Mkt Cap</p>
                     </div>
                   )}
                 </div>
@@ -250,7 +288,7 @@ export default function TokenDetailPage({ params }: { params: Promise<{ code: st
                           ${usdValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                         </p>
                       )}
-                      {!isNative && priceInPi === null && !priceLoading && (
+                      {!isNative && priceInPi === null && (
                         <p className="text-sm text-muted-foreground">No pool available - price unknown</p>
                       )}
                     </>
