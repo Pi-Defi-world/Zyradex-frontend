@@ -13,6 +13,7 @@ import {
   Droplets,
   ArrowRightLeft,
   Gift,
+  Heart,
   Github,
   Send,
   Share2,
@@ -189,6 +190,7 @@ const ProfilePage: React.FC = () => {
     { title: "Swap Assets", description: "Exchange tokens", icon: ArrowRightLeft, href: "/swap" },
     { title: "Transaction History", description: "View past transactions", icon: History, href: "/history" },
     { title: "Liquidity Pools", description: "Manage LP positions", icon: Droplets, href: "/liquidity" },
+    { title: "Donate", description: "Support ZYRADEX with Pi", icon: Heart, href: "/donate" },
     { title: "Rewards & Referral", description: "Earn and refer friends", icon: Gift, href: "/profile/rewards" },
     ...(profile?.role === "admin" ? [{ title: "Launchpad (Admin)", description: "Create new tokens", icon: Shield, href: "/mint" }] : []),
   ]
