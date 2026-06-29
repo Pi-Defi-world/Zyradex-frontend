@@ -95,7 +95,7 @@ export function PiProvider({ children }: { children: ReactNode }) {
         )
       }
 
-      const auth = await window.Pi.authenticate(["username"], onIncompletePaymentFound)
+      const auth = await window.Pi.authenticate(["username", "payments"], onIncompletePaymentFound)
 
       if (!auth?.accessToken) {
         throw new Error("No access token received from Pi SDK")
@@ -184,17 +184,19 @@ export function PiProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      window.Pi.init({ version: "2.0" })
+      window.Pi.init({ version: "2.0", sandbox: true })
 
       return new Promise((resolve, reject) => {
         const callbacks = {
           onReadyForServerApproval: async (paymentId: string) => {
             console.log("Payment ready for approval:", paymentId)
             try {
-              await approvePiPayment(paymentId)
-            } catch (err) {
-              console.error("Payment approval failed:", err)
-              reject(err)
+              const approvalResult = await approvePiPayment(paymentId)
+              console.log("Payment approved by server:", approvalResult)
+            } catch (err: any) {
+              const detail = err?.response?.data || err?.message || err
+              console.error("Payment approval FAILED:", JSON.stringify(detail))
+              reject(new Error(`Server approval failed: ${typeof detail === 'object' ? detail.message || JSON.stringify(detail) : detail}`))
             }
           },
 
