@@ -166,7 +166,7 @@ export default function HomePage() {
 
   const handleSwap = () => router.push("/swap")
   const handleSend = () => router.push("/send")
-  const handleExplore = () => router.push("/explore")
+  const handleTrade = () => router.push("/trade")
   const handleEarn = () => router.push("/earn")
   const handleManageTokens = () => router.push("/trustlines")
   const handleCopy = async () => {
@@ -319,12 +319,12 @@ export default function HomePage() {
               <span className="text-xs font-semibold">Receive</span>
             </Button>
             <Button
-              onClick={handleEarn}
+              onClick={handleTrade}
               variant="outline"
               className="h-14 flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300"
             >
-              <TrendingUp className="h-5 w-5" />
-              <span className="text-xs font-semibold">Earn</span>
+              <BarChart3 className="h-5 w-5" />
+              <span className="text-xs font-semibold">Trade</span>
             </Button>
           </div>
         </div>

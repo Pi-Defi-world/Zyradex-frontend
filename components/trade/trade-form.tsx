@@ -14,6 +14,7 @@ import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { useAccountBalances } from "@/hooks/useAccountData"
 import { useBalanceRefresh } from "@/components/providers/balance-refresh-provider"
+import { useTransactionPopup } from "@/components/providers/transaction-popup-provider"
 import { useCreateSellOffer, useCreateBuyOffer, useCreateMarketSellOffer, useCreateMarketBuyOffer, useSearchAssets, useOrderBook } from "@/hooks/useTrade"
 
 interface TradeFormProps {
@@ -45,6 +46,7 @@ export function TradeForm({ publicKey }: TradeFormProps) {
   const { toast } = useToast()
   const { balances, refresh: refreshBalances } = useAccountBalances(publicKey)
   const { refreshBalances: refreshBalancesGlobal, refreshAll } = useBalanceRefresh() ?? {}
+  const { showPopup, updatePopup } = useTransactionPopup()
   const [tradeType, setTradeType] = useState<"sell" | "buy">("sell")
   const [orderMode, setOrderMode] = useState<"limit" | "market">("limit")
   
@@ -133,49 +135,47 @@ export function TradeForm({ publicKey }: TradeFormProps) {
       return
     }
 
+    const label = tradeType === "sell" ? (orderMode === "market" ? "Market Sell" : "Sell") : (orderMode === "market" ? "Market Buy" : "Buy")
+    const popupId = showPopup({
+      type: "trade",
+      title: `${label}ing...`,
+      description: `${label} ${tradeType === "sell" ? amount : buyAmount} ${tradeType === "sell" ? sellingTokenParsed.code : buyingTokenParsed.code}`,
+      status: "pending",
+    })
+
     try {
       const sellingDescriptor = tokenToDescriptor(sellingTokenParsed)
       const buyingDescriptor = tokenToDescriptor(buyingTokenParsed)
 
+      let result: any
       if (tradeType === "sell") {
         if (orderMode === "market") {
-          await createMarketSellOffer({
-            userSecret: userSecret.trim(),
-            selling: sellingDescriptor,
-            buying: buyingDescriptor,
-            amount: amount,
+          result = await createMarketSellOffer({
+            userSecret: userSecret.trim(), selling: sellingDescriptor, buying: buyingDescriptor, amount: amount,
           })
-          toast({ title: "Market sell order executed", description: `Sold ${amount} ${sellingTokenParsed.code} at best market price.` })
         } else {
-          await createSellOffer({
-            userSecret: userSecret.trim(),
-            selling: sellingDescriptor,
-            buying: buyingDescriptor,
-            amount: amount,
-            price: price,
+          result = await createSellOffer({
+            userSecret: userSecret.trim(), selling: sellingDescriptor, buying: buyingDescriptor, amount: amount, price: price,
           })
-          toast({ title: "Sell offer created", description: `Selling ${amount} ${sellingTokenParsed.code} at ${price} per unit.` })
         }
       } else {
         if (orderMode === "market") {
-          await createMarketBuyOffer({
-            userSecret: userSecret.trim(),
-            selling: sellingDescriptor,
-            buying: buyingDescriptor,
-            buyAmount: buyAmount,
+          result = await createMarketBuyOffer({
+            userSecret: userSecret.trim(), selling: sellingDescriptor, buying: buyingDescriptor, buyAmount: buyAmount,
           })
-          toast({ title: "Market buy order executed", description: `Bought ${buyAmount} ${buyingTokenParsed.code} at best market price.` })
         } else {
-          await createBuyOffer({
-            userSecret: userSecret.trim(),
-            selling: sellingDescriptor,
-            buying: buyingDescriptor,
-            buyAmount: buyAmount,
-            price: price,
+          result = await createBuyOffer({
+            userSecret: userSecret.trim(), selling: sellingDescriptor, buying: buyingDescriptor, buyAmount: buyAmount, price: price,
           })
-          toast({ title: "Buy offer created", description: `Buying ${buyAmount} ${buyingTokenParsed.code} at ${price} per unit.` })
         }
       }
+
+      updatePopup(popupId, {
+        status: "success",
+        title: `${label} order executed`,
+        description: `${tradeType === "sell" ? "Sold" : "Bought"} ${tradeType === "sell" ? amount : buyAmount} ${tradeType === "sell" ? sellingTokenParsed.code : buyingTokenParsed.code}`,
+        txHash: result?.txHash || result?.data?.txHash,
+      })
 
       // Reset form
       setAmount("")
@@ -191,6 +191,7 @@ export function TradeForm({ publicKey }: TradeFormProps) {
       }, 2000) // Wait 2 seconds for transaction to be processed
     } catch (err) {
       const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Failed to create offer"
+      updatePopup(popupId, { status: "error", title: `${label} failed`, description: message })
       toast({ title: "Error", description: message, variant: "destructive" })
     }
   }

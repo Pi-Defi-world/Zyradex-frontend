@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast"
 import { usePoolsForPair, useSwapQuote, useExecuteSwap } from "@/hooks/useSwapData"
 import { useAccountBalances } from "@/hooks/useAccountData"
 import { useBalanceRefresh } from "@/components/providers/balance-refresh-provider"
+import { useTransactionPopup } from "@/components/providers/transaction-popup-provider"
 import { listLiquidityPools } from "@/lib/api/liquidity"
 import { useTokenMetadataMap } from "@/hooks/useTokenMetadataMap"
 import { TokenSelect, type TokenOption } from "@/components/swap/token-select"
@@ -61,6 +62,7 @@ export function SwapCard() {
   const publicKey = profile?.public_key || localWallet || user?.wallet_address || undefined
   const { balances: rawBalances, refresh: refreshBalances } = useAccountBalances(publicKey)
   const { refreshBalances: refreshBalancesGlobal, refreshAll } = useBalanceRefresh() ?? {}
+  const { showPopup, updatePopup } = useTransactionPopup()
   const { lookup } = useTokenMetadataMap()
   
   // Filter out duplicate native entries (ensure only one native/Test Pi entry)
@@ -335,6 +337,13 @@ export function SwapCard() {
       return
     }
     
+    const popupId = showPopup({
+      type: "swap",
+      title: "Swapping...",
+      description: `Swapping ${fromAmount} ${fromTokenDisplay} for ${toTokenDisplay}`,
+      status: "pending",
+    })
+
     try {
       const result = await executeSwap({
         userSecret: userSecret.trim(),
@@ -346,6 +355,12 @@ export function SwapCard() {
       })
       
       if (result?.success && result?.data?.txHash) {
+        updatePopup(popupId, {
+          status: "success",
+          title: "Swap executed",
+          description: `${fromAmount} ${fromTokenDisplay} to ${toTokenDisplay}`,
+          txHash: result.data.txHash,
+        })
         toast({ 
           title: "Swap executed successfully", 
             description: `Transaction submitted to the network`,
@@ -361,6 +376,11 @@ export function SwapCard() {
           refreshAll?.()
         }, 2000) // Wait 2 seconds for transaction to be processed
       } else {
+        updatePopup(popupId, {
+          status: "success",
+          title: "Swap submitted",
+          description: "Transaction submitted to the network",
+        })
         toast({ 
           title: "Swap submitted", 
           description: "Transaction submitted to the network",
@@ -397,6 +417,11 @@ export function SwapCard() {
         }
       }
       
+      updatePopup(popupId, {
+        status: "error",
+        title: errorTitle,
+        description: errorMessage,
+      })
       console.error("Swap error:", err)
       toast({ 
         title: errorTitle, 
