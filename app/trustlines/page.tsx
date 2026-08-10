@@ -38,7 +38,7 @@ export default function TrustlinesPage() {
     : undefined
 
   const { balances, refresh: refreshBalances } = useAccountBalances(publicKey)
-  const { refreshBalances: refreshBalancesGlobal } = useBalanceRefresh() ?? {}
+  const { refreshBalances: refreshBalancesGlobal, refreshAll } = useBalanceRefresh() ?? {}
   const { tokens: allTokens, isLoading: tokensLoading, error: tokensError, hasMore, loadMore, isLoadingMore, refresh: refreshTokens } = useNetworkTokens({ searchQuery, limit: 50 })
 
   // Check which tokens user already has trustlines for
@@ -73,8 +73,11 @@ export default function TrustlinesPage() {
   }
 
   const handleTrustlineSuccess = () => {
-    refreshBalances()
-    refreshBalancesGlobal?.()
+    setTimeout(() => {
+      refreshBalances()
+      refreshAll?.()
+      refreshTokens()
+    }, 3000)
   }
 
   return (

@@ -7,12 +7,14 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 import { Loader2, Search } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { useAccountBalances } from "@/hooks/useAccountData"
 import { useBalanceRefresh } from "@/components/providers/balance-refresh-provider"
-import { useCreateSellOffer, useCreateBuyOffer, useSearchAssets } from "@/hooks/useTrade"
+import { useCreateSellOffer, useCreateBuyOffer, useCreateMarketSellOffer, useCreateMarketBuyOffer, useSearchAssets, useOrderBook } from "@/hooks/useTrade"
 
 interface TradeFormProps {
   publicKey?: string
@@ -42,8 +44,9 @@ const tokenToDescriptor = (token: { code: string; issuer?: string }): string => 
 export function TradeForm({ publicKey }: TradeFormProps) {
   const { toast } = useToast()
   const { balances, refresh: refreshBalances } = useAccountBalances(publicKey)
-  const { refreshBalances: refreshBalancesGlobal } = useBalanceRefresh() ?? {}
+  const { refreshBalances: refreshBalancesGlobal, refreshAll } = useBalanceRefresh() ?? {}
   const [tradeType, setTradeType] = useState<"sell" | "buy">("sell")
+  const [orderMode, setOrderMode] = useState<"limit" | "market">("limit")
   
   // Token selection
   const [sellingToken, setSellingToken] = useState<string>("")
@@ -69,6 +72,22 @@ export function TradeForm({ publicKey }: TradeFormProps) {
 
   const { createSellOffer, isLoading: creatingSell, error: sellError } = useCreateSellOffer()
   const { createBuyOffer, isLoading: creatingBuy, error: buyError } = useCreateBuyOffer()
+  const { createMarketSellOffer, isLoading: creatingMarketSell, error: marketSellError } = useCreateMarketSellOffer()
+  const { createMarketBuyOffer, isLoading: creatingMarketBuy, error: marketBuyError } = useCreateMarketBuyOffer()
+
+  const { book: orderBook } = useOrderBook(
+    orderMode === "market" ? tokenToDescriptor(sellingTokenParsed) : undefined,
+    orderMode === "market" ? tokenToDescriptor(buyingTokenParsed) : undefined
+  )
+
+  const estimatedBestPrice = useMemo(() => {
+    if (orderMode !== "market") return null
+    if (tradeType === "sell") {
+      return orderBook.bids[0]?.price ?? null
+    } else {
+      return orderBook.asks[0]?.price ?? null
+    }
+  }, [orderMode, tradeType, orderBook])
 
   const handleCreateOffer = () => {
     if (!publicKey) {
@@ -82,13 +101,21 @@ export function TradeForm({ publicKey }: TradeFormProps) {
     }
 
     if (tradeType === "sell") {
-      if (!amount || !price) {
-        toast({ title: "Amount and price required", description: "Please enter amount and price for the sell offer.", variant: "destructive" })
+      if (!amount) {
+        toast({ title: "Amount required", description: "Please enter amount for the sell offer.", variant: "destructive" })
+        return
+      }
+      if (orderMode === "limit" && !price) {
+        toast({ title: "Price required", description: "Please enter a price for the limit sell offer.", variant: "destructive" })
         return
       }
     } else {
-      if (!buyAmount || !price) {
-        toast({ title: "Amount and price required", description: "Please enter buy amount and price for the buy offer.", variant: "destructive" })
+      if (!buyAmount) {
+        toast({ title: "Amount required", description: "Please enter buy amount for the buy offer.", variant: "destructive" })
+        return
+      }
+      if (orderMode === "limit" && !price) {
+        toast({ title: "Price required", description: "Please enter a price for the limit buy offer.", variant: "destructive" })
         return
       }
     }
@@ -111,23 +138,43 @@ export function TradeForm({ publicKey }: TradeFormProps) {
       const buyingDescriptor = tokenToDescriptor(buyingTokenParsed)
 
       if (tradeType === "sell") {
-        await createSellOffer({
-          userSecret: userSecret.trim(),
-          selling: sellingDescriptor,
-          buying: buyingDescriptor,
-          amount: amount,
-          price: price,
-        })
-        toast({ title: "Sell offer created", description: `Selling ${amount} ${sellingTokenParsed.code} at ${price} per unit.` })
+        if (orderMode === "market") {
+          await createMarketSellOffer({
+            userSecret: userSecret.trim(),
+            selling: sellingDescriptor,
+            buying: buyingDescriptor,
+            amount: amount,
+          })
+          toast({ title: "Market sell order executed", description: `Sold ${amount} ${sellingTokenParsed.code} at best market price.` })
+        } else {
+          await createSellOffer({
+            userSecret: userSecret.trim(),
+            selling: sellingDescriptor,
+            buying: buyingDescriptor,
+            amount: amount,
+            price: price,
+          })
+          toast({ title: "Sell offer created", description: `Selling ${amount} ${sellingTokenParsed.code} at ${price} per unit.` })
+        }
       } else {
-        await createBuyOffer({
-          userSecret: userSecret.trim(),
-          selling: sellingDescriptor,
-          buying: buyingDescriptor,
-          buyAmount: buyAmount,
-          price: price,
-        })
-        toast({ title: "Buy offer created", description: `Buying ${buyAmount} ${buyingTokenParsed.code} at ${price} per unit.` })
+        if (orderMode === "market") {
+          await createMarketBuyOffer({
+            userSecret: userSecret.trim(),
+            selling: sellingDescriptor,
+            buying: buyingDescriptor,
+            buyAmount: buyAmount,
+          })
+          toast({ title: "Market buy order executed", description: `Bought ${buyAmount} ${buyingTokenParsed.code} at best market price.` })
+        } else {
+          await createBuyOffer({
+            userSecret: userSecret.trim(),
+            selling: sellingDescriptor,
+            buying: buyingDescriptor,
+            buyAmount: buyAmount,
+            price: price,
+          })
+          toast({ title: "Buy offer created", description: `Buying ${buyAmount} ${buyingTokenParsed.code} at ${price} per unit.` })
+        }
       }
 
       // Reset form
@@ -140,7 +187,7 @@ export function TradeForm({ publicKey }: TradeFormProps) {
       // Refresh balances after successful offer creation
       setTimeout(() => {
         refreshBalances()
-        refreshBalancesGlobal?.()
+        refreshAll?.()
       }, 2000) // Wait 2 seconds for transaction to be processed
     } catch (err) {
       const message = err && typeof err === "object" && "message" in err ? (err as any).message : "Failed to create offer"
@@ -161,6 +208,18 @@ export function TradeForm({ publicKey }: TradeFormProps) {
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-foreground">Create Trade Offer</h2>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="order-mode" className="text-xs text-muted-foreground cursor-pointer">Limit</Label>
+              <Switch
+                id="order-mode"
+                checked={orderMode === "market"}
+                onCheckedChange={(checked) => {
+                  setOrderMode(checked ? "market" : "limit")
+                  setPrice("")
+                }}
+              />
+              <Label htmlFor="order-mode" className="text-xs text-muted-foreground cursor-pointer">Market</Label>
+            </div>
           </div>
 
           <Tabs value={tradeType} onValueChange={(v) => setTradeType(v as "sell" | "buy")}>
@@ -271,20 +330,35 @@ export function TradeForm({ publicKey }: TradeFormProps) {
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <div className="relative">
-                  <div className="absolute top-3 left-4 text-xs text-muted-foreground font-medium z-10">Price (per unit)</div>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="any"
-                    placeholder="0.00"
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                    className="rounded-2xl p-4 pt-8 border border-border/50"
-                  />
+              {orderMode === "limit" ? (
+                <div className="space-y-3">
+                  <div className="relative">
+                    <div className="absolute top-3 left-4 text-xs text-muted-foreground font-medium z-10">Price (per unit)</div>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="any"
+                      placeholder="0.00"
+                      value={price}
+                      onChange={(e) => setPrice(e.target.value)}
+                      className="rounded-2xl p-4 pt-8 border border-border/50"
+                    />
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="relative">
+                    <div className="absolute top-3 left-4 text-xs text-muted-foreground font-medium z-10">Estimated Best Price</div>
+                    <Input
+                      type="text"
+                      value={estimatedBestPrice ? String(estimatedBestPrice) : "Fetching..."}
+                      readOnly
+                      disabled
+                      className="rounded-2xl p-4 pt-8 border border-border/50 bg-muted/50"
+                    />
+                  </div>
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="buy" className="space-y-4">
@@ -389,36 +463,51 @@ export function TradeForm({ publicKey }: TradeFormProps) {
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <div className="relative">
-                  <div className="absolute top-3 left-4 text-xs text-muted-foreground font-medium z-10">Price (per unit)</div>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="any"
-                    placeholder="0.00"
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                    className="rounded-2xl p-4 pt-8 border border-border/50"
-                  />
+              {orderMode === "limit" ? (
+                <div className="space-y-3">
+                  <div className="relative">
+                    <div className="absolute top-3 left-4 text-xs text-muted-foreground font-medium z-10">Price (per unit)</div>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="any"
+                      placeholder="0.00"
+                      value={price}
+                      onChange={(e) => setPrice(e.target.value)}
+                      className="rounded-2xl p-4 pt-8 border border-border/50"
+                    />
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="relative">
+                    <div className="absolute top-3 left-4 text-xs text-muted-foreground font-medium z-10">Estimated Best Price</div>
+                    <Input
+                      type="text"
+                      value={estimatedBestPrice ? String(estimatedBestPrice) : "Fetching..."}
+                      readOnly
+                      disabled
+                      className="rounded-2xl p-4 pt-8 border border-border/50 bg-muted/50"
+                    />
+                  </div>
+                </div>
+              )}
             </TabsContent>
           </Tabs>
 
           {/* Only show non-auth errors here */}
-          {(sellError || buyError) && sellError?.status !== 401 && sellError?.status !== 403 && buyError?.status !== 401 && buyError?.status !== 403 && (
+          {(sellError || buyError || marketSellError || marketBuyError) && sellError?.status !== 401 && sellError?.status !== 403 && buyError?.status !== 401 && buyError?.status !== 403 && marketSellError?.status !== 401 && marketSellError?.status !== 403 && marketBuyError?.status !== 401 && marketBuyError?.status !== 403 && (
             <div className="mt-4 p-3 bg-destructive/10 text-destructive text-sm rounded">
-              {(sellError || buyError)?.message || "An error occurred"}
+              {(sellError || buyError || marketSellError || marketBuyError)?.message || "An error occurred"}
             </div>
           )}
 
           <Button
             className="w-full h-14 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 text-white font-bold text-lg rounded-xl shadow-lg hover:shadow-emerald-500/25 transition-all disabled:opacity-50 mt-6"
             onClick={handleCreateOffer}
-            disabled={creatingSell || creatingBuy}
+            disabled={creatingSell || creatingBuy || creatingMarketSell || creatingMarketBuy}
           >
-            {(creatingSell || creatingBuy) ? (
+            {(creatingSell || creatingBuy || creatingMarketSell || creatingMarketBuy) ? (
               <>
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                 Creating...
@@ -468,9 +557,9 @@ export function TradeForm({ publicKey }: TradeFormProps) {
               <Button
                 className="flex-1 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600"
                 onClick={handleSubmit}
-                disabled={creatingSell || creatingBuy || !userSecret.trim()}
+                disabled={creatingSell || creatingBuy || creatingMarketSell || creatingMarketBuy || !userSecret.trim()}
               >
-                {(creatingSell || creatingBuy) ? (
+                {(creatingSell || creatingBuy || creatingMarketSell || creatingMarketBuy) ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Creating...

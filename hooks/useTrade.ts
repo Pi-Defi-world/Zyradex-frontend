@@ -15,9 +15,13 @@ import {
   createSellOffer,
   createBuyOffer,
   cancelOffer,
+  createMarketSellOrder,
+  createMarketBuyOrder,
   type CreateSellOfferPayload,
   type CreateBuyOfferPayload,
   type CancelOfferPayload,
+  type MarketSellOrderPayload,
+  type MarketBuyOrderPayload,
   type TradeResponse,
 } from "@/lib/api/trade"
 import type { ApiError } from "@/lib/api"
@@ -230,6 +234,16 @@ export const useCreateSellOffer = () => {
 export const useCreateBuyOffer = () => {
   const { mutate, data, error, isLoading } = useMutation<CreateBuyOfferPayload, TradeResponse>(createBuyOffer)
   return { createBuyOffer: mutate, data, error, isLoading }
+}
+
+export const useCreateMarketSellOffer = () => {
+  const { mutate, data, error, isLoading } = useMutation<MarketSellOrderPayload, TradeResponse>(createMarketSellOrder)
+  return { createMarketSellOffer: mutate, data, error, isLoading }
+}
+
+export const useCreateMarketBuyOffer = () => {
+  const { mutate, data, error, isLoading } = useMutation<MarketBuyOrderPayload, TradeResponse>(createMarketBuyOrder)
+  return { createMarketBuyOffer: mutate, data, error, isLoading }
 }
 
 export const useCancelOffer = () => {

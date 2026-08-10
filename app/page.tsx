@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
-import { ArrowDown, TrendingUp, ArrowRightLeft, Loader2, Copy, Wallet, ArrowUpRight, Zap, BarChart3, Sparkles, Plus } from "lucide-react"
+import { ArrowDown, TrendingUp, ArrowRightLeft, Loader2, Copy, Wallet, ArrowUpRight, Zap, BarChart3, Plus } from "lucide-react"
+import Image from "next/image"
 import { useToast } from "@/hooks/use-toast"
 import { usePi } from "@/components/providers/pi-provider"
 import { useAccountBalances, useAccountOperations } from "@/hooks/useAccountData"
@@ -166,6 +167,7 @@ export default function HomePage() {
   const handleSwap = () => router.push("/swap")
   const handleSend = () => router.push("/send")
   const handleExplore = () => router.push("/explore")
+  const handleEarn = () => router.push("/earn")
   const handleManageTokens = () => router.push("/trustlines")
   const handleCopy = async () => {
     const key = publicKey || ""
@@ -196,8 +198,15 @@ export default function HomePage() {
       <div className="min-h-screen premium-gradient pt-20 pb-24 lg:pb-6 flex items-center justify-center">
         <div className="container mx-auto px-4 max-w-lg text-center space-y-8">
           <div className="space-y-4">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-green-600 to-mint-500 flex items-center justify-center shadow-xl mx-auto">
-              <Sparkles className="w-10 h-10 text-white" />
+            <div className="w-24 h-24 rounded-2xl overflow-hidden shadow-xl mx-auto">
+              <Image
+                src="/logo.jpg"
+                alt="ZyraDex Logo"
+                width={96}
+                height={96}
+                className="object-cover w-full h-full"
+                priority
+              />
             </div>
             <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-white">
               Welcome to ZyraDex
@@ -310,7 +319,7 @@ export default function HomePage() {
               <span className="text-xs font-semibold">Receive</span>
             </Button>
             <Button
-              onClick={handleExplore}
+              onClick={handleEarn}
               variant="outline"
               className="h-14 flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300"
             >

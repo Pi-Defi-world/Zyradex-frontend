@@ -138,7 +138,7 @@ export default function SavingsPage() {
   const { toast } = useToast()
   const { profile, isLoading: profileLoading, refresh: refreshProfile } = useUserProfile()
   const { isAuthenticated } = usePi()
-  const { refreshBalances: refreshBalancesGlobal } = useBalanceRefresh() ?? {}
+  const { refreshBalances: refreshBalancesGlobal, refreshAll } = useBalanceRefresh() ?? {}
   // Support backend returning id, _id (Mongo), or uid
   const userId = profile?.id ?? (profile as { _id?: string })?._id ?? profile?.uid ?? ""
 
@@ -215,7 +215,7 @@ export default function SavingsPage() {
       setDepositTermOption(null)
       setDepositSecret("")
       refetchPositions()
-      refreshBalancesGlobal?.()
+      refreshAll?.()
     } catch (e) {
       toast({
         title: "Deposit failed",
@@ -240,6 +240,8 @@ export default function SavingsPage() {
       const result = await withdrawMutation(positionId)
       const txMsg = result?.transactionHash ? ` Tx: ${result.transactionHash.slice(0, 8)}...` : ""
       toast({ title: "Withdrawal successful", description: `Principal + interest sent to your wallet.${txMsg}` })
+      refetchPositions()
+      refreshAll?.()
     } catch (e) {
       toast({
         title: "Withdraw failed",

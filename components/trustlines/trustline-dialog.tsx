@@ -56,12 +56,14 @@ export function TrustlineDialog({
 
       toast({
         title: "Trustline established",
-        description: `${token.assetCode} is now trusted.`,
+        description: `${token.assetCode} is now trusted. Refreshing holdings...`,
       })
 
       setUserSecret("")
       onOpenChange(false)
-      onSuccess?.()
+      setTimeout(() => {
+        onSuccess?.()
+      }, 2000)
     } catch (err: any) {
       const message =
         err && typeof err === "object" && "message" in err

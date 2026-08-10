@@ -60,7 +60,7 @@ export function SwapCard() {
   // Get user balances for Token A dropdown
   const publicKey = profile?.public_key || localWallet || user?.wallet_address || undefined
   const { balances: rawBalances, refresh: refreshBalances } = useAccountBalances(publicKey)
-  const { refreshBalances: refreshBalancesGlobal } = useBalanceRefresh() ?? {}
+  const { refreshBalances: refreshBalancesGlobal, refreshAll } = useBalanceRefresh() ?? {}
   const { lookup } = useTokenMetadataMap()
   
   // Filter out duplicate native entries (ensure only one native/Test Pi entry)
@@ -358,7 +358,7 @@ export function SwapCard() {
         // Backend already clears cache, but we refresh to get the latest data
         setTimeout(() => {
           refreshBalances()
-          refreshBalancesGlobal?.()
+          refreshAll?.()
         }, 2000) // Wait 2 seconds for transaction to be processed
       } else {
         toast({ 

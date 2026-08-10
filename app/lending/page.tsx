@@ -246,7 +246,7 @@ export default function LendingPage() {
   const { toast } = useToast()
   const { profile, isLoading: profileLoading, refresh: refreshProfile } = useUserProfile()
   const { isAuthenticated } = usePi()
-  const { refreshBalances: refreshBalancesGlobal } = useBalanceRefresh() ?? {}
+  const { refreshBalances: refreshBalancesGlobal, refreshAll } = useBalanceRefresh() ?? {}
   const userId = profile?.id ?? (profile as { _id?: string })?._id ?? profile?.uid ?? ""
   const [refreshKey, setRefreshKey] = useState(0)
 
@@ -313,7 +313,7 @@ export default function LendingPage() {
         setPendingSupply(null)
         setSecretDialogOpen(false)
         setRefreshKey((k) => k + 1)
-        refreshBalancesGlobal?.()
+        refreshAll?.()
       } else if (pendingBorrow) {
         await borrowApi(pendingBorrow.poolId, {
           ...pendingBorrow.body,
@@ -324,14 +324,14 @@ export default function LendingPage() {
         setPendingBorrow(null)
         setSecretDialogOpen(false)
         setRefreshKey((k) => k + 1)
-        refreshBalancesGlobal?.()
+        refreshAll?.()
       } else if (pendingRepay) {
         await repayApi(pendingRepay.positionId, { amount: pendingRepay.amount, userSecret: secretValue.trim() })
         toast({ title: "Repayment successful" })
         setPendingRepay(null)
         setSecretDialogOpen(false)
         setRefreshKey((k) => k + 1)
-        refreshBalancesGlobal?.()
+        refreshAll?.()
       }
     } catch (e) {
       toast({
@@ -349,7 +349,7 @@ export default function LendingPage() {
   }
   const handleWithdraw = async () => {
     setRefreshKey((k) => k + 1)
-    refreshBalancesGlobal?.()
+    refreshAll?.()
   }
   const handleBorrow = async () => {
     setRefreshKey((k) => k + 1)

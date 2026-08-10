@@ -32,7 +32,7 @@ function MobileBottomNav() {
   const navItems = [
     { href: "/", icon: Home, label: "Home" },
     { href: "/swap", icon: ArrowRightLeft, label: "Swap" },
-    { href: "/explore", icon: Compass, label: "Explore" },
+    { href: "/earn", icon: Compass, label: "Earn" },
     { href: "/profile", icon: User, label: "Profile" },
   ]
 
@@ -107,6 +107,7 @@ export function Navbar() {
   const desktopLinks = [
     { href: "/", label: "Home" },
     { href: "/swap", label: "Swap" },
+    { href: "/earn", label: "Earn" },
     { href: "/explore", label: "Explore" },
     { href: "/profile", label: "Profile" },
   ]

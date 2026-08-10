@@ -160,6 +160,7 @@ export const useAccountBalances = (publicKey?: string) => {
 }
 
 export const useAccountOperations = (publicKey?: string, options: UseAccountOperationsOptions = {}) => {
+  const { operationRefreshVersion } = useBalanceRefresh() ?? { operationRefreshVersion: 0 }
   const [data, setData] = useState<PaginatedOperations | null>(null)
   const [error, setError] = useState<ApiError | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -211,7 +212,7 @@ export const useAccountOperations = (publicKey?: string, options: UseAccountOper
     return () => {
       cancelled = true
     }
-  }, [publicKey, limit, order, cursor, skip, refreshTrigger])
+  }, [publicKey, limit, order, cursor, skip, refreshTrigger, operationRefreshVersion])
 
   const operations = (data?.data ?? []) as AccountOperation[]
   const pagination = data?.pagination

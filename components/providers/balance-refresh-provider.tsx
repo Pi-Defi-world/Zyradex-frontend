@@ -8,32 +8,49 @@ import {
   type ReactNode,
 } from "react"
 
-interface BalanceRefreshContextValue {
-  /** Increment to trigger all useAccountBalances subscribers to refetch. */
+interface TransactionContextValue {
   balanceRefreshVersion: number
-  /** Call after any transaction that affects balance (send, swap, liquidity, mint, etc.). Optionally pass publicKey(s) to target; without args, all balance consumers refetch. */
+  operationRefreshVersion: number
   refreshBalances: (publicKey?: string) => void
+  refreshOperations: (publicKey?: string) => void
+  refreshAll: (publicKey?: string) => void
 }
 
-const BalanceRefreshContext = createContext<BalanceRefreshContextValue | null>(null)
+const TransactionContext = createContext<TransactionContextValue | null>(null)
 
 export function BalanceRefreshProvider({ children }: { children: ReactNode }) {
   const [balanceRefreshVersion, setBalanceRefreshVersion] = useState(0)
+  const [operationRefreshVersion, setOperationRefreshVersion] = useState(0)
 
   const refreshBalances = useCallback((_publicKey?: string) => {
     setBalanceRefreshVersion((v) => v + 1)
   }, [])
 
+  const refreshOperations = useCallback((_publicKey?: string) => {
+    setOperationRefreshVersion((v) => v + 1)
+  }, [])
+
+  const refreshAll = useCallback((_publicKey?: string) => {
+    setBalanceRefreshVersion((v) => v + 1)
+    setOperationRefreshVersion((v) => v + 1)
+  }, [])
+
   return (
-    <BalanceRefreshContext.Provider
-      value={{ balanceRefreshVersion, refreshBalances }}
+    <TransactionContext.Provider
+      value={{
+        balanceRefreshVersion,
+        operationRefreshVersion,
+        refreshBalances,
+        refreshOperations,
+        refreshAll,
+      }}
     >
       {children}
-    </BalanceRefreshContext.Provider>
+    </TransactionContext.Provider>
   )
 }
 
 export function useBalanceRefresh() {
-  const ctx = useContext(BalanceRefreshContext)
+  const ctx = useContext(TransactionContext)
   return ctx
 }
