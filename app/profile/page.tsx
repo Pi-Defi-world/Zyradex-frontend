@@ -116,6 +116,11 @@ const ProfilePage: React.FC = () => {
   }
 
   const handlePiConnect = async () => {
+    if (typeof window === "undefined") return
+    if (!window.Pi) {
+      toast({ title: "Pi Browser Required", description: "Please open this app in Pi Browser to connect your wallet.", variant: "destructive" })
+      return
+    }
     setIsLoading(true)
     try {
       await authenticate()

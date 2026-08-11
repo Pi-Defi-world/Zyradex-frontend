@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Moon, Sun, Wallet, Home, ArrowRightLeft, Compass, User } from "lucide-react"
 import { useTheme } from "next-themes"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { usePi } from "@/components/providers/pi-provider"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { useState, useEffect } from "react"
@@ -75,8 +76,9 @@ function MobileBottomNav() {
 }
 
 export function Navbar() {
+  const router = useRouter()
   const { theme, setTheme } = useTheme()
-  const { user, isAuthenticated, authenticate, signOut } = usePi()
+  const { user, isAuthenticated, authenticate, signOut, isLoading: authLoading } = usePi()
   const { profile, isLoading: profileLoading } = useUserProfile()
   const [mounted, setMounted] = useState(false)
 
@@ -85,19 +87,16 @@ export function Navbar() {
   }, [])
 
   const handlePiAuth = async () => {
-    if (typeof window === "undefined") {
-      alert("Window not available. Please refresh the page.")
-      return
-    }
+    if (typeof window === "undefined") return
     if (!window.Pi) {
-      alert("Pi SDK not available. Please open this app in Pi Browser.")
+      router.push("/profile")
       return
     }
     try {
       await authenticate()
     } catch (error) {
       console.error("Pi authentication failed:", error)
-      alert(error instanceof Error ? error.message : "Authentication failed")
+      router.push("/profile")
     }
   }
 
@@ -185,7 +184,7 @@ export function Navbar() {
             ) : (
               <Button
                 onClick={handlePiAuth}
-                disabled={profileLoading}
+                disabled={profileLoading || authLoading}
                 size="sm"
                 className="gap-2 bg-gradient-to-r from-green-600 to-mint-500 text-white hover:shadow-lg hover:shadow-green-500/25"
               >

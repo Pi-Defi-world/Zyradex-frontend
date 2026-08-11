@@ -95,7 +95,12 @@ export function PiProvider({ children }: { children: ReactNode }) {
         )
       }
 
-      const auth = await window.Pi.authenticate(["username"], onIncompletePaymentFound)
+      const auth = await Promise.race([
+        window.Pi.authenticate(["username"], onIncompletePaymentFound),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Authentication timed out. Please try again.")), 30_000)
+        ),
+      ])
 
       if (!auth?.accessToken) {
         throw new Error("No access token received from Pi SDK")

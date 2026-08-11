@@ -113,6 +113,7 @@ export function SwapCard() {
   const [slippagePercent, setSlippagePercent] = useState<number>(1)
   const [pairedTokens, setPairedTokens] = useState<string[]>([])
   const [loadingPairedTokens, setLoadingPairedTokens] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
 
   const tokenBOptions = useMemo<TokenOption[]>(() =>
     pairedTokens
@@ -454,9 +455,9 @@ export function SwapCard() {
       <div className="relative">
         <CardContent className="p-6">
           {/* Header */}
-          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-foreground">Swap</h2>
-            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted/50">
+            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted/50" onClick={() => setShowSettings(true)}>
               <Settings className="h-4 w-4" />
             </Button>
           </div>
@@ -707,6 +708,59 @@ export function SwapCard() {
           </Button>
             </div>
       </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Slippage Settings Dialog */}
+      <Dialog open={showSettings} onOpenChange={setShowSettings}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Swap Settings</DialogTitle>
+            <DialogDescription>
+              Configure slippage tolerance and transaction settings.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Slippage Tolerance: {slippagePercent}%
+              </label>
+              <div className="flex gap-2">
+                {[0.5, 1, 2, 5].map((val) => (
+                  <Button
+                    key={val}
+                    variant={slippagePercent === val ? "default" : "outline"}
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setSlippagePercent(val)}
+                  >
+                    {val}%
+                  </Button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <Input
+                  type="number"
+                  min="0.1"
+                  max="50"
+                  step="0.1"
+                  placeholder="Custom"
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value)
+                    if (!isNaN(v) && v > 0) setSlippagePercent(v)
+                  }}
+                  className="rounded-xl"
+                />
+                <span className="text-sm text-muted-foreground">%</span>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Your transaction will revert if the price changes unfavorably by more than this percentage.
+            </p>
+            <Button onClick={() => setShowSettings(false)} className="w-full">
+              Done
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </Card>
