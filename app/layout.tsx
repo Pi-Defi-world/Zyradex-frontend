@@ -12,6 +12,7 @@ import { TransactionPopupProvider } from "@/components/providers/transaction-pop
 import { PoolPriceProvider } from "@/components/providers/pool-price-provider"
 import { DisclaimerProvider } from "@/components/disclaimer-provider"
 import { RefCapture } from "@/components/ref-capture"
+import { ErrorBoundary } from "@/components/errors/error-boundary"
 import Script from 'next/script'
 import "./globals.css"
 
@@ -45,6 +46,7 @@ export default function RootLayout({
           <TransactionPopupProvider>
           <PoolPriceProvider>
           <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+            <ErrorBoundary>
             <Suspense fallback={null}>
               <RefCapture />
               <Navbar />
@@ -52,6 +54,7 @@ export default function RootLayout({
               <Toaster />
               <DisclaimerProvider />
             </Suspense>
+            </ErrorBoundary>
           </ThemeProvider>
           </PoolPriceProvider>
           </TransactionPopupProvider>

@@ -744,10 +744,11 @@ export function SwapCard() {
                   min="0.1"
                   max="50"
                   step="0.1"
+                  value={String(slippagePercent)}
                   placeholder="Custom"
                   onChange={(e) => {
                     const v = parseFloat(e.target.value)
-                    if (!isNaN(v) && v > 0) setSlippagePercent(v)
+                    if (!isNaN(v) && v >= 0.1 && v <= 50) setSlippagePercent(v)
                   }}
                   className="rounded-xl"
                 />
