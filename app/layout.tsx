@@ -1,0 +1,66 @@
+import type React from "react"
+import type { Metadata } from "next"
+import { GeistSans } from "geist/font/sans"
+import { GeistMono } from "geist/font/mono"
+import { Toaster } from "@/components/ui/toaster"
+import { ThemeProvider } from "@/components/theme-provider"
+import { Navbar } from "@/components/navbar"
+import { Suspense } from "react"
+import { PiProvider } from "@/components/providers/pi-provider"
+import { BalanceRefreshProvider } from "@/components/providers/balance-refresh-provider"
+import { TransactionPopupProvider } from "@/components/providers/transaction-popup-provider"
+import { PoolPriceProvider } from "@/components/providers/pool-price-provider"
+import { DisclaimerProvider } from "@/components/disclaimer-provider"
+import { RefCapture } from "@/components/ref-capture"
+import { ErrorBoundary } from "@/components/errors/error-boundary"
+import Script from 'next/script'
+import "./globals.css"
+
+export const metadata: Metadata = {
+  title: "ZYRADEX CAPITAL - Financial platform on Pi Network",
+  description: "Savings, investments, and borrowing on Pi Network. Mint tokens, trade, and manage assets.",
+  generator: "ZyraDex Capital",
+  manifest: "/site.webmanifest",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} pb-20 lg:pb-0`}>
+        <Script src="https://sdk.minepi.com/pi-sdk.js" strategy="beforeInteractive" />
+        <PiProvider>
+          <BalanceRefreshProvider>
+          <TransactionPopupProvider>
+          <PoolPriceProvider>
+          <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+            <ErrorBoundary>
+            <Suspense fallback={null}>
+              <RefCapture />
+              <Navbar />
+              {children}
+              <Toaster />
+              <DisclaimerProvider />
+            </Suspense>
+            </ErrorBoundary>
+          </ThemeProvider>
+          </PoolPriceProvider>
+          </TransactionPopupProvider>
+          </BalanceRefreshProvider>
+        </PiProvider>
+      </body>
+    </html>
+  )
+}

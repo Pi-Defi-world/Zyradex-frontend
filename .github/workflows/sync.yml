@@ -1,0 +1,60 @@
+name: Sync to Vercel Repo
+
+on:
+  push:
+    branches:
+      - passkey
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source repo
+        uses: actions/checkout@v4
+
+      - name: Configure Git
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "${{ github.actor }}"
+          git config --global --add safe.directory /github/workspace
+
+      - name: Push to destination (Vercel) repo
+        env:
+          DESTINATION_REPO: "https://junman140:${{ secrets.API_TOKEN_GITHUB }}@github.com/junman140/tokenization-fe.git"
+        run: |
+          # Try to clone main branch first, if it fails, create the repo structure
+          if git clone "$DESTINATION_REPO" --branch main --single-branch temp_zyra_dex 2>/dev/null; then
+            echo "✅ Cloned main branch successfully"
+          else
+            echo "⚠️ Repository or main branch doesn't exist, creating..."
+            mkdir -p temp_zyra_dex
+            cd temp_zyra_dex
+            git init
+            git checkout -b main
+            git remote add origin "$DESTINATION_REPO"
+            cd ..
+          fi
+          
+          # Sync files, ignoring errors from vanished files
+          rsync -av --delete --ignore-errors \
+            --exclude '.git' \
+            --exclude '.github/workflows' \
+            --exclude 'temp_zyra_dex' \
+            --exclude 'node_modules' \
+            ./ temp_zyra_dex/ || true
+          
+          cd temp_zyra_dex
+          
+          # Configure git if not already done
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "GitHub Actions"
+
+          if [ -n "$(git status --porcelain)" ]; then
+            git add .
+            git commit -m "Sync source code for Vercel build 🚀 [skip ci]"
+            git push origin main || git push -u origin main
+            echo "✅ Synced successfully!"
+          else
+            echo "🟢 No changes detected — skipping commit."
+          fi

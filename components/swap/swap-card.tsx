@@ -1,0 +1,870 @@
+// @ts-nocheck
+"use client"
+
+import { useEffect, useMemo, useState } from "react"
+import { Button } from "@/components/ui/button"
+import { FeeBreakdown } from "@/components/fee-breakdown"
+import { Input } from "@/components/ui/input"
+import { Card, CardContent } from "@/components/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { ArrowDown, Settings, Loader2, ChevronDown, ChevronUp } from "lucide-react"
+import { usePi } from "@/components/providers/pi-provider"
+import { useUserProfile } from "@/hooks/useUserProfile"
+import { useToast } from "@/hooks/use-toast"
+import { usePoolsForPair, useSwapQuote, useExecuteSwap } from "@/hooks/useSwapData"
+import { useAccountBalances } from "@/hooks/useAccountData"
+import { useBalanceRefresh } from "@/components/providers/balance-refresh-provider"
+import { useTransactionPopup } from "@/components/providers/transaction-popup-provider"
+import { listLiquidityPools } from "@/lib/api/liquidity"
+import { useTokenMetadataMap } from "@/hooks/useTokenMetadataMap"
+import { TokenSelect, type TokenOption } from "@/components/swap/token-select"
+import { useHubMode } from "@/components/providers/hub-mode-provider"
+import { getHubSwapQuote, executeHubSwap, getHubPools, type HubPool } from "@/lib/api/hub"
+
+const getStoredWallet = () => {
+  if (typeof window === "undefined") return null
+  return localStorage.getItem("zyradex-wallet-address")
+}
+
+// Parse token string (e.g., "native" or "CODE:ISSUER" or just "CODE") into { code, issuer }
+const parseToken = (token: string): { code: string; issuer?: string } => {
+  if (!token || token.trim() === "") return { code: "" }
+  const trimmed = token.trim()
+  if (trimmed === "native") {
+    return { code: "native" }
+  }
+  const parts = trimmed.split(":")
+  if (parts.length === 2) {
+    return { code: parts[0].trim(), issuer: parts[1].trim() }
+  }
+  return { code: trimmed }
+}
+
+// Convert token to descriptor string for quote API
+const tokenToDescriptor = (token: { code: string; issuer?: string }): string => {
+  if (token.code === "native") return "native"
+  if (token.issuer) return `${token.code}:${token.issuer}`
+  return token.code
+}
+
+export function SwapCard() {
+  const { user } = usePi()
+  const { profile } = useUserProfile()
+  const { toast } = useToast()
+  const [localWallet, setLocalWallet] = useState<string | null>(null)
+
+  useEffect(() => {
+    const stored = getStoredWallet()
+    const address = profile?.public_key || stored || user?.wallet_address || null
+    setLocalWallet(address)
+  }, [profile?.public_key, user?.wallet_address])
+
+  // Get user balances for Token A dropdown
+  const publicKey = profile?.public_key || localWallet || user?.wallet_address || undefined
+  const { balances: rawBalances, refresh: refreshBalances } = useAccountBalances(publicKey)
+  const { refreshBalances: refreshBalancesGlobal, refreshAll } = useBalanceRefresh() ?? {}
+  const { showPopup, updatePopup } = useTransactionPopup()
+  const { lookup } = useTokenMetadataMap()
+  const { hubMode } = useHubMode()
+  const [hubPools, setHubPools] = useState<HubPool[]>([])
+  const [selectedHubPool, setSelectedHubPool] = useState<HubPool | null>(null)
+  const [hubQuote, setHubQuote] = useState<{ amountOut: number; minAmountOut: number } | null>(null)
+  const [loadingHubQuote, setLoadingHubQuote] = useState(false)
+  
+  // Filter out duplicate native entries (ensure only one native/Test Pi entry)
+  const balances = useMemo(() => {
+    const seen = new Set<string>()
+    return rawBalances.filter((balance) => {
+      const isNative = balance.assetType === "native" || balance.assetCode === "native" || balance.assetCode === "Test Pi"
+      if (isNative) {
+        if (seen.has("native")) {
+          return false // Skip duplicate native entries
+        }
+        seen.add("native")
+        return true
+      }
+      // For non-native tokens, use code:issuer as unique key
+      const key = balance.assetIssuer ? `${balance.assetCode}:${balance.assetIssuer}` : balance.assetCode
+      if (seen.has(key)) {
+        return false // Skip duplicates
+      }
+      seen.add(key)
+      return true
+    })
+  }, [rawBalances])
+
+  const tokenAOptions = useMemo<TokenOption[]>(() =>
+    balances.map((balance) => {
+      const isNative = balance.assetType === "native"
+      const code = isNative ? "PI" : balance.assetCode
+      const value = isNative ? "native" : (balance.assetIssuer ? `${balance.assetCode}:${balance.assetIssuer}` : balance.assetCode || "unknown")
+      const meta = !isNative ? lookup(balance.assetCode, balance.assetIssuer) : undefined
+      return {
+        value,
+        code,
+        issuer: isNative ? undefined : balance.assetIssuer,
+        name: isNative ? "Pi" : (meta?.name || balance.assetCode),
+        image: meta?.image,
+        balance: Number(balance.amount),
+      }
+    }),
+    [balances, lookup]
+  )
+
+  // Token input state
+  const [tokenA, setTokenA] = useState<string>("")
+  const [tokenB, setTokenB] = useState<string>("")
+  const [fromAmount, setFromAmount] = useState("")
+  const [selectedPoolId, setSelectedPoolId] = useState<string>("")
+  const [slippagePercent, setSlippagePercent] = useState<number>(1)
+  const [pairedTokens, setPairedTokens] = useState<string[]>([])
+  const [loadingPairedTokens, setLoadingPairedTokens] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+
+  const tokenBOptions = useMemo<TokenOption[]>(() =>
+    pairedTokens
+      .filter((t) => t && typeof t === "string" && t.trim() !== "")
+      .map((token) => {
+        const safeToken = token.trim()
+        const isNative = safeToken === "native"
+        const code = isNative ? "PI" : (safeToken.includes(":") ? safeToken.split(":")[0] : safeToken)
+        const issuer = !isNative && safeToken.includes(":") ? safeToken.split(":")[1] : undefined
+        const meta = issuer ? lookup(code, issuer) : undefined
+        return {
+          value: safeToken,
+          code,
+          issuer,
+          name: isNative ? "Pi" : (meta?.name || code),
+          image: meta?.image,
+        }
+      }),
+    [pairedTokens, lookup]
+  )
+  
+  const walletAddress = localWallet || profile?.public_key || user?.wallet_address
+  const [userSecret, setUserSecret] = useState<string>("")
+  const [showSecretDialog, setShowSecretDialog] = useState(false)
+  const [showDetails, setShowDetails] = useState(false)
+
+  // Parse tokens
+  const fromToken = useMemo(() => {
+    if (!tokenA) return null
+    return parseToken(tokenA)
+  }, [tokenA])
+
+  const toToken = useMemo(() => {
+    if (!tokenB) return null
+    return parseToken(tokenB)
+  }, [tokenB])
+
+  
+  const poolsEnabled = Boolean(
+    fromToken && 
+    toToken && 
+    fromToken.code && 
+    toToken.code && 
+    fromToken.code !== toToken.code
+  )
+  
+  const { pools, isLoading: loadingPools, error: poolsError } = usePoolsForPair(
+    poolsEnabled && fromToken && toToken
+      ? {
+          tokenA: fromToken.code === "native" ? "native" : fromToken.code.toUpperCase(),
+          tokenB: toToken.code === "native" ? "native" : toToken.code.toUpperCase(),
+        }
+      : undefined
+  )
+
+  // Auto-select first pool if available and none selected
+  useEffect(() => {
+    if (pools.length > 0 && !selectedPoolId) {
+      setSelectedPoolId(pools[0].id)
+    } else if (pools.length === 0) {
+      setSelectedPoolId("")
+    }
+  }, [pools, selectedPoolId])
+
+  // Get selected pool
+  const selectedPool = useMemo(() => {
+    return pools.find((p) => p.id === selectedPoolId)
+  }, [pools, selectedPoolId])
+
+  // Fetch quote when pool and amount are available
+  const quoteEnabled = Boolean(selectedPoolId && fromAmount && Number(fromAmount) > 0 && fromToken && toToken)
+  const fromDescriptor = fromToken ? tokenToDescriptor(fromToken) : ""
+  const toDescriptor = toToken ? tokenToDescriptor(toToken) : ""
+
+  const { quote, isLoading: quoting, error: quoteError, timeUntilRefresh } = useSwapQuote(
+    quoteEnabled && !hubMode
+      ? {
+          poolId: selectedPoolId,
+          from: fromDescriptor,
+          to: toDescriptor,
+          amount: fromAmount,
+          slippagePercent,
+        }
+      : undefined
+  )
+
+  // Hub mode: find matching Hub pool and fetch quote
+  useEffect(() => {
+    if (!hubMode || !fromToken || !toToken || !fromAmount || Number(fromAmount) <= 0) {
+      setSelectedHubPool(null)
+      setHubQuote(null)
+      return
+    }
+
+    const acode = fromToken.code === "native" ? "native" : fromToken.code.toUpperCase()
+    const bcode = toToken.code === "native" ? "native" : toToken.code.toUpperCase()
+
+    // Find Hub pool matching this pair
+    const match = hubPools.find((p) => {
+      const pA = p.tokenA.toUpperCase()
+      const pB = p.tokenB.toUpperCase()
+      return (pA.includes(acode) && pB.includes(bcode)) || (pA.includes(bcode) && pB.includes(acode))
+    })
+
+    if (!match) {
+      setSelectedHubPool(null)
+      setHubQuote(null)
+      return
+    }
+
+    setSelectedHubPool(match)
+
+    const fetchHubQuote = async () => {
+      setLoadingHubQuote(true)
+      try {
+        const result = await getHubSwapQuote({
+          tokenA: match.tokenA,
+          tokenB: match.tokenB,
+          amount: parseFloat(fromAmount),
+          slippagePercent,
+        })
+        setHubQuote({ amountOut: result.amountOut, minAmountOut: result.minAmountOut })
+      } catch (err) {
+        console.error("Hub quote failed:", err)
+        setHubQuote(null)
+      } finally {
+        setLoadingHubQuote(false)
+      }
+    }
+
+    fetchHubQuote()
+  }, [hubMode, fromToken, toToken, fromAmount, slippagePercent, hubPools])
+
+  // Local state for countdown display (updates every second)
+  const [displayCountdown, setDisplayCountdown] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (timeUntilRefresh === null) {
+      setDisplayCountdown(null)
+      return
+    }
+
+    setDisplayCountdown(timeUntilRefresh)
+
+    const interval = setInterval(() => {
+      setDisplayCountdown((prev) => {
+        if (prev === null || prev <= 0) return null
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [timeUntilRefresh])
+
+  const { executeSwap, isLoading: executing } = useExecuteSwap()
+
+  // Fetch paired tokens when Token A is selected
+  useEffect(() => {
+    if (!fromToken?.code || fromToken.code === "") {
+      setPairedTokens([])
+      setTokenB("")
+      return
+    }
+
+    const fetchPairedTokens = async () => {
+      setLoadingPairedTokens(true)
+      try {
+        const tokenACode = fromToken.code === "native" ? "native" : fromToken.code.toUpperCase()
+        const paired = new Set<string>()
+        let cursor: string | null = null
+        const pageSize = 100
+
+        // Paginate through all pools so Token B shows every onchain pair
+        do {
+          const poolsResponse = await listLiquidityPools(
+            { limit: pageSize, cursor: cursor ?? undefined },
+            { skipCache: !!cursor }
+          )
+          const pools = poolsResponse.data || []
+
+          pools.forEach((pool) => {
+            if (!pool.reserves || pool.reserves.length < 2) return
+
+            const assets = pool.reserves.map((r: any) => {
+              const assetStr = r.asset || ""
+              if (assetStr === "native") return "native"
+              return assetStr.split(":")[0].toUpperCase()
+            })
+
+            if (assets.includes(tokenACode)) {
+              const otherToken = assets.find((a: string) => a !== tokenACode)
+              if (otherToken) {
+                const otherReserve = pool.reserves.find((r: any) => {
+                  const code = r.asset === "native" ? "native" : r.asset.split(":")[0].toUpperCase()
+                  return code === otherToken
+                })
+                if (otherReserve) {
+                  paired.add(otherReserve.asset === "native" ? "native" : otherReserve.asset)
+                } else {
+                  paired.add(otherToken)
+                }
+              }
+            }
+          })
+
+          const next = poolsResponse.pagination?.nextCursor
+          const hasMore = poolsResponse.pagination?.hasMore ?? false
+          cursor = next && hasMore ? next : null
+        } while (cursor)
+
+        setPairedTokens(Array.from(paired))
+      } catch (err) {
+        console.error("Failed to fetch paired tokens:", err)
+        setPairedTokens([])
+      } finally {
+        setLoadingPairedTokens(false)
+      }
+    }
+
+    // Also fetch Hub pools when in Hub mode
+    const fetchHubPools = async () => {
+      if (!hubMode) return
+      try {
+        const pools = await getHubPools()
+        setHubPools(pools)
+      } catch (err) {
+        console.error("Failed to fetch Hub pools:", err)
+      }
+    }
+
+    fetchPairedTokens()
+    fetchHubPools()
+  }, [fromToken?.code, hubMode])
+
+  const handleTokenAChange = (value: string) => {
+    setTokenA(value)
+    setTokenB("")
+    setSelectedPoolId("")
+    setFromAmount("")
+    setSlippagePercent(1) // Reset to default
+  }
+
+  const handleTokenBChange = (value: string) => {
+    setTokenB(value)
+    setSelectedPoolId("")
+    setFromAmount("")
+    setSlippagePercent(1) // Reset to default
+  }
+
+  const handleSwapTokens = () => {
+    const temp = tokenA
+    setTokenA(tokenB)
+    setTokenB(temp)
+    setSelectedPoolId("")
+    setFromAmount("")
+  }
+
+  const handleSwapClick = () => {
+    if (hubMode && !selectedHubPool) {
+      toast({ title: "No Hub pool available", description: "No Hub pool found for this token pair.", variant: "destructive" })
+      return
+    }
+    if (!hubMode && !selectedPoolId) {
+      toast({ title: "No pool available", description: "No pools found for this token pair.", variant: "destructive" })
+      return
+    }
+    if (!fromToken || !toToken) {
+      toast({ title: "Invalid pair", description: "Please enter both tokens to create a trading pair.", variant: "destructive" })
+      return
+    }
+    if (!fromAmount || parseFloat(fromAmount) <= 0) {
+      toast({ title: "Amount required", description: "Please enter an amount to swap.", variant: "destructive" })
+      return
+    }
+    setShowSecretDialog(true)
+  }
+
+  const handleSubmit = async () => {
+    if (!userSecret.trim()) {
+      toast({ 
+        title: "Secret seed required", 
+        description: "Please enter your secret seed to sign the transaction.",
+        variant: "destructive" 
+      })
+      return
+    }
+    
+    const popupId = showPopup({
+      type: "swap",
+      title: "Swapping...",
+      description: `Swapping ${fromAmount} ${fromTokenDisplay} for ${toTokenDisplay}`,
+      status: "pending",
+    })
+
+    try {
+      let result: any
+
+      if (hubMode && selectedHubPool && hubQuote) {
+        // Hub mode: execute swap via Hub contracts
+        result = await executeHubSwap({
+          poolAddress: selectedHubPool.poolAddress,
+          tokenIn: selectedHubPool.tokenA,
+          amountIn: parseFloat(fromAmount),
+          minAmountOut: hubQuote.minAmountOut,
+          traderSecret: userSecret.trim(),
+        })
+      } else {
+        // Legacy mode: execute via Stellar native AMM
+        result = await executeSwap({
+          userSecret: userSecret.trim(),
+          poolId: selectedPoolId,
+          from: fromToken,
+          to: toToken,
+          sendAmount: fromAmount,
+          slippagePercent,
+        })
+      }
+      
+      if (result?.success && result?.data?.txHash) {
+        updatePopup(popupId, {
+          status: "success",
+          title: "Swap executed",
+          description: `${fromAmount} ${fromTokenDisplay} to ${toTokenDisplay}`,
+          txHash: result.data.txHash,
+        })
+        toast({ 
+          title: "Swap executed successfully", 
+            description: `Transaction submitted to the network`,
+            variant: "default"
+        })
+        setFromAmount("")
+        setUserSecret("") // Clear secret after successful transaction
+        setShowSecretDialog(false) // Close dialog
+        // Refresh balances after successful swap to show updated amounts
+        // Backend already clears cache, but we refresh to get the latest data
+        setTimeout(() => {
+          refreshBalances()
+          refreshAll?.()
+        }, 2000) // Wait 2 seconds for transaction to be processed
+      } else {
+        updatePopup(popupId, {
+          status: "success",
+          title: "Swap submitted",
+          description: "Transaction submitted to the network",
+        })
+        toast({ 
+          title: "Swap submitted", 
+          description: "Transaction submitted to the network",
+          variant: "default"
+        })
+        setShowSecretDialog(false) // Close dialog
+      }
+    } catch (err: any) {
+      let errorMessage = "Swap failed"
+      let errorTitle = "Swap failed"
+      
+      if (err) {
+        // API errors use { success: false, message: string }
+        if (err.response?.data?.message) {
+          errorMessage = err.response.data.message
+        } else if (err.response?.data?.error) {
+          errorMessage = err.response.data.error
+        } else if (typeof err === "object" && "message" in err) {
+          errorMessage = (err as any).message
+        } else if (typeof err === "string") {
+          errorMessage = err
+        }
+        
+        // Check for specific error types
+        if (errorMessage.toLowerCase().includes("insufficient balance") || 
+            errorMessage.toLowerCase().includes("underfunded")) {
+          errorTitle = "Insufficient Balance"
+        } else if (errorMessage.toLowerCase().includes("trustline")) {
+          errorTitle = "Trustline Required"
+        } else if (errorMessage.toLowerCase().includes("pool") && errorMessage.toLowerCase().includes("not found")) {
+          errorTitle = "Pool Not Found"
+        } else if (errorMessage.toLowerCase().includes("slippage")) {
+          errorTitle = "Slippage Exceeded"
+        }
+      }
+      
+      updatePopup(popupId, {
+        status: "error",
+        title: errorTitle,
+        description: errorMessage,
+      })
+      console.error("Swap error:", err)
+      toast({ 
+        title: errorTitle, 
+        description: errorMessage, 
+        variant: "destructive",
+        duration: 5000 // Show for 5 seconds so user can read it
+      })
+    }
+  }
+
+
+  const poolSummary = () => {
+    if (!tokenA || !tokenB) return "Enter both tokens to check for pools."
+    if (fromToken?.code === toToken?.code) return "Tokens must be different."
+    if (hubMode) {
+      if (!hubPools.length) return "Checking Hub pools..."
+      if (!selectedHubPool) return `No Hub pool found for ${fromToken?.code}/${toToken?.code}`
+      return `Hub: ${selectedHubPool.poolType === 'stableswap' ? 'Stableswap' : 'CPMM'} (${(selectedHubPool.feeBps / 100).toFixed(2)}%)`
+    }
+    if (loadingPools) return "Checking for pools..."
+    if (poolsError) return `Error: ${poolsError.message}`
+    if (!pools?.length) {
+      const tokenAStr = fromToken?.code || tokenA
+      const tokenBStr = toToken?.code || tokenB
+      return `No pools found for ${tokenAStr}/${tokenBStr}`
+    }
+    return `${pools.length} pool${pools.length > 1 ? "s" : ""} available`
+  }
+
+  const fromTokenDisplay = fromToken?.code === "native" ? "Test Pi" : (tokenA.includes(":") ? tokenA.split(":")[0] : tokenA)
+  const toTokenDisplay = toToken?.code === "native" ? "Test Pi" : (tokenB.includes(":") ? tokenB.split(":")[0] : tokenB)
+
+  return (
+    <Card className="relative overflow-hidden border border-border/50 bg-card shadow-xl rounded-2xl">
+      <div className="relative">
+        <CardContent className="p-6">
+          {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-foreground">Swap</h2>
+            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted/50" onClick={() => setShowSettings(true)}>
+              <Settings className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="space-y-4">
+            {/* You Pay Section */}
+            <div className="relative">
+              <div className="absolute top-3 left-4 text-xs text-muted-foreground font-medium z-10">You pay</div>
+              <div className="flex items-center gap-2 bg-muted/30 rounded-2xl p-4 pt-8 pb-12 border border-border/50">
+                <Input
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder="0.0"
+                  value={fromAmount}
+                  onChange={(event) => setFromAmount(event.target.value)}
+                  className="border-0 bg-transparent text-2xl font-semibold p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0 flex-1"
+                />
+                <TokenSelect
+                  options={tokenAOptions}
+                  value={tokenA}
+                  onChange={handleTokenAChange}
+                  placeholder="Select"
+                />
+              </div>
+              {tokenA && (
+                <div className="absolute bottom-3 left-4 text-xs text-muted-foreground">
+                  Balance: {balances.find(b => {
+                    const isNative = b.assetType === "native"
+                    const value = isNative ? "native" : (b.assetIssuer ? `${b.assetCode}:${b.assetIssuer}` : b.assetCode)
+                    return value === tokenA
+                  })?.amount || "0.00"}
+          </div>
+              )}
+          </div>
+
+            {/* Swap Button */}
+            <div className="flex justify-center mt-2 mb-4 relative z-20">
+            <Button
+              variant="outline"
+              size="icon"
+                className="h-10 w-10 rounded-full bg-background border-2 border-border hover:border-primary/50 hover:bg-muted/50 transition-all shadow-md"
+              onClick={handleSwapTokens}
+              disabled={!tokenA || !tokenB}
+            >
+                <ArrowDown className="h-5 w-5" />
+            </Button>
+          </div>
+
+            {/* You Receive Section */}
+            <div className="relative">
+              <div className="absolute top-3 left-4 text-xs text-muted-foreground font-medium z-10">You receive</div>
+              <div className="flex items-center gap-2 bg-muted/30 rounded-2xl p-4 pt-8 pb-12 border border-border/50">
+                {(hubMode ? loadingHubQuote : quoting) ? (
+                  <div className="flex-1 flex items-center gap-2 text-2xl font-semibold text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Quoting...
+                  </div>
+                ) : hubMode && hubQuote ? (
+                  <div className="flex-1 text-2xl font-semibold text-foreground">
+                    {hubQuote.amountOut}
+                  </div>
+                ) : quote && quote.expectedOutput ? (
+                  <div className="flex-1 text-2xl font-semibold text-foreground">
+                    {quote.expectedOutput}
+                  </div>
+                ) : (
+                  <div className="flex-1 text-2xl font-semibold text-muted-foreground">
+                    0.0
+                  </div>
+                )}
+                {!tokenA ? (
+                  <div className="w-auto min-w-[120px] h-12 rounded-xl bg-muted/50 border border-border/50 flex items-center justify-center text-muted-foreground text-sm">
+                    Select token
+                  </div>
+                ) : loadingPairedTokens ? (
+                  <div className="w-auto min-w-[140px] h-12 rounded-xl bg-muted/50 border border-border/50 flex items-center justify-center">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  </div>
+                ) : (
+                  <TokenSelect
+                    options={tokenBOptions}
+                    value={tokenB}
+                    onChange={handleTokenBChange}
+                    placeholder={pairedTokens.length > 0 ? "Select" : "No pairs"}
+                  />
+                )}
+              </div>
+              {tokenB && quote && (
+                <div className="absolute bottom-3 left-4 text-xs text-muted-foreground">
+                  ≈ ${(parseFloat(quote.expectedOutput || "0") * 1).toFixed(2)}
+                </div>
+            )}
+          </div>
+            {/* Quote Display - Eye-catching colors */}
+            {quote && quote.expectedOutput && (
+              <div className="space-y-3">
+                <div className="rounded-xl border-2 border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-green-500/10 to-teal-500/10 p-4 space-y-2 backdrop-blur-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Estimated Output</span>
+                    <span className="text-lg font-bold text-emerald-600 dark:text-emerald-500">
+                      {quote.expectedOutput} {toTokenDisplay}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Min Received</span>
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">{quote.minOut}</span>
+                  </div>
+                </div>
+                <FeeBreakdown
+                  items={[
+                    {
+                      label: "Pool fee",
+                      value: `${(quote.fee ?? 0).toFixed(2)}%`,
+                    },
+                    {
+                      label: profile?.roles?.includes("business")
+                        ? "Platform fee (Business pricing)"
+                        : profile?.roles?.includes("developer")
+                          ? "Platform fee (Developer pricing)"
+                          : "Platform fee",
+                      value: `${quote.platformFeeAmount ?? "0"} Pi${
+                        quote.platformFee != null ? ` (${Number(quote.platformFee).toFixed(2)}%)` : ""
+                      }`,
+                    },
+                    ...(quote.platformFeeReasonSummary
+                      ? [
+                          {
+                            label: "Fee policy",
+                            value: quote.platformFeeReasonSummary,
+                          },
+                        ]
+                      : []),
+                  ]}
+                />
+              </div>
+            )}
+
+            {/* Transaction Details - Collapsible */}
+            {quote && quote.expectedOutput && (
+              <div className="border-t border-border/50 pt-3">
+                <button
+                  onClick={() => setShowDetails(!showDetails)}
+                  className="w-full flex items-center justify-between text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <span>Transaction Details</span>
+                  {showDetails ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </button>
+                {showDetails && (
+                  <div className="mt-3 space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Slippage</span>
+                      <span>{quote.slippagePercent}%</span>
+                          </div>
+                    {selectedPool && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Pool Fee</span>
+                        <span>{(selectedPool.fee_bp / 100).toFixed(2)}%</span>
+                </div>
+              )}
+                  </div>
+                )}
+                </div>
+              )}
+
+            {/* Swap Button */}
+            <Button
+              className="w-full h-14 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 text-white font-bold text-lg rounded-xl shadow-lg hover:shadow-emerald-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleSwapClick}
+              disabled={executing || (hubMode ? loadingHubQuote : quoting) || !tokenA || !tokenB || !(hubMode ? selectedHubPool : selectedPoolId) || !fromAmount || parseFloat(fromAmount) <= 0}
+            >
+              {executing ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Executing...
+                </>
+              ) : (hubMode ? loadingHubQuote : quoting) ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Fetching quote...
+                </>
+              ) : !tokenA || !tokenB ? (
+                "Select tokens"
+              ) : !fromAmount || parseFloat(fromAmount) <= 0 ? (
+                "Enter amount"
+              ) : hubMode && !selectedHubPool ? (
+                "No Hub pool found"
+              ) : (
+                "Swap"
+              )}
+            </Button>
+
+            {/* Error Messages - Only show non-auth errors here */}
+            {poolsError && poolsError.status !== 401 && poolsError.status !== 403 && (
+              <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                <div className="font-medium">Error fetching pools:</div>
+                <div className="text-xs mt-1">{poolsError.message}</div>
+                    </div>
+                  )}
+
+            {quoteError && quoteError.status !== 401 && quoteError.status !== 403 && (
+              <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                <div className="font-medium">Failed to fetch quote:</div>
+                <div className="text-xs mt-1">{quoteError.message || "Unknown error"}</div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </div>
+
+      {/* Secret Seed Dialog */}
+      <Dialog open={showSecretDialog} onOpenChange={setShowSecretDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirm Swap</DialogTitle>
+            <DialogDescription>
+              Enter your secret seed to sign and execute the swap transaction.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+          <div className="space-y-2">
+              <label className="text-sm font-medium">Secret Seed</label>
+            <Input
+              type="password"
+              placeholder="Enter your secret seed (starts with S...)"
+              value={userSecret}
+              onChange={(event) => setUserSecret(event.target.value)}
+                className="font-mono"
+                autoFocus
+            />
+            <p className="text-xs text-muted-foreground">
+                We don't store your secret seed. It's only used to sign this transaction.
+            </p>
+          </div>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setShowSecretDialog(false)
+                  setUserSecret("")
+                }}
+              >
+                Cancel
+              </Button>
+          <Button
+                className="flex-1 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600"
+            onClick={handleSubmit}
+                disabled={executing || !userSecret.trim()}
+          >
+            {executing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Executing...
+              </>
+            ) : (
+                  "Confirm Swap"
+            )}
+          </Button>
+            </div>
+      </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Slippage Settings Dialog */}
+      <Dialog open={showSettings} onOpenChange={setShowSettings}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Swap Settings</DialogTitle>
+            <DialogDescription>
+              Configure slippage tolerance and transaction settings.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Slippage Tolerance: {slippagePercent}%
+              </label>
+              <div className="flex gap-2">
+                {[0.5, 1, 2, 5].map((val) => (
+                  <Button
+                    key={val}
+                    variant={slippagePercent === val ? "default" : "outline"}
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setSlippagePercent(val)}
+                  >
+                    {val}%
+                  </Button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <Input
+                  type="number"
+                  min="0.1"
+                  max="50"
+                  step="0.1"
+                  value={String(slippagePercent)}
+                  placeholder="Custom"
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value)
+                    if (!isNaN(v) && v >= 0.1 && v <= 50) setSlippagePercent(v)
+                  }}
+                  className="rounded-xl"
+                />
+                <span className="text-sm text-muted-foreground">%</span>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Your transaction will revert if the price changes unfavorably by more than this percentage.
+            </p>
+            <Button onClick={() => setShowSettings(false)} className="w-full">
+              Done
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  )
+}
+
